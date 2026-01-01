@@ -50,7 +50,7 @@ class SetupCommand extends Command
         ]);
 
         info('✅ Spotify credentials cleared');
-        note('Run: ./💩 spotify:setup');
+        note('Run: music setup');
 
         return self::SUCCESS;
     }
@@ -60,8 +60,8 @@ class SetupCommand extends Command
         // Check if already configured
         if ($this->hasStoredCredentials() && ! $this->option('reset')) {
             info('✅ Spotify is already configured');
-            note('Run: ./💩 spotify:login (if not authenticated)');
-            note('Run: ./💩 spotify:setup --reset (to reconfigure)');
+            note('Run: music login (if not authenticated)');
+            note('Run: music setup --reset (to reconfigure)');
 
             return self::SUCCESS;
         }
@@ -80,7 +80,7 @@ class SetupCommand extends Command
     private function executeSetupTasks(): int
     {
         $this->newLine();
-        $this->line('🎵 <options=bold>Setting up THE SHIT Spotify Integration</options>');
+        $this->line('🎵 <options=bold>Setting up Spotify CLI</options>');
         $this->newLine();
 
         // Emit setup started event
@@ -214,7 +214,7 @@ class SetupCommand extends Command
 
     private function displayWelcome(): void
     {
-        info('🎵 THE SHIT Spotify Integration Setup');
+        info('🎵 Spotify CLI Setup');
         note('This will guide you through setting up your personal Spotify integration.');
         note('You\'ll need to create a Spotify app (takes 2 minutes).');
     }
@@ -222,15 +222,15 @@ class SetupCommand extends Command
     private function displayAppConfiguration(int $port): void
     {
         $username = trim(shell_exec('whoami')) ?: 'Developer';
-        $appName = "THE SHIT - {$username}";
+        $appName = "Music CLI - {$username}";
         $redirectUri = "http://127.0.0.1:{$port}/callback";
 
         info('📋 Step-by-step Spotify app creation:');
 
         $this->newLine();
         note('1. 📱 App Name: Enter any name you prefer (suggestion: "'.$appName.'")');
-        note('2. 📝 App Description: Enter any description (suggestion: "THE SHIT Spotify Integration")');
-        note('3. 🌐 Website URL: Enter any URL (suggestion: "https://github.com/the-shit/spotify")');
+        note('2. 📝 App Description: Enter any description (suggestion: "Spotify CLI Tool")');
+        note('3. 🌐 Website URL: Enter any URL (suggestion: "https://github.com/your-user/music")');
 
         $this->newLine();
         $this->line('<fg=yellow;options=bold>4. 🔗 REDIRECT URI - COPY THIS EXACTLY:</fg=yellow;options=bold>');
@@ -347,17 +347,17 @@ class SetupCommand extends Command
 
     private function displaySuccess(): void
     {
-        info('🎉 THE SHIT Spotify integration setup complete!');
+        info('🎉 Spotify CLI setup complete!');
 
         note('🚀 What\'s next?');
-        note('1. 🔐 ./💩 spotify:login (authenticate with Spotify)');
-        note('2. 🎵 ./💩 spotify:current (see what\'s playing)');
-        note('3. ▶️  ./💩 spotify:play "Never Gonna Give You Up"');
-        note('4. ⏸️  ./💩 spotify:pause');
+        note('1. 🔐 music login (authenticate with Spotify)');
+        note('2. 🎵 music current (see what\'s playing)');
+        note('3. ▶️  music play "Never Gonna Give You Up"');
+        note('4. ⏸️  music pause');
 
         note('💡 Pro Tips:');
-        note('• Run ./💩 spotify:setup --reset to reconfigure');
-        note('• Your token is stored securely in ~/.config/spotify-cli/');
+        note("• Run music setup --reset to reconfigure");
+        note("• Your token is stored securely in ~/.config/spotify-cli/");
         note('• All commands support --help for usage info');
     }
 

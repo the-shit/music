@@ -159,7 +159,7 @@ class SpotifyService
     public function search(string $query, string $type = 'track'): ?array
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "music login" first.');
         }
 
         $this->ensureValidToken();
@@ -193,7 +193,7 @@ class SpotifyService
     public function play(string $uri, ?string $deviceId = null): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "music login" first.');
         }
 
         $this->ensureValidToken();
@@ -248,7 +248,7 @@ class SpotifyService
     public function resume(?string $deviceId = null): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "music login" first.');
         }
 
         $this->ensureValidToken();
@@ -287,7 +287,7 @@ class SpotifyService
     public function pause(): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "music login" first.');
         }
 
         $this->ensureValidToken();
@@ -307,7 +307,7 @@ class SpotifyService
     public function setVolume(int $volumePercent): bool
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "music login" first.');
         }
 
         $this->ensureValidToken();
@@ -327,7 +327,7 @@ class SpotifyService
     public function next(): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "music login" first.');
         }
 
         $this->ensureValidToken();
@@ -347,7 +347,7 @@ class SpotifyService
     public function previous(): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "music login" first.');
         }
 
         $this->ensureValidToken();
@@ -367,7 +367,7 @@ class SpotifyService
     public function getDevices(): array
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "music login" first.');
         }
 
         $this->ensureValidToken();
@@ -390,7 +390,7 @@ class SpotifyService
     public function transferPlayback(string $deviceId, bool $play = true): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "music login" first.');
         }
 
         $this->ensureValidToken();
@@ -431,7 +431,7 @@ class SpotifyService
     public function addToQueue(string $uri): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "music login" first.');
         }
 
         $this->ensureValidToken();
@@ -557,7 +557,7 @@ class SpotifyService
     public function searchMultiple(string $query, string $type = 'track', int $limit = 10): array
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "music login" first.');
         }
 
         $this->ensureValidToken();
@@ -596,7 +596,7 @@ class SpotifyService
     public function setShuffle(bool $state): bool
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "music login" first.');
         }
 
         $this->ensureValidToken();
@@ -613,7 +613,7 @@ class SpotifyService
     public function setRepeat(string $state): bool
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "music login" first.');
         }
 
         $this->ensureValidToken();

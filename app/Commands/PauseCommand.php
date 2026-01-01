@@ -31,7 +31,7 @@ class PauseCommand extends Command
         if (! $spotify->isConfigured()) {
             $this->error('❌ Spotify is not configured');
             $this->info('💡 Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET env vars');
-            $this->info('💡 Then run "spotify:login" to authenticate');
+            $this->info('💡 Then run "music login" to authenticate');
 
             return self::FAILURE;
         }

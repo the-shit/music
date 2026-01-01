@@ -8,7 +8,7 @@ class EventEmitCommand extends Command
 {
     protected $signature = 'event:emit {event : Event name} {data? : JSON data}';
 
-    protected $description = 'Emit an event to THE SHIT event bus';
+    protected $description = 'Emit an event to the event bus';
 
     public function handle()
     {
@@ -23,10 +23,8 @@ class EventEmitCommand extends Command
             'timestamp' => now()->toIso8601String(),
         ];
 
-        // Navigate from component to THE SHIT root
-        // We're in: the-shit/💩-components/spotify/
-        // We need: the-shit/storage/events.jsonl
-        $queueFile = dirname(dirname(base_path())).'/storage/events.jsonl';
+        // Store events in storage directory
+        $queueFile = base_path('storage/events.jsonl');
 
         // Ensure directory exists
         $dir = dirname($queueFile);

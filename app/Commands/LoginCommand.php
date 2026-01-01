@@ -25,7 +25,7 @@ class LoginCommand extends Command
 
         if (! $clientId || ! $clientSecret) {
             error('❌ Missing Spotify credentials');
-            info('💡 Run "spotify setup" to get started');
+            info('💡 Run "music setup" to get started');
 
             return self::FAILURE;
         }
@@ -159,9 +159,9 @@ class LoginCommand extends Command
         info('✅ Successfully authenticated with Spotify!');
         info('');
         info('Try these commands:');
-        info('  ./💩 spotify:play "Never Gonna Give You Up"');
-        info('  ./💩 spotify:pause');
-        info('  ./💩 spotify:current');
+        info('  music play "Never Gonna Give You Up"');
+        info('  music pause');
+        info('  music current');
 
         return self::SUCCESS;
     }
@@ -193,7 +193,7 @@ if (str_starts_with($uri, "/callback") && isset($_GET["code"])) {
     echo "<!DOCTYPE html>
 <html>
 <head>
-    <title>THE SHIT - Spotify Connected</title>
+    <title>Music CLI - Spotify Connected</title>
     <style>
         body {
             background: #000;
@@ -220,8 +220,8 @@ if (str_starts_with($uri, "/callback") && isset($_GET["code"])) {
 </head>
 <body>
     <div class=\"container\">
-        <h1>💩 ✅</h1>
-        <p>THE SHIT is connected to Spotify!</p>
+        <h1>🎵 ✅</h1>
+        <p>Music CLI is connected to Spotify!</p>
         <p style=\"font-size: 1em; color: #666;\">You can close this window</p>
     </div>
 </body>
