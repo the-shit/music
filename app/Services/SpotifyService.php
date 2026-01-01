@@ -12,6 +12,8 @@ class SpotifyService
 
     private ?int $expiresAt = null;
 
+    private array $grantedScopes = [];
+
     private string $clientId;
 
     private string $clientSecret;
@@ -51,6 +53,7 @@ class SpotifyService
                 $this->accessToken = $data['access_token'] ?? null;
                 $this->refreshToken = $data['refresh_token'] ?? null;
                 $this->expiresAt = $data['expires_at'] ?? null;
+                $this->parseScopes($data['scope'] ?? '');
 
                 return;
             }
@@ -76,6 +79,7 @@ class SpotifyService
                     $this->accessToken = $data['access_token'] ?? null;
                     $this->refreshToken = $data['refresh_token'] ?? null;
                     $this->expiresAt = $data['expires_at'] ?? null;
+                    $this->parseScopes($data['scope'] ?? '');
                 }
 
                 // Migrate to new location
@@ -87,6 +91,46 @@ class SpotifyService
                 return;
             }
         }
+            }
+        }
+    }
+
+    /**
+     * Parse scope string into array of scopes
+     */
+    private function parseScopes(string $scopeString): void
+    {
+        if (empty($scopeString)) {
+            $this->grantedScopes = [];
+
+            return;
+        }
+
+        $this->grantedScopes = array_filter(array_map('trim', explode(' ', $scopeString)));
+    }
+
+    /**
+     * Get the granted OAuth scopes
+     */
+    public function getGrantedScopes(): array
+    {
+        return $this->grantedScopes;
+    }
+
+    /**
+     * Check if a specific scope is granted
+     */
+    public function hasScope(string $scope): bool
+    {
+        return in_array($scope, $this->grantedScopes, true);
+    }
+
+    /**
+     * Set granted scopes (useful for testing)
+     */
+    public function setGrantedScopes(array $scopes): void
+    {
+        $this->grantedScopes = $scopes;
     }
 
     /**
@@ -131,6 +175,7 @@ class SpotifyService
             'access_token' => $this->accessToken,
             'refresh_token' => $this->refreshToken,
             'expires_at' => $this->expiresAt,
+            'scope' => implode(' ', $this->grantedScopes),
         ];
 
         // Ensure config directory exists (PHAR compatible path)

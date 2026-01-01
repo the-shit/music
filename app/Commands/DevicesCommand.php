@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ChecksAuthorization;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
@@ -12,6 +13,7 @@ use function Laravel\Prompts\warning;
 
 class DevicesCommand extends Command
 {
+    use ChecksAuthorization;
     protected $signature = 'devices {--switch : Switch to a different device}';
 
     protected $description = 'List or switch Spotify devices';
@@ -24,6 +26,10 @@ class DevicesCommand extends Command
             error('❌ Spotify not configured');
             info('💡 Run "spotify setup" first');
 
+            return self::FAILURE;
+        }
+
+        if (! $this->authorizeOrFail('spotify:devices')) {
             return self::FAILURE;
         }
 

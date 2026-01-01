@@ -2,12 +2,15 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ChecksAuthorization;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
 class ShuffleCommand extends Command
 {
-    protected $signature = 'shuffle 
+    use ChecksAuthorization;
+
+    protected $signature = 'shuffle
                             {state? : on/off/toggle - defaults to toggle}
                             {--json : Output as JSON}';
 
@@ -21,6 +24,10 @@ class ShuffleCommand extends Command
             $this->error('❌ Spotify is not configured');
             $this->info('💡 Run "spotify setup" first');
 
+            return self::FAILURE;
+        }
+
+        if (! $this->authorizeOrFail('spotify:shuffle')) {
             return self::FAILURE;
         }
 

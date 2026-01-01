@@ -2,11 +2,13 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ChecksAuthorization;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
 class VolumeCommand extends Command
 {
+    use ChecksAuthorization;
     protected $signature = 'volume 
                             {level? : Volume level (0-100) or +/- for relative change}
                             {--json : Output as JSON}';
@@ -21,6 +23,10 @@ class VolumeCommand extends Command
             $this->error('❌ Spotify is not configured');
             $this->info('💡 Run "spotify setup" first');
 
+            return self::FAILURE;
+        }
+
+        if (! $this->authorizeOrFail('spotify:volume')) {
             return self::FAILURE;
         }
 

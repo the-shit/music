@@ -2,11 +2,13 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ChecksAuthorization;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
 class ResumeCommand extends Command
 {
+    use ChecksAuthorization;
     protected $signature = 'resume 
                             {--device= : Device name or ID to resume on}
                             {--json : Output as JSON}';
@@ -22,6 +24,10 @@ class ResumeCommand extends Command
             $this->info('💡 Run "spotify setup" to configure Spotify');
             $this->info('💡 Or set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET env vars');
 
+            return self::FAILURE;
+        }
+
+        if (! $this->authorizeOrFail('spotify:resume')) {
             return self::FAILURE;
         }
 

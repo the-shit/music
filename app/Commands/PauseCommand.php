@@ -2,11 +2,13 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ChecksAuthorization;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
 class PauseCommand extends Command
 {
+    use ChecksAuthorization;
     /**
      * The name and signature of the console command.
      *
@@ -33,6 +35,10 @@ class PauseCommand extends Command
             $this->info('💡 Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET env vars');
             $this->info('💡 Then run "music login" to authenticate');
 
+            return self::FAILURE;
+        }
+
+        if (! $this->authorizeOrFail('spotify:pause')) {
             return self::FAILURE;
         }
 

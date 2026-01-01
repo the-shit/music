@@ -2,11 +2,13 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ChecksAuthorization;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
 class RepeatCommand extends Command
 {
+    use ChecksAuthorization;
     protected $signature = 'repeat 
                             {state? : off/track/context/toggle - defaults to toggle}
                             {--json : Output as JSON}';
@@ -21,6 +23,10 @@ class RepeatCommand extends Command
             $this->error('❌ Spotify is not configured');
             $this->info('💡 Run "spotify setup" first');
 
+            return self::FAILURE;
+        }
+
+        if (! $this->authorizeOrFail('spotify:repeat')) {
             return self::FAILURE;
         }
 

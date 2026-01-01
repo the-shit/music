@@ -437,4 +437,188 @@ describe('SpotifyService', function () {
             });
         });
     });
+
+    describe('OAuth Scope Management', function () {
+
+        test('parses scopes from token data', function () {
+            file_put_contents($this->tokenFile, json_encode([
+                'access_token' => 'valid_token',
+                'refresh_token' => 'refresh_token',
+                'expires_at' => time() + 3600,
+                'scope' => 'user-read-playback-state user-modify-playback-state streaming',
+            ]));
+
+            $service = new SpotifyService;
+            $reflection = new ReflectionClass($service);
+            $property = $reflection->getProperty('tokenFile');
+            $property->setAccessible(true);
+            $property->setValue($service, $this->tokenFile);
+
+            $method = $reflection->getMethod('loadTokenData');
+            $method->setAccessible(true);
+            $method->invoke($service);
+
+            $scopes = $service->getGrantedScopes();
+
+            expect($scopes)->toBeArray();
+            expect($scopes)->toContain('user-read-playback-state');
+            expect($scopes)->toContain('user-modify-playback-state');
+            expect($scopes)->toContain('streaming');
+            expect($scopes)->toHaveCount(3);
+        });
+
+        test('returns empty array when no scopes in token', function () {
+            file_put_contents($this->tokenFile, json_encode([
+                'access_token' => 'valid_token',
+                'refresh_token' => 'refresh_token',
+                'expires_at' => time() + 3600,
+            ]));
+
+            $service = new SpotifyService;
+            $reflection = new ReflectionClass($service);
+            $property = $reflection->getProperty('tokenFile');
+            $property->setAccessible(true);
+            $property->setValue($service, $this->tokenFile);
+
+            $method = $reflection->getMethod('loadTokenData');
+            $method->setAccessible(true);
+            $method->invoke($service);
+
+            $scopes = $service->getGrantedScopes();
+
+            expect($scopes)->toBeArray();
+            expect($scopes)->toBeEmpty();
+        });
+
+        test('hasScope returns true for granted scope', function () {
+            file_put_contents($this->tokenFile, json_encode([
+                'access_token' => 'valid_token',
+                'refresh_token' => 'refresh_token',
+                'expires_at' => time() + 3600,
+                'scope' => 'user-read-playback-state user-modify-playback-state',
+            ]));
+
+            $service = new SpotifyService;
+            $reflection = new ReflectionClass($service);
+            $property = $reflection->getProperty('tokenFile');
+            $property->setAccessible(true);
+            $property->setValue($service, $this->tokenFile);
+
+            $method = $reflection->getMethod('loadTokenData');
+            $method->setAccessible(true);
+            $method->invoke($service);
+
+            expect($service->hasScope('user-read-playback-state'))->toBeTrue();
+            expect($service->hasScope('user-modify-playback-state'))->toBeTrue();
+        });
+
+        test('hasScope returns false for non-granted scope', function () {
+            file_put_contents($this->tokenFile, json_encode([
+                'access_token' => 'valid_token',
+                'refresh_token' => 'refresh_token',
+                'expires_at' => time() + 3600,
+                'scope' => 'user-read-playback-state',
+            ]));
+
+            $service = new SpotifyService;
+            $reflection = new ReflectionClass($service);
+            $property = $reflection->getProperty('tokenFile');
+            $property->setAccessible(true);
+            $property->setValue($service, $this->tokenFile);
+
+            $method = $reflection->getMethod('loadTokenData');
+            $method->setAccessible(true);
+            $method->invoke($service);
+
+            expect($service->hasScope('user-modify-playback-state'))->toBeFalse();
+            expect($service->hasScope('streaming'))->toBeFalse();
+        });
+
+        test('setGrantedScopes sets scopes correctly', function () {
+            $service = new SpotifyService;
+
+            $service->setGrantedScopes(['scope1', 'scope2', 'scope3']);
+
+            expect($service->getGrantedScopes())->toBe(['scope1', 'scope2', 'scope3']);
+            expect($service->hasScope('scope1'))->toBeTrue();
+            expect($service->hasScope('scope2'))->toBeTrue();
+            expect($service->hasScope('scope3'))->toBeTrue();
+            expect($service->hasScope('scope4'))->toBeFalse();
+        });
+
+        test('saves scopes when saving token data', function () {
+            file_put_contents($this->tokenFile, json_encode([
+                'access_token' => 'valid_token',
+                'refresh_token' => 'refresh_token',
+                'expires_at' => time() + 3600,
+                'scope' => 'user-read-playback-state user-modify-playback-state',
+            ]));
+
+            $service = new SpotifyService;
+            $reflection = new ReflectionClass($service);
+            $property = $reflection->getProperty('tokenFile');
+            $property->setAccessible(true);
+            $property->setValue($service, $this->tokenFile);
+
+            $method = $reflection->getMethod('loadTokenData');
+            $method->setAccessible(true);
+            $method->invoke($service);
+
+            // Trigger saveTokenData by calling a method that saves
+            $saveMethod = $reflection->getMethod('saveTokenData');
+            $saveMethod->setAccessible(true);
+            $saveMethod->invoke($service);
+
+            // Read the saved file
+            $savedData = json_decode(file_get_contents($this->tokenFile), true);
+
+            expect($savedData)->toHaveKey('scope');
+            expect($savedData['scope'])->toBe('user-read-playback-state user-modify-playback-state');
+        });
+
+        test('handles empty scope string gracefully', function () {
+            file_put_contents($this->tokenFile, json_encode([
+                'access_token' => 'valid_token',
+                'refresh_token' => 'refresh_token',
+                'expires_at' => time() + 3600,
+                'scope' => '',
+            ]));
+
+            $service = new SpotifyService;
+            $reflection = new ReflectionClass($service);
+            $property = $reflection->getProperty('tokenFile');
+            $property->setAccessible(true);
+            $property->setValue($service, $this->tokenFile);
+
+            $method = $reflection->getMethod('loadTokenData');
+            $method->setAccessible(true);
+            $method->invoke($service);
+
+            expect($service->getGrantedScopes())->toBeEmpty();
+        });
+
+        test('handles scopes with extra whitespace', function () {
+            file_put_contents($this->tokenFile, json_encode([
+                'access_token' => 'valid_token',
+                'refresh_token' => 'refresh_token',
+                'expires_at' => time() + 3600,
+                'scope' => '  user-read-playback-state   user-modify-playback-state  ',
+            ]));
+
+            $service = new SpotifyService;
+            $reflection = new ReflectionClass($service);
+            $property = $reflection->getProperty('tokenFile');
+            $property->setAccessible(true);
+            $property->setValue($service, $this->tokenFile);
+
+            $method = $reflection->getMethod('loadTokenData');
+            $method->setAccessible(true);
+            $method->invoke($service);
+
+            $scopes = $service->getGrantedScopes();
+
+            expect($scopes)->toContain('user-read-playback-state');
+            expect($scopes)->toContain('user-modify-playback-state');
+        });
+    });
 });
