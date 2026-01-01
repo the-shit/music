@@ -138,11 +138,11 @@ class LoginCommand extends Command
             return self::FAILURE;
         }
 
-        // Save complete token data to storage
-        $tokenFile = base_path('storage/spotify_token.json');
-        $storageDir = dirname($tokenFile);
-        if (! is_dir($storageDir)) {
-            mkdir($storageDir, 0755, true);
+        // Save complete token data to config directory (PHAR compatible)
+        $tokenFile = config('spotify.token_path');
+        $configDir = dirname($tokenFile);
+        if (! is_dir($configDir)) {
+            mkdir($configDir, 0755, true);
         }
         file_put_contents($tokenFile, json_encode($tokenData, JSON_PRETTY_PRINT));
         chmod($tokenFile, 0600); // Only owner can read/write

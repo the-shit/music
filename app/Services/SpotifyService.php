@@ -25,8 +25,8 @@ class SpotifyService
         $this->clientId = config('spotify.client_id', '');
         $this->clientSecret = config('spotify.client_secret', '');
 
-        // Set token file path in app storage
-        $this->tokenFile = base_path('storage/spotify_token.json');
+        // Use config path for PHAR compatibility (base_path() doesn't work in PHAR)
+        $this->tokenFile = config('spotify.token_path');
 
         $this->loadTokenData();
     }
@@ -44,7 +44,7 @@ class SpotifyService
      */
     private function loadTokenData(): void
     {
-        // Try new location first
+        // Try current config location first
         if (file_exists($this->tokenFile)) {
             $data = json_decode(file_get_contents($this->tokenFile), true);
             if ($data) {
@@ -56,27 +56,36 @@ class SpotifyService
             }
         }
 
-        // Fall back to old location for migration
-        $oldTokenFile = $_SERVER['HOME'].'/.spotify_token';
-        if (file_exists($oldTokenFile)) {
-            $content = file_get_contents($oldTokenFile);
+        // Fall back to legacy locations for migration
+        $home = $_SERVER['HOME'] ?? getenv('HOME');
+        $legacyLocations = [
+            $home.'/.spotify_token',
+            base_path('storage/spotify_token.json'),
+        ];
 
-            // Handle old format (just token string)
-            if (! json_decode($content)) {
-                $this->accessToken = trim($content);
-            } else {
-                // Handle new format (JSON with refresh token)
-                $data = json_decode($content, true);
-                $this->accessToken = $data['access_token'] ?? null;
-                $this->refreshToken = $data['refresh_token'] ?? null;
-                $this->expiresAt = $data['expires_at'] ?? null;
+        foreach ($legacyLocations as $oldTokenFile) {
+            if (file_exists($oldTokenFile)) {
+                $content = file_get_contents($oldTokenFile);
+
+                // Handle old format (just token string)
+                if (! json_decode($content)) {
+                    $this->accessToken = trim($content);
+                } else {
+                    // Handle new format (JSON with refresh token)
+                    $data = json_decode($content, true);
+                    $this->accessToken = $data['access_token'] ?? null;
+                    $this->refreshToken = $data['refresh_token'] ?? null;
+                    $this->expiresAt = $data['expires_at'] ?? null;
+                }
+
+                // Migrate to new location
+                $this->saveTokenData();
+
+                // Remove old file after migration
+                @unlink($oldTokenFile);
+
+                return;
             }
-
-            // Migrate to new location
-            $this->saveTokenData();
-
-            // Remove old file after migration
-            unlink($oldTokenFile);
         }
     }
 
@@ -124,10 +133,10 @@ class SpotifyService
             'expires_at' => $this->expiresAt,
         ];
 
-        // Ensure storage directory exists
-        $storageDir = dirname($this->tokenFile);
-        if (! is_dir($storageDir)) {
-            mkdir($storageDir, 0755, true);
+        // Ensure config directory exists (PHAR compatible path)
+        $configDir = dirname($this->tokenFile);
+        if (! is_dir($configDir)) {
+            mkdir($configDir, 0755, true);
         }
 
         // Save with restricted permissions

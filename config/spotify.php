@@ -24,5 +24,26 @@ return [
         'playlist-read-collaborative',
     ],
 
-    'token_path' => env('SPOTIFY_TOKEN_PATH', $_SERVER['HOME'].'/.spotify_token'),
+    /*
+    |--------------------------------------------------------------------------
+    | Token Storage Path
+    |--------------------------------------------------------------------------
+    |
+    | Path to store OAuth tokens. Uses ~/.config/spotify-cli/ for PHAR
+    | compatibility (base_path() doesn't work in PHAR archives).
+    |
+    */
+
+    'token_path' => env('SPOTIFY_TOKEN_PATH', ($_SERVER['HOME'] ?? getenv('HOME')).'/.config/spotify-cli/token.json'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Config Directory
+    |--------------------------------------------------------------------------
+    |
+    | Base directory for all spotify-cli configuration files.
+    |
+    */
+
+    'config_dir' => env('SPOTIFY_CONFIG_DIR', ($_SERVER['HOME'] ?? getenv('HOME')).'/.config/spotify-cli'),
 ];
