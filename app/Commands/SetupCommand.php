@@ -40,17 +40,8 @@ class SetupCommand extends Command
 
         $this->clearStoredCredentials();
 
-        // Emit reset event
-        $this->call('event:emit', [
-            'event' => 'setup.reset',
-            'data' => json_encode([
-                'credentials_cleared' => true,
-                'token_cleared' => file_exists($_SERVER['HOME'].'/.spotify_token'),
-            ]),
-        ]);
-
         info('✅ Spotify credentials cleared');
-        note('Run: ./💩 spotify:setup');
+        note('Run: php spotify setup');
 
         return self::SUCCESS;
     }
@@ -60,8 +51,8 @@ class SetupCommand extends Command
         // Check if already configured
         if ($this->hasStoredCredentials() && ! $this->option('reset')) {
             info('✅ Spotify is already configured');
-            note('Run: ./💩 spotify:login (if not authenticated)');
-            note('Run: ./💩 spotify:setup --reset (to reconfigure)');
+            note('Run: php spotify login (if not authenticated)');
+            note('Run: php spotify setup --reset (to reconfigure)');
 
             return self::SUCCESS;
         }
@@ -80,16 +71,8 @@ class SetupCommand extends Command
     private function executeSetupTasks(): int
     {
         $this->newLine();
-        $this->line('🎵 <options=bold>Setting up THE SHIT Spotify Integration</options>');
+        $this->line('🎵 <options=bold>Setting up Spotify CLI Integration</options>');
         $this->newLine();
-
-        // Emit setup started event
-        $this->call('event:emit', [
-            'event' => 'setup.started',
-            'data' => json_encode([
-                'reset' => $this->option('reset'),
-            ]),
-        ]);
 
         $appUrl = null;
         $credentials = null;
@@ -156,21 +139,8 @@ class SetupCommand extends Command
             // Task 7: Store credentials
             $this->task('Storing credentials securely', function () use ($credentials, $defaultPort) {
                 $this->storeCredentials($credentials);
-                $stored = $this->hasStoredCredentials();
 
-                if ($stored) {
-                    // Emit credentials configured event
-                    $this->call('event:emit', [
-                        'event' => 'setup.credentials_configured',
-                        'data' => json_encode([
-                            'client_id_configured' => true,
-                            'callback_port' => $defaultPort,
-                            'validation_passed' => true,
-                        ]),
-                    ]);
-                }
-
-                return $stored;
+                return $this->hasStoredCredentials();
             });
 
             // Task 8: Test connection
@@ -184,17 +154,9 @@ class SetupCommand extends Command
             $this->newLine();
             $this->displaySuccess();
 
-            // Emit setup completed event
-            $willAutoLogin = confirm('🔐 Would you like to authenticate with Spotify now?', true);
-            $this->call('event:emit', [
-                'event' => 'setup.completed',
-                'data' => json_encode([
-                    'auto_login_triggered' => $willAutoLogin,
-                    'credentials_stored' => true,
-                ]),
-            ]);
-
             // Offer to start authentication immediately
+            $willAutoLogin = confirm('🔐 Would you like to authenticate with Spotify now?', true);
+
             if ($willAutoLogin) {
                 $this->newLine();
                 info('🚀 Starting Spotify authentication...');
@@ -214,7 +176,7 @@ class SetupCommand extends Command
 
     private function displayWelcome(): void
     {
-        info('🎵 THE SHIT Spotify Integration Setup');
+        info('🎵 Spotify CLI Integration Setup');
         note('This will guide you through setting up your personal Spotify integration.');
         note('You\'ll need to create a Spotify app (takes 2 minutes).');
     }
@@ -222,15 +184,15 @@ class SetupCommand extends Command
     private function displayAppConfiguration(int $port): void
     {
         $username = trim(shell_exec('whoami')) ?: 'Developer';
-        $appName = "THE SHIT - {$username}";
+        $appName = "Spotify CLI - {$username}";
         $redirectUri = "http://127.0.0.1:{$port}/callback";
 
         info('📋 Step-by-step Spotify app creation:');
 
         $this->newLine();
         note('1. 📱 App Name: Enter any name you prefer (suggestion: "'.$appName.'")');
-        note('2. 📝 App Description: Enter any description (suggestion: "THE SHIT Spotify Integration")');
-        note('3. 🌐 Website URL: Enter any URL (suggestion: "https://github.com/the-shit/spotify")');
+        note('2. 📝 App Description: Enter any description (suggestion: "Spotify CLI Integration")');
+        note('3. 🌐 Website URL: Enter any URL (suggestion: "https://github.com/your-username/spotify-cli")');
 
         $this->newLine();
         $this->line('<fg=yellow;options=bold>4. 🔗 REDIRECT URI - COPY THIS EXACTLY:</fg=yellow;options=bold>');
@@ -301,26 +263,41 @@ class SetupCommand extends Command
 
     private function storeCredentials(array $credentials): void
     {
-        // Store in the component's .env file
+        // Store in user config directory (PHAR-compatible)
+        $configDir = config('spotify.config_dir');
+        $credentialsFile = config('spotify.credentials_path');
+
+        // Ensure config directory exists
+        if (! is_dir($configDir)) {
+            mkdir($configDir, 0755, true);
+        }
+
+        // Store credentials as JSON
+        $credentialsData = [
+            'client_id' => $credentials['client_id'],
+            'client_secret' => $credentials['client_secret'],
+        ];
+
+        file_put_contents($credentialsFile, json_encode($credentialsData, JSON_PRETTY_PRINT));
+        chmod($credentialsFile, 0600); // Only owner can read/write
+
+        // Also update .env if it exists (for development)
         $envFile = base_path('.env');
+        if (file_exists($envFile)) {
+            $envContent = file_get_contents($envFile);
 
-        // But ALSO store in the parent app's .env if we're running as a component
-        $parentEnvFile = dirname(dirname(base_path())).'/.env';
+            // Remove old values if they exist
+            $envContent = preg_replace('/^SPOTIFY_CLIENT_ID=.*/m', '', $envContent);
+            $envContent = preg_replace('/^SPOTIFY_CLIENT_SECRET=.*/m', '', $envContent);
+            $envContent = trim($envContent);
 
-        // Store in component's .env
-        $envContent = file_exists($envFile) ? file_get_contents($envFile) : '';
+            // Add new values
+            $envContent .= "\n\n# Spotify API Credentials\n";
+            $envContent .= "SPOTIFY_CLIENT_ID={$credentials['client_id']}\n";
+            $envContent .= "SPOTIFY_CLIENT_SECRET={$credentials['client_secret']}\n";
 
-        // Remove old values if they exist
-        $envContent = preg_replace('/^SPOTIFY_CLIENT_ID=.*/m', '', $envContent);
-        $envContent = preg_replace('/^SPOTIFY_CLIENT_SECRET=.*/m', '', $envContent);
-        $envContent = trim($envContent);
-
-        // Add new values
-        $envContent .= "\n\n# Spotify API Credentials\n";
-        $envContent .= "SPOTIFY_CLIENT_ID={$credentials['client_id']}\n";
-        $envContent .= "SPOTIFY_CLIENT_SECRET={$credentials['client_secret']}\n";
-
-        file_put_contents($envFile, $envContent);
+            file_put_contents($envFile, $envContent);
+        }
     }
 
     private function testSpotifyConnection(array $credentials): bool
@@ -347,22 +324,30 @@ class SetupCommand extends Command
 
     private function displaySuccess(): void
     {
-        info('🎉 THE SHIT Spotify integration setup complete!');
+        info('🎉 Spotify CLI integration setup complete!');
 
         note('🚀 What\'s next?');
-        note('1. 🔐 ./💩 spotify:login (authenticate with Spotify)');
-        note('2. 🎵 ./💩 spotify:current (see what\'s playing)');
-        note('3. ▶️  ./💩 spotify:play "Never Gonna Give You Up"');
-        note('4. ⏸️  ./💩 spotify:pause');
+        note('1. 🔐 php spotify login (authenticate with Spotify)');
+        note('2. 🎵 php spotify current (see what\'s playing)');
+        note('3. ▶️  php spotify play "Never Gonna Give You Up"');
+        note('4. ⏸️  php spotify pause');
 
         note('💡 Pro Tips:');
-        note('• Run ./💩 spotify:setup --reset to reconfigure');
-        note('• Your token is stored securely in storage/spotify_token.json');
+        note('• Run php spotify setup --reset to reconfigure');
+        note('• Your credentials are stored in ~/.config/spotify-cli/');
         note('• All commands support --help for usage info');
     }
 
     private function hasStoredCredentials(): bool
     {
+        $credentialsFile = config('spotify.credentials_path');
+
+        if (file_exists($credentialsFile)) {
+            $credentials = json_decode(file_get_contents($credentialsFile), true);
+            return isset($credentials['client_id']) && isset($credentials['client_secret']);
+        }
+
+        // Fall back to checking .env for development
         $envFile = base_path('.env');
         if (! file_exists($envFile)) {
             return false;
@@ -376,6 +361,19 @@ class SetupCommand extends Command
 
     private function clearStoredCredentials(): void
     {
+        // Clear credentials from user config
+        $credentialsFile = config('spotify.credentials_path');
+        if (file_exists($credentialsFile)) {
+            unlink($credentialsFile);
+        }
+
+        // Clear token from user config
+        $tokenFile = config('spotify.token_path');
+        if (file_exists($tokenFile)) {
+            unlink($tokenFile);
+        }
+
+        // Also clear from .env if it exists
         $envFile = base_path('.env');
         if (file_exists($envFile)) {
             $envContent = file_get_contents($envFile);
@@ -384,16 +382,15 @@ class SetupCommand extends Command
             file_put_contents($envFile, trim($envContent));
         }
 
-        // Clear token from storage
-        $tokenFile = base_path('storage/spotify_token.json');
-        if (file_exists($tokenFile)) {
-            unlink($tokenFile);
+        // Clear old token locations
+        $oldTokenFile = base_path('storage/spotify_token.json');
+        if (file_exists($oldTokenFile)) {
+            unlink($oldTokenFile);
         }
 
-        // Also clean up old file if it exists
-        $tokenFile = $_SERVER['HOME'].'/.spotify_token';
-        if (file_exists($tokenFile)) {
-            unlink($tokenFile);
+        $oldOldTokenFile = $_SERVER['HOME'].'/.spotify_token';
+        if (file_exists($oldOldTokenFile)) {
+            unlink($oldOldTokenFile);
         }
     }
 
