@@ -357,7 +357,7 @@ class SetupCommand extends Command
 
         note('💡 Pro Tips:');
         note('• Run ./💩 spotify:setup --reset to reconfigure');
-        note('• Your token is stored securely in storage/spotify_token.json');
+        note('• Your token is stored securely in ~/.config/spotify-cli/');
         note('• All commands support --help for usage info');
     }
 
@@ -384,16 +384,21 @@ class SetupCommand extends Command
             file_put_contents($envFile, trim($envContent));
         }
 
-        // Clear token from storage
-        $tokenFile = base_path('storage/spotify_token.json');
+        // Clear token from config directory (PHAR compatible path)
+        $tokenFile = config('spotify.token_path');
         if (file_exists($tokenFile)) {
             unlink($tokenFile);
         }
 
-        // Also clean up old file if it exists
-        $tokenFile = $_SERVER['HOME'].'/.spotify_token';
-        if (file_exists($tokenFile)) {
-            unlink($tokenFile);
+        // Also clean up legacy token locations
+        $legacyLocations = [
+            ($_SERVER['HOME'] ?? getenv('HOME')).'/.spotify_token',
+            base_path('storage/spotify_token.json'),
+        ];
+        foreach ($legacyLocations as $legacyFile) {
+            if (file_exists($legacyFile)) {
+                unlink($legacyFile);
+            }
         }
     }
 
