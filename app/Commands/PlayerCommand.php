@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ChecksAuthorization;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
@@ -11,6 +12,7 @@ use function Laravel\Prompts\spin;
 
 class PlayerCommand extends Command
 {
+    use ChecksAuthorization;
     protected $signature = 'player';
 
     protected $description = '🎵 Interactive Spotify player with visual controls';
@@ -27,6 +29,10 @@ class PlayerCommand extends Command
             $this->error('❌ Spotify is not configured');
             $this->info('💡 Run "spotify setup" first');
 
+            return self::FAILURE;
+        }
+
+        if (! $this->authorizeOrFail('spotify:player')) {
             return self::FAILURE;
         }
 

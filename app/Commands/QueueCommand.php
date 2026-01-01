@@ -2,11 +2,13 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ChecksAuthorization;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
 class QueueCommand extends Command
 {
+    use ChecksAuthorization;
     protected $signature = 'queue {query : Song, artist, or playlist to add to queue}';
 
     protected $description = 'Add a song to the Spotify queue (plays after current track)';
@@ -20,6 +22,10 @@ class QueueCommand extends Command
             $this->info('💡 Run "spotify setup" to configure Spotify');
             $this->info('💡 Or set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET env vars');
 
+            return self::FAILURE;
+        }
+
+        if (! $this->authorizeOrFail('spotify:queue')) {
             return self::FAILURE;
         }
 

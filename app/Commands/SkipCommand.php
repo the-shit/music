@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ChecksAuthorization;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
@@ -10,6 +11,7 @@ use function Laravel\Prompts\info;
 
 class SkipCommand extends Command
 {
+    use ChecksAuthorization;
     protected $signature = 'skip 
                             {direction? : next or prev (default: next)}
                             {--json : Output as JSON}';
@@ -22,6 +24,10 @@ class SkipCommand extends Command
             error('❌ Spotify not configured');
             info('💡 Run "spotify setup" to get started');
 
+            return self::FAILURE;
+        }
+
+        if (! $this->authorizeOrFail('spotify:skip')) {
             return self::FAILURE;
         }
 

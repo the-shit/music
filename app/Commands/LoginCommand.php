@@ -276,6 +276,7 @@ echo "Waiting for Spotify callback...";
                 'refresh_token' => $data['refresh_token'] ?? null,
                 'expires_in' => $data['expires_in'] ?? 3600,
                 'expires_at' => time() + ($data['expires_in'] ?? 3600),
+                'scope' => $data['scope'] ?? '',
             ];
         }
 
