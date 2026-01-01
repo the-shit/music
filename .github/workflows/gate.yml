@@ -1,0 +1,27 @@
+name: Gate
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sentinel Gate
+        uses: synapse-sentinel/gate@master
+        with:
+          check: certify
+          coverage-threshold: 80
+          php-version: '8.3'
+          auto-merge: false
+          coverage-comment: true
