@@ -21,8 +21,8 @@ class DevicesCommand extends Command
         $spotify = new SpotifyService;
 
         if (! $spotify->isConfigured()) {
-            error('❌ Spotify not configured');
-            info('💡 Run "spotify setup" first');
+            error('Spotify not configured');
+            info('Run "spotify setup" first');
 
             return self::FAILURE;
         }
@@ -30,16 +30,26 @@ class DevicesCommand extends Command
         try {
             $devices = $spotify->getDevices();
 
+            // Check daemon status
+            $daemonStatus = $spotify->getDaemonStatus();
+
             if (empty($devices)) {
-                warning('📱 No devices found');
-                info('💡 Open Spotify on your phone, computer, or smart speaker');
+                warning('No devices found');
+                info('Open Spotify on your phone, computer, or smart speaker');
+
+                // Show daemon suggestion if not running
+                if (! $daemonStatus['running']) {
+                    $this->newLine();
+                    info('Or start the terminal daemon:');
+                    info('  spotify daemon start');
+                }
 
                 return self::SUCCESS;
             }
 
             if (! $this->option('switch')) {
                 // Just list devices
-                $this->displayDevices($devices);
+                $this->displayDevices($devices, $daemonStatus);
 
                 // Emit devices listed event
                 $activeDevice = null;
@@ -57,6 +67,7 @@ class DevicesCommand extends Command
                         'device_count' => count($devices),
                         'active_device' => $activeDevice,
                         'available_types' => array_unique($deviceTypes),
+                        'daemon_running' => $daemonStatus['running'],
                     ]),
                 ]);
 
@@ -89,22 +100,22 @@ class DevicesCommand extends Command
             }
 
             $selected = select(
-                label: '🎵 Select a device to switch to:',
+                label: 'Select a device to switch to:',
                 options: $choices,
                 default: $activeDevice
             );
 
             if ($selected === $activeDevice) {
-                info('✅ Already playing on this device');
+                info('Already playing on this device');
 
                 return self::SUCCESS;
             }
 
             // Transfer playback
-            info('🔄 Switching to device...');
+            info('Switching to device...');
             $spotify->transferPlayback($selected);
 
-            info('✅ Playback transferred!');
+            info('Playback transferred!');
 
             // Emit event
             $this->call('event:emit', [
@@ -118,16 +129,24 @@ class DevicesCommand extends Command
             return self::SUCCESS;
 
         } catch (\Exception $e) {
-            error('❌ '.$e->getMessage());
+            error($e->getMessage());
 
             return self::FAILURE;
         }
     }
 
-    private function displayDevices(array $devices): void
+    private function displayDevices(array $devices, array $daemonStatus): void
     {
-        info('📱 Available Spotify Devices:');
+        info('Available Spotify Devices:');
         $this->newLine();
+
+        // Show daemon status first if running
+        if ($daemonStatus['running']) {
+            info('Terminal Daemon:');
+            $this->line("  🎧 <fg=green>Running</> (PID: {$daemonStatus['pid']})");
+            $this->line('     Use "spotify daemon stop" to stop the daemon');
+            $this->newLine();
+        }
 
         foreach ($devices as $device) {
             $icon = match ($device['type']) {
@@ -151,7 +170,14 @@ class DevicesCommand extends Command
         }
 
         if (! array_filter($devices, fn ($d) => $d['is_active'])) {
-            info("💡 No active device. Use 'spotify devices --switch' to activate one");
+            info("No active device. Use 'spotify devices --switch' to activate one");
+        }
+
+        // Show daemon hint if not running
+        if (! $daemonStatus['running']) {
+            $this->newLine();
+            info('Start terminal daemon for local playback:');
+            info('  spotify daemon start');
         }
     }
 }

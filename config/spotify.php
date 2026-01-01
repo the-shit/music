@@ -6,9 +6,12 @@ return [
     | Spotify API Configuration
     |--------------------------------------------------------------------------
     |
-    | Configuration for THE SHIT Spotify integration
+    | Configuration for Spotify CLI integration
     |
     */
+
+    // Support reading from user config directory for PHAR compatibility
+    'config_dir' => $_SERVER['HOME'].'/.config/spotify-cli',
 
     'client_id' => env('SPOTIFY_CLIENT_ID'),
     'client_secret' => env('SPOTIFY_CLIENT_SECRET'),
@@ -24,5 +27,9 @@ return [
         'playlist-read-collaborative',
     ],
 
-    'token_path' => env('SPOTIFY_TOKEN_PATH', $_SERVER['HOME'].'/.spotify_token'),
+    // Token path in user config directory (PHAR-compatible)
+    'token_path' => $_SERVER['HOME'].'/.config/spotify-cli/token.json',
+
+    // Credentials path in user config directory (PHAR-compatible)
+    'credentials_path' => $_SERVER['HOME'].'/.config/spotify-cli/credentials.json',
 ];

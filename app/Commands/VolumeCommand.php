@@ -7,7 +7,7 @@ use LaravelZero\Framework\Commands\Command;
 
 class VolumeCommand extends Command
 {
-    protected $signature = 'volume 
+    protected $signature = 'volume
                             {level? : Volume level (0-100) or +/- for relative change}
                             {--json : Output as JSON}';
 
@@ -78,14 +78,6 @@ class VolumeCommand extends Command
 
             return self::FAILURE;
         }
-
-        // Emit event
-        $this->call('event:emit', [
-            'event' => 'volume.changed',
-            'data' => json_encode([
-                'volume' => $newVolume,
-            ]),
-        ]);
 
         if ($this->option('json')) {
             $this->line(json_encode(['volume' => $newVolume, 'success' => true]));

@@ -23,9 +23,19 @@ class LoginCommand extends Command
         $clientId = config('spotify.client_id');
         $clientSecret = config('spotify.client_secret');
 
+        // Try loading from user config if not in env
+        if (! $clientId || ! $clientSecret) {
+            $credentialsFile = config('spotify.credentials_path');
+            if (file_exists($credentialsFile)) {
+                $credentials = json_decode(file_get_contents($credentialsFile), true);
+                $clientId = $credentials['client_id'] ?? null;
+                $clientSecret = $credentials['client_secret'] ?? null;
+            }
+        }
+
         if (! $clientId || ! $clientSecret) {
             error('❌ Missing Spotify credentials');
-            info('💡 Run "spotify setup" to get started');
+            info('💡 Run "php spotify setup" to get started');
 
             return self::FAILURE;
         }
@@ -35,15 +45,6 @@ class LoginCommand extends Command
         // Find available port
         $port = $this->findAvailablePort();
         $redirectUri = "http://127.0.0.1:{$port}/callback";
-
-        // Emit login started event
-        $this->call('event:emit', [
-            'event' => 'auth.login_started',
-            'data' => json_encode([
-                'redirect_uri' => $redirectUri,
-                'callback_port' => $port,
-            ]),
-        ]);
 
         if ($port !== 8888) {
             warning("⚠️  Using port {$port} because 8888 is in use");
@@ -69,9 +70,6 @@ class LoginCommand extends Command
             'playlist-read-private',
             'playlist-read-collaborative',
         ];
-
-        // Store scopes for event emission
-        $this->scopes = $scopes;
 
         $state = bin2hex(random_bytes(16));
         $authUrl = 'https://accounts.spotify.com/authorize?'.http_build_query([
@@ -103,15 +101,6 @@ class LoginCommand extends Command
         if (! $code) {
             error('❌ Authorization timeout or cancelled');
 
-            // Emit login failed event
-            $this->call('event:emit', [
-                'event' => 'auth.login_failed',
-                'data' => json_encode([
-                    'error' => 'timeout_or_cancelled',
-                    'reason' => 'User did not complete authorization within timeout period',
-                ]),
-            ]);
-
             return self::FAILURE;
         }
 
@@ -126,42 +115,26 @@ class LoginCommand extends Command
         if (! $tokenData || ! $tokenData['access_token']) {
             error('❌ Failed to get access token');
 
-            // Emit login failed event
-            $this->call('event:emit', [
-                'event' => 'auth.login_failed',
-                'data' => json_encode([
-                    'error' => 'token_exchange_failed',
-                    'reason' => 'Failed to exchange authorization code for access token',
-                ]),
-            ]);
-
             return self::FAILURE;
         }
 
-        // Save complete token data to storage
-        $tokenFile = base_path('storage/spotify_token.json');
-        $storageDir = dirname($tokenFile);
-        if (! is_dir($storageDir)) {
-            mkdir($storageDir, 0755, true);
+        // Save complete token data to user config directory (PHAR-compatible)
+        $tokenFile = config('spotify.token_path');
+        $configDir = config('spotify.config_dir');
+
+        if (! is_dir($configDir)) {
+            mkdir($configDir, 0755, true);
         }
+
         file_put_contents($tokenFile, json_encode($tokenData, JSON_PRETTY_PRINT));
         chmod($tokenFile, 0600); // Only owner can read/write
-
-        // Emit login completed event
-        $this->call('event:emit', [
-            'event' => 'auth.login_completed',
-            'data' => json_encode([
-                'user_authenticated' => true,
-                'scopes_granted' => explode(' ', implode(' ', $scopes)),
-            ]),
-        ]);
 
         info('✅ Successfully authenticated with Spotify!');
         info('');
         info('Try these commands:');
-        info('  ./💩 spotify:play "Never Gonna Give You Up"');
-        info('  ./💩 spotify:pause');
-        info('  ./💩 spotify:current');
+        info('  php spotify play "Never Gonna Give You Up"');
+        info('  php spotify pause');
+        info('  php spotify current');
 
         return self::SUCCESS;
     }
@@ -193,7 +166,7 @@ if (str_starts_with($uri, "/callback") && isset($_GET["code"])) {
     echo "<!DOCTYPE html>
 <html>
 <head>
-    <title>THE SHIT - Spotify Connected</title>
+    <title>Spotify CLI - Connected</title>
     <style>
         body {
             background: #000;
@@ -220,8 +193,8 @@ if (str_starts_with($uri, "/callback") && isset($_GET["code"])) {
 </head>
 <body>
     <div class=\"container\">
-        <h1>💩 ✅</h1>
-        <p>THE SHIT is connected to Spotify!</p>
+        <h1>🎵 ✅</h1>
+        <p>Spotify CLI is connected!</p>
         <p style=\"font-size: 1em; color: #666;\">You can close this window</p>
     </div>
 </body>

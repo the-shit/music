@@ -20,15 +20,43 @@ class SpotifyService
 
     private string $tokenFile;
 
+    private string $credentialsFile;
+
+    private string $configDir;
+
+    private string $daemonPidFile;
+
     public function __construct()
     {
+        // Set config directory
+        $this->configDir = config('spotify.config_dir');
+        $this->tokenFile = config('spotify.token_path');
+        $this->credentialsFile = config('spotify.credentials_path');
+        $this->daemonPidFile = $this->configDir.'/daemon.pid';
+
+        // Load credentials from user config or env
+        $this->loadCredentials();
+
+        // Load token data
+        $this->loadTokenData();
+    }
+
+    /**
+     * Load credentials from user config directory or environment
+     */
+    private function loadCredentials(): void
+    {
+        // First try to load from user config directory (PHAR-compatible)
+        if (file_exists($this->credentialsFile)) {
+            $credentials = json_decode(file_get_contents($this->credentialsFile), true);
+            $this->clientId = $credentials['client_id'] ?? '';
+            $this->clientSecret = $credentials['client_secret'] ?? '';
+            return;
+        }
+
+        // Fall back to environment variables (for development)
         $this->clientId = config('spotify.client_id', '');
         $this->clientSecret = config('spotify.client_secret', '');
-
-        // Set token file path in app storage
-        $this->tokenFile = base_path('storage/spotify_token.json');
-
-        $this->loadTokenData();
     }
 
     /**
@@ -44,7 +72,7 @@ class SpotifyService
      */
     private function loadTokenData(): void
     {
-        // Try new location first
+        // Try new location first (user config directory)
         if (file_exists($this->tokenFile)) {
             $data = json_decode(file_get_contents($this->tokenFile), true);
             if ($data) {
@@ -56,10 +84,26 @@ class SpotifyService
             }
         }
 
-        // Fall back to old location for migration
-        $oldTokenFile = $_SERVER['HOME'].'/.spotify_token';
+        // Fall back to old location in app storage for migration
+        $oldTokenFile = base_path('storage/spotify_token.json');
         if (file_exists($oldTokenFile)) {
-            $content = file_get_contents($oldTokenFile);
+            $data = json_decode(file_get_contents($oldTokenFile), true);
+            if ($data) {
+                $this->accessToken = $data['access_token'] ?? null;
+                $this->refreshToken = $data['refresh_token'] ?? null;
+                $this->expiresAt = $data['expires_at'] ?? null;
+
+                // Migrate to new location
+                $this->saveTokenData();
+
+                return;
+            }
+        }
+
+        // Fall back to old old location for migration
+        $oldOldTokenFile = $_SERVER['HOME'].'/.spotify_token';
+        if (file_exists($oldOldTokenFile)) {
+            $content = file_get_contents($oldOldTokenFile);
 
             // Handle old format (just token string)
             if (! json_decode($content)) {
@@ -74,9 +118,6 @@ class SpotifyService
 
             // Migrate to new location
             $this->saveTokenData();
-
-            // Remove old file after migration
-            unlink($oldTokenFile);
         }
     }
 
@@ -124,10 +165,9 @@ class SpotifyService
             'expires_at' => $this->expiresAt,
         ];
 
-        // Ensure storage directory exists
-        $storageDir = dirname($this->tokenFile);
-        if (! is_dir($storageDir)) {
-            mkdir($storageDir, 0755, true);
+        // Ensure config directory exists
+        if (! is_dir($this->configDir)) {
+            mkdir($this->configDir, 0755, true);
         }
 
         // Save with restricted permissions
@@ -150,7 +190,7 @@ class SpotifyService
     public function search(string $query, string $type = 'track'): ?array
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "spotify login" first.');
         }
 
         $this->ensureValidToken();
@@ -184,7 +224,7 @@ class SpotifyService
     public function play(string $uri, ?string $deviceId = null): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "spotify login" first.');
         }
 
         $this->ensureValidToken();
@@ -239,7 +279,7 @@ class SpotifyService
     public function resume(?string $deviceId = null): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "spotify login" first.');
         }
 
         $this->ensureValidToken();
@@ -278,7 +318,7 @@ class SpotifyService
     public function pause(): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "spotify login" first.');
         }
 
         $this->ensureValidToken();
@@ -298,7 +338,7 @@ class SpotifyService
     public function setVolume(int $volumePercent): bool
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "spotify login" first.');
         }
 
         $this->ensureValidToken();
@@ -318,7 +358,7 @@ class SpotifyService
     public function next(): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "spotify login" first.');
         }
 
         $this->ensureValidToken();
@@ -338,7 +378,7 @@ class SpotifyService
     public function previous(): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "spotify login" first.');
         }
 
         $this->ensureValidToken();
@@ -358,7 +398,7 @@ class SpotifyService
     public function getDevices(): array
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "spotify login" first.');
         }
 
         $this->ensureValidToken();
@@ -381,7 +421,7 @@ class SpotifyService
     public function transferPlayback(string $deviceId, bool $play = true): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "spotify login" first.');
         }
 
         $this->ensureValidToken();
@@ -422,7 +462,7 @@ class SpotifyService
     public function addToQueue(string $uri): void
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "spotify login" first.');
         }
 
         $this->ensureValidToken();
@@ -545,7 +585,7 @@ class SpotifyService
     public function searchMultiple(string $query, string $type = 'track', int $limit = 10): array
     {
         if (! $this->accessToken) {
-            throw new \Exception('Not authenticated. Run "spotify:login" first.');
+            throw new \Exception('Not authenticated. Run "spotify login" first.');
         }
 
         $this->ensureValidToken();
@@ -560,7 +600,7 @@ class SpotifyService
         if ($response->successful()) {
             $data = $response->json();
             $results = [];
-            
+
             if (isset($data['tracks']['items'])) {
                 foreach ($data['tracks']['items'] as $track) {
                     $results[] = [
@@ -571,7 +611,7 @@ class SpotifyService
                     ];
                 }
             }
-            
+
             return $results;
         }
 
@@ -609,5 +649,39 @@ class SpotifyService
         }
 
         return null;
+    }
+
+    /**
+     * Check if the daemon is running
+     */
+    public function isDaemonRunning(): bool
+    {
+        if (! file_exists($this->daemonPidFile)) {
+            return false;
+        }
+
+        $pid = (int) file_get_contents($this->daemonPidFile);
+
+        // Check if process is still running
+        return posix_kill($pid, 0);
+    }
+
+    /**
+     * Get daemon status information
+     */
+    public function getDaemonStatus(): array
+    {
+        $isRunning = $this->isDaemonRunning();
+
+        $status = [
+            'running' => $isRunning,
+            'pid' => null,
+        ];
+
+        if ($isRunning) {
+            $status['pid'] = (int) file_get_contents($this->daemonPidFile);
+        }
+
+        return $status;
     }
 }
