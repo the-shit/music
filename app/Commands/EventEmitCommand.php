@@ -23,8 +23,8 @@ class EventEmitCommand extends Command
             'timestamp' => now()->toIso8601String(),
         ];
 
-        // Store events in storage directory
-        $queueFile = base_path('storage/events.jsonl');
+        // Store events in storage directory (configurable for testing)
+        $queueFile = config('app.events_file', base_path('storage/events.jsonl'));
 
         // Ensure directory exists
         $dir = dirname($queueFile);

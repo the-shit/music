@@ -5,11 +5,15 @@ use Illuminate\Support\Facades\File;
 describe('EventEmitCommand', function () {
 
     beforeEach(function () {
-        // Clean up events file before each test to ensure isolation
-        $this->eventsFile = base_path('storage/events.jsonl');
+        // Use unique file per test process to avoid parallel test interference
+        $this->testId = uniqid('test_', true);
+        $this->eventsFile = sys_get_temp_dir() . '/spotify-events-' . $this->testId . '.jsonl';
         if (file_exists($this->eventsFile)) {
             unlink($this->eventsFile);
         }
+
+        // Override the events file path in the app
+        config(['app.events_file' => $this->eventsFile]);
     });
 
     afterEach(function () {
