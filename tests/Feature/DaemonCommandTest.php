@@ -53,7 +53,7 @@ describe('DaemonCommand', function () {
         it('handles invalid action', function () {
             $this->artisan('daemon', ['action' => 'invalid'])
                 ->expectsOutputToContain('Invalid action: invalid')
-                ->expectsOutputToContain('Valid actions: start, stop, status')
+                ->expectsOutputToContain('Available actions: start, stop, status')
                 ->assertExitCode(1);
         });
 
@@ -61,7 +61,7 @@ describe('DaemonCommand', function () {
             // Note: restart is not implemented in the command
             $this->artisan('daemon', ['action' => 'restart'])
                 ->expectsOutputToContain('Invalid action: restart')
-                ->expectsOutputToContain('Valid actions: start, stop, status')
+                ->expectsOutputToContain('Available actions: start, stop, status')
                 ->assertExitCode(1);
         });
 
@@ -119,7 +119,7 @@ describe('DaemonCommand', function () {
         it('reports when daemon is not running', function () {
             $this->artisan('daemon', ['action' => 'status'])
                 ->expectsOutputToContain('Daemon is not running')
-                ->expectsOutputToContain('Use "spotify daemon start" to start it')
+                ->expectsOutputToContain('Use: spotify devices to see available playback devices')
                 ->assertExitCode(0);
         });
 
@@ -167,7 +167,7 @@ describe('DaemonCommand', function () {
 
         it('has correct description', function () {
             $command = $this->app->make(DaemonCommand::class);
-            expect($command->getDescription())->toBe('Manage the spotifyd/librespot daemon for terminal playback');
+            expect($command->getDescription())->toBe('Manage the Spotify daemon for terminal playback (experimental)');
         });
 
         it('requires action argument', function () {
@@ -274,14 +274,14 @@ describe('DaemonCommand', function () {
         it('shows start guidance when not running', function () {
             $this->artisan('daemon', ['action' => 'status'])
                 ->expectsOutputToContain('Daemon is not running')
-                ->expectsOutputToContain('Use "spotify daemon start" to start it')
+                ->expectsOutputToContain('Use: spotify devices to see available playback devices')
                 ->assertExitCode(0);
         });
 
         it('lists valid actions when invalid action provided', function () {
             $this->artisan('daemon', ['action' => 'unknown'])
                 ->expectsOutputToContain('Invalid action: unknown')
-                ->expectsOutputToContain('Valid actions: start, stop, status')
+                ->expectsOutputToContain('Available actions: start, stop, status')
                 ->assertExitCode(1);
         });
 
