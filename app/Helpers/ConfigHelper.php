@@ -54,4 +54,51 @@ class ConfigHelper
     {
         return self::configDir().'/events.jsonl';
     }
+
+    /**
+     * Get webhook configuration
+     */
+    public static function getWebhookConfig(): array
+    {
+        $file = self::configDir().'/webhook.json';
+
+        if (! file_exists($file)) {
+            return ['url' => null, 'secret' => null, 'enabled' => false];
+        }
+
+        return json_decode(file_get_contents($file), true) ?? [];
+    }
+
+    /**
+     * Check if webhook is configured and enabled
+     */
+    public static function hasWebhook(): bool
+    {
+        $config = self::getWebhookConfig();
+
+        return ! empty($config['url']) && ! empty($config['secret']) && ($config['enabled'] ?? false);
+    }
+
+    /**
+     * Save webhook configuration
+     */
+    public static function saveWebhookConfig(array $config): void
+    {
+        $dir = self::configDir();
+        if (! is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        $file = $dir.'/webhook.json';
+        file_put_contents($file, json_encode($config, JSON_PRETTY_PRINT));
+        chmod($file, 0600);
+    }
+
+    /**
+     * Get webhook error log path
+     */
+    public static function webhookErrorLogPath(): string
+    {
+        return self::configDir().'/webhook-errors.log';
+    }
 }
