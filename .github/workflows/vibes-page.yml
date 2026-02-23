@@ -25,13 +25,13 @@ jobs:
         run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Generate vibes page
-        run: php spotify vibes --no-open --output=docs/index.html
+        run: php spotify vibes --no-open --output=docs/vibes.html
 
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/index.html
+          git add docs/vibes.html
           if git diff --cached --quiet; then
             echo "No changes to vibes page"
           else

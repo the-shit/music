@@ -9,6 +9,6 @@ SPOTIFY="$REPO_DIR/spotify"
 [ ! -f "$SPOTIFY" ] && exit 0
 
 # Regenerate silently in the background (don't slow down commits)
-php "$SPOTIFY" vibes --no-open --output="$REPO_DIR/docs/index.html" > /dev/null 2>&1 &
+php "$SPOTIFY" vibes --no-open --output="$REPO_DIR/docs/vibes.html" > /dev/null 2>&1 &
 
 exit 0
