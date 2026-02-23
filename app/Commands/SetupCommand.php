@@ -45,7 +45,6 @@ class SetupCommand extends Command
             'event' => 'setup.reset',
             'data' => json_encode([
                 'credentials_cleared' => true,
-                'token_cleared' => file_exists($_SERVER['HOME'].'/.spotify_token'),
             ]),
         ]);
 
@@ -245,7 +244,7 @@ class SetupCommand extends Command
         note("💡 Using port {$port} for OAuth callback server");
     }
 
-    private function collectCredentials(): ?array
+    private function collectCredentials(): array
     {
         info('🔑 App Credentials');
         note('In your Spotify app dashboard:');
@@ -301,7 +300,7 @@ class SetupCommand extends Command
 
     private function storeCredentials(array $credentials): void
     {
-        // Store in ~/.shit-music/credentials.json (PHAR-compatible)
+        // Store in ~/.config/spotify-cli/credentials.json (PHAR-compatible)
         $configDir = \App\Helpers\ConfigHelper::configDir();
 
         // Ensure directory exists
@@ -353,7 +352,7 @@ class SetupCommand extends Command
 
         note('💡 Pro Tips:');
         note('• Run spotify setup --reset to reconfigure');
-        note('• Your credentials are stored securely in ~/.shit-music/');
+        note('• Your credentials are stored securely in ~/.config/spotify-cli/');
         note('• All commands support --help for usage info');
     }
 
@@ -376,17 +375,6 @@ class SetupCommand extends Command
         $tokenFile = \App\Helpers\ConfigHelper::tokenPath();
         if (file_exists($tokenFile)) {
             unlink($tokenFile);
-        }
-
-        // Also clean up legacy token locations
-        $legacyLocations = [
-            ($_SERVER['HOME'] ?? getenv('HOME')).'/.spotify_token',
-            base_path('storage/spotify_token.json'),
-        ];
-        foreach ($legacyLocations as $legacyFile) {
-            if (file_exists($legacyFile)) {
-                unlink($legacyFile);
-            }
         }
     }
 

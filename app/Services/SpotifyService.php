@@ -44,47 +44,12 @@ class SpotifyService
      */
     private function loadTokenData(): void
     {
-        // Try current config location first
         if (file_exists($this->tokenFile)) {
             $data = json_decode(file_get_contents($this->tokenFile), true);
             if ($data) {
                 $this->accessToken = $data['access_token'] ?? null;
                 $this->refreshToken = $data['refresh_token'] ?? null;
                 $this->expiresAt = $data['expires_at'] ?? null;
-
-                return;
-            }
-        }
-
-        // Fall back to legacy locations for migration
-        $home = $_SERVER['HOME'] ?? getenv('HOME');
-        $legacyLocations = [
-            $home.'/.spotify_token',
-            base_path('storage/spotify_token.json'),
-        ];
-
-        foreach ($legacyLocations as $oldTokenFile) {
-            if (file_exists($oldTokenFile)) {
-                $content = file_get_contents($oldTokenFile);
-
-                // Handle old format (just token string)
-                if (! json_decode($content)) {
-                    $this->accessToken = trim($content);
-                } else {
-                    // Handle new format (JSON with refresh token)
-                    $data = json_decode($content, true);
-                    $this->accessToken = $data['access_token'] ?? null;
-                    $this->refreshToken = $data['refresh_token'] ?? null;
-                    $this->expiresAt = $data['expires_at'] ?? null;
-                }
-
-                // Migrate to new location
-                $this->saveTokenData();
-
-                // Remove old file after migration
-                @unlink($oldTokenFile);
-
-                return;
             }
         }
     }
@@ -142,15 +107,6 @@ class SpotifyService
         // Save with restricted permissions
         file_put_contents($this->tokenFile, json_encode($tokenData, JSON_PRETTY_PRINT));
         chmod($this->tokenFile, 0600); // Only owner can read/write
-    }
-
-    /**
-     * Save access token to storage (legacy compatibility)
-     */
-    private function saveAccessToken(string $token): void
-    {
-        $this->accessToken = $token;
-        $this->saveTokenData();
     }
 
     /**

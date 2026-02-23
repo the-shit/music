@@ -19,7 +19,7 @@ from Foundation import NSObject, NSRunLoop, NSDate
 from AppKit import NSApplication
 import MediaPlayer
 
-SPOTIFY_CLI = "/Users/jordanpartridge/packages/the-shit/music/spotify"
+SPOTIFY_CLI = "/Users/jordanpartridge/packages/the-shit/spotify-cli/spotify"
 PHP_BIN = "/Users/jordanpartridge/Library/Application Support/Herd/bin/php"
 
 

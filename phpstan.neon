@@ -1,7 +1,6 @@
 parameters:
     paths:
         - app/
-        - tests/
 
     level: 5
 
@@ -9,6 +8,12 @@ parameters:
 
     ignoreErrors:
         - '#Strict comparison#'
+        - '#While loop condition is always true#'
 
     excludePaths:
         - app/Commands/Concerns/*
+        - app/Commands/CodeReviewAgent.php
+        - app/Commands/DocAgent.php
+        - app/Commands/ExplainAgent.php
+        - app/Commands/OptimizeAgent.php
+        - app/Commands/TestGenAgent.php

@@ -47,14 +47,14 @@ class PauseCommand extends Command
 
                 // Emit pause event
                 if ($current) {
-                    $this->call('event:emit', [
+                    $this->callSilently('event:emit', [
                         'event' => 'track.paused',
                         'data' => json_encode([
                             'track' => $current['name'],
                             'artist' => $current['artist'],
                             'paused_at' => $current['progress_ms'],
                         ]),
-                    ], true);
+                    ]);
                 }
             }
         } catch (\Exception $e) {

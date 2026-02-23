@@ -12,7 +12,7 @@ class ConfigHelper
     {
         // Try config first (allows test overrides), fallback to default
         return config('spotify.config_dir')
-            ?? ($_SERVER['HOME'] ?? getenv('HOME')).'/.shit-music';
+            ?? ($_SERVER['HOME'] ?? getenv('HOME')).'/.config/spotify-cli';
     }
 
     /**

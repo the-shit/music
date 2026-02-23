@@ -7,7 +7,7 @@ describe('SetupCommand', function () {
 
     beforeEach(function () {
         // Use a temp directory for credentials during tests
-        $this->testConfigDir = sys_get_temp_dir().'/shit-music-test-'.uniqid();
+        $this->testConfigDir = sys_get_temp_dir().'/spotify-cli-test-'.uniqid();
         mkdir($this->testConfigDir, 0755, true);
         config(['spotify.config_dir' => $this->testConfigDir]);
 

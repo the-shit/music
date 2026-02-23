@@ -25,7 +25,7 @@ cp .git-hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
 chmod +x .git/hooks/prepare-commit-msg
 ```
 
-The hook reads your Spotify token from `~/.shit-music/token.json` (written by `./spotify login`) and appends the currently playing track as a trailer. If nothing is playing, it skips silently — but your commit will fail CI.
+The hook reads your Spotify token from `~/.config/spotify-cli/token.json` (written by `./spotify login`) and appends the currently playing track as a trailer. If nothing is playing, it skips silently — but your commit will fail CI.
 
 ### What a valid commit looks like
 
