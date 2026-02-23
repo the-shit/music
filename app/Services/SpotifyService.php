@@ -712,6 +712,50 @@ class SpotifyService
     }
 
     /**
+     * Get track recommendations from Spotify's algorithm
+     */
+    public function getRecommendations(array $seedTrackIds = [], array $seedArtistIds = [], int $limit = 10): array
+    {
+        if (! $this->accessToken) {
+            throw new \Exception('Not authenticated. Run "music login" first.');
+        }
+
+        $this->ensureValidToken();
+
+        $params = ['limit' => $limit];
+
+        if (! empty($seedTrackIds)) {
+            $params['seed_tracks'] = implode(',', array_slice($seedTrackIds, 0, 5));
+        }
+
+        if (! empty($seedArtistIds)) {
+            $params['seed_artists'] = implode(',', array_slice($seedArtistIds, 0, 5));
+        }
+
+        $response = Http::withToken($this->accessToken)
+            ->get($this->baseUri.'recommendations', $params);
+
+        if ($response->successful()) {
+            $data = $response->json();
+            $tracks = [];
+
+            foreach ($data['tracks'] ?? [] as $track) {
+                $tracks[] = [
+                    'uri' => $track['uri'],
+                    'id' => $track['id'],
+                    'name' => $track['name'],
+                    'artist' => $track['artists'][0]['name'] ?? 'Unknown',
+                    'album' => $track['album']['name'] ?? 'Unknown',
+                ];
+            }
+
+            return $tracks;
+        }
+
+        return [];
+    }
+
+    /**
      * Set shuffle state
      */
     public function setShuffle(bool $state): bool
