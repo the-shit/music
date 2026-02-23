@@ -22,13 +22,19 @@ class DaemonSetupCommand extends Command
         info('This will set up the headless Spotify daemon for CLI playback.');
         $this->newLine();
 
-        $this->checkDependencies();
+        if (($result = $this->checkDependencies()) !== null) {
+            return $result;
+        }
 
-        $this->authenticateSpotifyd();
+        if (($result = $this->authenticateSpotifyd()) !== null) {
+            return $result;
+        }
 
         $this->startDaemon();
 
         $this->displaySuccess();
+
+        return self::SUCCESS;
     }
 
     private function banner(): void
@@ -40,7 +46,7 @@ class DaemonSetupCommand extends Command
         $this->newLine();
     }
 
-    private function checkDependencies(): void
+    private function checkDependencies(): ?int
     {
         info('📦 Checking dependencies...');
         $this->newLine();
@@ -66,7 +72,7 @@ class DaemonSetupCommand extends Command
         }
 
         if (empty($issues)) {
-            return;
+            return null;
         }
 
         $this->newLine();
@@ -76,13 +82,14 @@ class DaemonSetupCommand extends Command
             error('Setup cancelled. Install dependencies manually:');
             info('  macOS: brew install spotifyd sox');
             info('  Linux: apt install spotifyd sox');
-            exit(1);
+
+            return self::FAILURE;
         }
 
-        $this->installDependencies($issues);
+        return $this->installDependencies($issues);
     }
 
-    private function installDependencies(array $issues): void
+    private function installDependencies(array $issues): ?int
     {
         $os = PHP_OS_FAMILY;
 
@@ -92,7 +99,8 @@ class DaemonSetupCommand extends Command
             $cmd = 'sudo apt install -y '.implode(' ', $issues);
         } else {
             error("Unsupported OS: {$os}");
-            exit(1);
+
+            return self::FAILURE;
         }
 
         info("Running: {$cmd}");
@@ -110,14 +118,17 @@ class DaemonSetupCommand extends Command
 
             if (! $check) {
                 error("❌ Failed to install {$dep}");
-                exit(1);
+
+                return self::FAILURE;
             }
         }
 
         info('✅ All dependencies installed');
+
+        return null;
     }
 
-    private function authenticateSpotifyd(): void
+    private function authenticateSpotifyd(): ?int
     {
         $this->newLine();
         info('🔐 Setting up Spotify authentication...');
@@ -133,7 +144,7 @@ class DaemonSetupCommand extends Command
         if (file_exists($credFile)) {
             info('✅ Already authenticated with Spotify');
 
-            return;
+            return null;
         }
 
         warning('You will be asked to authenticate with Spotify in your browser.');
@@ -146,10 +157,13 @@ class DaemonSetupCommand extends Command
 
         if (file_exists($credFile)) {
             info('✅ Spotify authentication successful!');
-        } else {
-            error('❌ Authentication failed');
-            exit(1);
+
+            return null;
         }
+
+        error('❌ Authentication failed');
+
+        return self::FAILURE;
     }
 
     private function startDaemon(): void

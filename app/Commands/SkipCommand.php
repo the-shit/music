@@ -69,7 +69,7 @@ class SkipCommand extends Command
 
             // Emit skip event
             if ($before && ! $this->option('json')) {
-                $this->call('event:emit', [
+                $this->callSilently('event:emit', [
                     'event' => 'track.skipped',
                     'data' => json_encode([
                         'track' => $before['name'],
@@ -77,7 +77,7 @@ class SkipCommand extends Command
                         'skip_at' => $before['progress_ms'],
                         'direction' => $skippedDirection,
                     ]),
-                ], true);
+                ]);
             }
 
             return self::SUCCESS;

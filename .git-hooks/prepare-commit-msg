@@ -17,8 +17,8 @@ if echo "$REMOTE_URL" | grep -qiE "pstrax"; then
     exit 0
 fi
 
-# Get access token from ~/.shit-music/token.json
-TOKEN_FILE="$HOME/.shit-music/token.json"
+# Get access token from ~/.config/spotify-cli/token.json
+TOKEN_FILE="$HOME/.config/spotify-cli/token.json"
 if [ ! -f "$TOKEN_FILE" ]; then
     exit 0
 fi

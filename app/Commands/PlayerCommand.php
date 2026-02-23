@@ -149,7 +149,7 @@ class PlayerCommand extends Command
         $barLength = 30;
         $filled = floor($percentage * $barLength);
 
-        $bar = str_repeat('━', $filled).'●'.str_repeat('━', $barLength - $filled - 1);
+        $bar = str_repeat('━', (int) $filled).'●'.str_repeat('━', (int) ($barLength - $filled - 1));
 
         return sprintf(
             '%s %s %d:%02d/%d:%02d',
@@ -171,7 +171,7 @@ class PlayerCommand extends Command
 
         $barLength = 20;
         $filled = floor($volume * $barLength / 100);
-        $bar = str_repeat('▓', $filled).str_repeat('░', $barLength - $filled);
+        $bar = str_repeat('▓', (int) $filled).str_repeat('░', (int) ($barLength - $filled));
 
         return sprintf('%s %s %d%%', $icon, $bar, $volume);
     }
@@ -375,7 +375,7 @@ class PlayerCommand extends Command
         // Show up to 10 tracks in queue
         $tracks = array_slice($queue['queue'], 0, 10);
         foreach ($tracks as $index => $track) {
-            $number = str_pad($index + 1, 2, ' ', STR_PAD_LEFT);
+            $number = str_pad((string) ($index + 1), 2, ' ', STR_PAD_LEFT);
             $name = substr($track['name'] ?? 'Unknown', 0, 35);
             $artist = substr($track['artists'][0]['name'] ?? 'Unknown', 0, 25);
 

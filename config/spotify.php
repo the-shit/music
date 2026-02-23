@@ -1,7 +1,7 @@
 <?php
 
 // Load credentials from file if not in env
-$configDir = ($_SERVER['HOME'] ?? getenv('HOME')).'/.shit-music';
+$configDir = ($_SERVER['HOME'] ?? getenv('HOME')).'/.config/spotify-cli';
 $credentialsFile = $configDir.'/credentials.json';
 $credentials = [];
 if (file_exists($credentialsFile)) {

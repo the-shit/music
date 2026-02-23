@@ -75,9 +75,6 @@ class LoginCommand extends Command
             'user-read-recently-played',
         ];
 
-        // Store scopes for event emission
-        $this->scopes = $scopes;
-
         $state = bin2hex(random_bytes(16));
         $authUrl = 'https://accounts.spotify.com/authorize?'.http_build_query([
             'client_id' => $clientId,
