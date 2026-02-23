@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commands — Spotify CLI</title>
+    <meta name="description" content="Complete command reference for the Spotify CLI. 32 commands for playback, discovery, queue management, and more.">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="nav">
+        <a href="index.html" class="nav-logo"><span>spotify</span> cli</a>
+        <ul class="nav-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="commands.html" class="active">Commands</a></li>
+            <li><a href="vibes.html">Vibes</a></li>
+            <li><a href="https://github.com/the-shit/music">GitHub</a></li>
+        </ul>
+    </nav>
+
+    <div class="hero">
+        <h1>Command <span>Reference</span></h1>
+        <p class="subtitle">Every command available in the Spotify CLI.</p>
+    </div>
+
+    <div class="container">
+
+        <div class="cmd-section">
+            <h3>Setup &amp; Auth</h3>
+            <table class="cmd-table">
+                <thead><tr><th>Command</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>spotify setup</code></td><td>Set up Spotify API credentials with guided wizard</td></tr>
+                    <tr><td><code>spotify login</code></td><td>Authenticate with Spotify via OAuth</td></tr>
+                    <tr><td><code>spotify daemon:setup</code></td><td>Set up the Spotify daemon with all dependencies</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="cmd-section">
+            <h3>Playback</h3>
+            <table class="cmd-table">
+                <thead><tr><th>Command</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>spotify play "query"</code></td><td>Search and play a track, artist, album, or playlist</td></tr>
+                    <tr><td><code>spotify pause</code></td><td>Pause playback</td></tr>
+                    <tr><td><code>spotify resume</code></td><td>Resume playback from where it was paused</td></tr>
+                    <tr><td><code>spotify skip</code></td><td>Skip to next track</td></tr>
+                    <tr><td><code>spotify skip prev</code></td><td>Skip to previous track</td></tr>
+                    <tr><td><code>spotify volume [level]</code></td><td>Show or set volume (absolute or relative like +10, -10)</td></tr>
+                    <tr><td><code>spotify shuffle [on|off]</code></td><td>Toggle or set shuffle mode</td></tr>
+                    <tr><td><code>spotify repeat [off|track|context]</code></td><td>Set repeat mode</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="cmd-section">
+            <h3>Information</h3>
+            <table class="cmd-table">
+                <thead><tr><th>Command</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>spotify current</code></td><td>Show currently playing track</td></tr>
+                    <tr><td><code>spotify devices</code></td><td>List available Spotify devices</td></tr>
+                    <tr><td><code>spotify top [tracks|artists]</code></td><td>Show your top tracks or artists</td></tr>
+                    <tr><td><code>spotify recent</code></td><td>Show recently played tracks</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="cmd-section">
+            <h3>Queue</h3>
+            <table class="cmd-table">
+                <thead><tr><th>Command</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>spotify queue "query"</code></td><td>Add a track to the queue</td></tr>
+                    <tr><td><code>spotify queue:show</code></td><td>Show upcoming tracks in the queue</td></tr>
+                    <tr><td><code>spotify queue:fill</code></td><td>Auto-fill queue using Spotify's recommendation engine</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="cmd-section">
+            <h3>Discovery &amp; Mood</h3>
+            <table class="cmd-table">
+                <thead><tr><th>Command</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>spotify discover "query"</code></td><td>AI-friendly search combining keywords with listening patterns</td></tr>
+                    <tr><td><code>spotify chill</code></td><td>Queue chill, relaxing music</td></tr>
+                    <tr><td><code>spotify flow</code></td><td>Queue focus/flow state music for deep work</td></tr>
+                    <tr><td><code>spotify hype</code></td><td>Queue high-energy hype tracks</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="cmd-section">
+            <h3>Interactive</h3>
+            <table class="cmd-table">
+                <thead><tr><th>Command</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>spotify player</code></td><td>Launch interactive player with visual controls</td></tr>
+                    <tr><td><code>spotify inspire</code></td><td>Display an inspiring quote</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="cmd-section">
+            <h3>Integrations</h3>
+            <table class="cmd-table">
+                <thead><tr><th>Command</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>spotify slack</code></td><td>Share what's playing to Slack</td></tr>
+                    <tr><td><code>spotify serve</code></td><td>Run the Spotify request server (accepts Slack slash commands)</td></tr>
+                    <tr><td><code>spotify webhook:configure</code></td><td>Configure webhook for event forwarding</td></tr>
+                    <tr><td><code>spotify webhook:test</code></td><td>Send a test ping to the configured webhook</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="cmd-section">
+            <h3>System &amp; Daemon</h3>
+            <table class="cmd-table">
+                <thead><tr><th>Command</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>spotify daemon</code></td><td>Manage the Spotify daemon for terminal playback</td></tr>
+                    <tr><td><code>spotify nowplaying</code></td><td>Sync playback to macOS Control Center and enable media keys</td></tr>
+                    <tr><td><code>spotify watch</code></td><td>Watch playback and stream events (track changes, play/pause)</td></tr>
+                    <tr><td><code>spotify event:emit</code></td><td>Emit an event to the event bus</td></tr>
+                    <tr><td><code>spotify vibes</code></td><td>Generate the vibes page — commits grouped by song</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="global-note">
+            <strong>JSON output:</strong> Most commands support <code>--json</code> for machine-readable output, useful for scripting and integrations.
+        </div>
+
+    </div>
+
+    <div class="footer">
+        <a href="https://github.com/the-shit/music">the-shit/music</a> &middot;
+        <a href="index.html">Home</a> &middot;
+        <a href="vibes.html">Vibes</a>
+    </div>
+</body>
+</html>
