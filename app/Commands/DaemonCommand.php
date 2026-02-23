@@ -3,7 +3,6 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -14,7 +13,7 @@ class DaemonCommand extends Command
 {
     use RequiresSpotifyConfig;
 
-    protected $signature = 'daemon {action : start, stop, or status}';
+    protected $signature = 'daemon {action : start, stop, or status} {--name= : Device name for Spotify Connect}';
 
     protected $description = 'Manage the Spotify daemon for terminal playback (experimental)';
 
@@ -111,22 +110,15 @@ class DaemonCommand extends Command
             mkdir($configDir, 0755, true);
         }
 
-        // Get username
-        $spotify = app(SpotifyService::class);
-        $profile = $spotify->getUserProfile();
-        $username = $profile['id'] ?? $profile['display_name'] ?? null;
+        $deviceName = $this->option('name') ?: gethostname() ?: 'Spotify CLI';
 
-        if (! $username) {
-            throw new \Exception('Failed to get Spotify username. Run "spotify login" first.');
-        }
-
-        // Simple configuration
+        // Configuration — uses OAuth via cache_path, no username needed
         $config = "[global]\n".
-                  "username = \"{$username}\"\n".
                   "backend = \"portaudio\"\n".
-                  "device_name = \"Spotify CLI\"\n".
+                  "device_name = \"{$deviceName}\"\n".
                   "bitrate = 320\n".
-                  "volume_normalisation = true\n";
+                  "volume_normalisation = true\n".
+                  "cache_path = \"{$configDir}/cache\"\n";
 
         file_put_contents($configFile, $config);
 

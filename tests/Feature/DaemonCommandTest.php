@@ -167,6 +167,13 @@ describe('DaemonCommand', function () {
                 ->assertExitCode(0);
         });
 
+        it('accepts --name option', function () {
+            $command = $this->app->make(DaemonCommand::class);
+            $definition = $command->getDefinition();
+            expect($definition->hasOption('name'))->toBeTrue();
+            expect($definition->getOption('name')->getDescription())->toBe('Device name for Spotify Connect');
+        });
+
     });
 
     describe('PID file operations', function () {
