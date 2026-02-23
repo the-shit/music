@@ -30,6 +30,8 @@ return [
         'streaming',
         'playlist-read-private',
         'playlist-read-collaborative',
+        'playlist-modify-public',
+        'playlist-modify-private',
         'user-top-read',
         'user-read-recently-played',
     ],

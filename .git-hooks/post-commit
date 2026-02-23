@@ -1,0 +1,14 @@
+#!/bin/bash
+# Regenerate the vibes page after every commit.
+# The page shows commits grouped by the Spotify track playing when they were written.
+
+REPO_DIR="$(git rev-parse --show-toplevel)"
+SPOTIFY="$REPO_DIR/spotify"
+
+# Only run if the CLI exists
+[ ! -f "$SPOTIFY" ] && exit 0
+
+# Regenerate silently in the background (don't slow down commits)
+php "$SPOTIFY" vibes --no-open --output="$REPO_DIR/docs/index.html" > /dev/null 2>&1 &
+
+exit 0

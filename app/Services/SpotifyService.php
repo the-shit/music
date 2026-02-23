@@ -62,6 +62,10 @@ class SpotifyService
         // If we have a refresh token and the access token is expired (or about to expire in 60 seconds)
         if ($this->refreshToken && (! $this->expiresAt || $this->expiresAt < (time() + 60))) {
             $this->refreshAccessToken();
+
+            if (! $this->accessToken) {
+                throw new \Exception('Session expired. Run "spotify login" to re-authenticate.');
+            }
         }
     }
 
@@ -82,8 +86,17 @@ class SpotifyService
             $this->accessToken = $data['access_token'];
             $this->expiresAt = time() + ($data['expires_in'] ?? 3600);
 
+            // Spotify may rotate refresh tokens — always capture the new one
+            if (! empty($data['refresh_token'])) {
+                $this->refreshToken = $data['refresh_token'];
+            }
+
             // Save updated token data
             $this->saveTokenData();
+        } else {
+            // Refresh failed — token is likely revoked, clear it so callers know
+            $this->accessToken = null;
+            $this->expiresAt = null;
         }
     }
 
@@ -784,6 +797,147 @@ class SpotifyService
         }
 
         return null;
+    }
+
+    /**
+     * Get multiple tracks by IDs (batch, max 50)
+     */
+    public function getTracks(array $trackIds): array
+    {
+        if (! $this->accessToken || empty($trackIds)) {
+            return [];
+        }
+
+        $this->ensureValidToken();
+
+        $tracks = [];
+
+        // Spotify allows max 50 IDs per request
+        foreach (array_chunk($trackIds, 50) as $chunk) {
+            $response = Http::withToken($this->accessToken)
+                ->get($this->baseUri.'tracks', [
+                    'ids' => implode(',', $chunk),
+                ]);
+
+            if ($response->successful()) {
+                foreach ($response->json()['tracks'] ?? [] as $track) {
+                    if (! $track) {
+                        continue;
+                    }
+                    $images = $track['album']['images'] ?? [];
+                    $tracks[$track['id']] = [
+                        'id' => $track['id'],
+                        'name' => $track['name'],
+                        'artist' => $track['artists'][0]['name'] ?? 'Unknown',
+                        'album' => $track['album']['name'] ?? 'Unknown',
+                        'uri' => $track['uri'],
+                        'image_large' => $images[0]['url'] ?? null,
+                        'image_medium' => $images[1]['url'] ?? null,
+                        'image_small' => $images[2]['url'] ?? null,
+                    ];
+                }
+            }
+        }
+
+        return $tracks;
+    }
+
+    /**
+     * Create a playlist for the authenticated user
+     */
+    public function createPlaylist(string $name, string $description = '', bool $public = true): ?array
+    {
+        if (! $this->accessToken) {
+            throw new \Exception('Not authenticated. Run "music login" first.');
+        }
+
+        $this->ensureValidToken();
+
+        $profile = $this->getUserProfile();
+        if (! $profile) {
+            return null;
+        }
+
+        $response = Http::withToken($this->accessToken)
+            ->post($this->baseUri."users/{$profile['id']}/playlists", [
+                'name' => $name,
+                'description' => $description,
+                'public' => $public,
+            ]);
+
+        if ($response->successful()) {
+            return $response->json();
+        }
+
+        return null;
+    }
+
+    /**
+     * Replace all tracks in a playlist
+     */
+    public function replacePlaylistTracks(string $playlistId, array $trackUris): bool
+    {
+        if (! $this->accessToken) {
+            throw new \Exception('Not authenticated. Run "music login" first.');
+        }
+
+        $this->ensureValidToken();
+
+        // Spotify allows max 100 URIs per request
+        $first = true;
+        foreach (array_chunk($trackUris, 100) as $chunk) {
+            if ($first) {
+                $response = Http::withToken($this->accessToken)
+                    ->put($this->baseUri."playlists/{$playlistId}/tracks", [
+                        'uris' => $chunk,
+                    ]);
+                $first = false;
+            } else {
+                $response = Http::withToken($this->accessToken)
+                    ->post($this->baseUri."playlists/{$playlistId}/tracks", [
+                        'uris' => $chunk,
+                    ]);
+            }
+
+            if (! $response->successful()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Find a playlist by name in user's playlists
+     */
+    public function findPlaylistByName(string $name): ?array
+    {
+        $playlists = $this->getPlaylists(50);
+
+        foreach ($playlists as $playlist) {
+            if (($playlist['name'] ?? '') === $name) {
+                return $playlist;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Update playlist details (cover image, description, etc.)
+     */
+    public function updatePlaylistDetails(string $playlistId, array $details): bool
+    {
+        if (! $this->accessToken) {
+            return false;
+        }
+
+        $this->ensureValidToken();
+
+        $response = Http::withToken($this->accessToken)
+            ->put($this->baseUri."playlists/{$playlistId}", $details);
+
+        return $response->successful();
     }
 
     /**

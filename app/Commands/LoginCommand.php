@@ -64,16 +64,7 @@ class LoginCommand extends Command
         info("📋 Using redirect URI: {$redirectUri}");
 
         // Generate auth URL
-        $scopes = [
-            'user-read-playback-state',
-            'user-modify-playback-state',
-            'user-read-currently-playing',
-            'streaming',
-            'playlist-read-private',
-            'playlist-read-collaborative',
-            'user-top-read',
-            'user-read-recently-played',
-        ];
+        $scopes = config('spotify.scopes');
 
         $state = bin2hex(random_bytes(16));
         $authUrl = 'https://accounts.spotify.com/authorize?'.http_build_query([

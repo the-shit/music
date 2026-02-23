@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibes — Commit Soundtrack</title>
+    <meta name="description" content="Every commit has a vibe. 4 commits, 3 tracks.">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0a0a;
+            --surface: #141414;
+            --surface-hover: #1a1a1a;
+            --border: #282828;
+            --text: #e1e1e1;
+            --text-dim: #6a6a6a;
+            --text-muted: #404040;
+            --green: #1DB954;
+            --green-dim: #1a7a3a;
+            --commit-type-feat: #1DB954;
+            --commit-type-fix: #e74c3c;
+            --commit-type-test: #9b59b6;
+            --commit-type-ci: #3498db;
+            --commit-type-refactor: #f39c12;
+            --commit-type-docs: #1abc9c;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 80px 20px 60px;
+            background: linear-gradient(180deg, #1DB95415 0%, transparent 100%);
+            position: relative;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 12px;
+        }
+
+        .hero h1 span { color: var(--green); }
+
+        .hero .subtitle {
+            color: var(--text-dim);
+            font-size: 1.15rem;
+            max-width: 520px;
+            margin: 0 auto 24px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 32px;
+            justify-content: center;
+            margin-top: 24px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--green);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .playlist-link {
+            display: inline-block;
+            margin-top: 28px;
+            padding: 12px 28px;
+            background: var(--green);
+            color: #000;
+            font-weight: 700;
+            font-size: 0.95rem;
+            border-radius: 50px;
+            text-decoration: none;
+            transition: transform 0.15s, background 0.15s;
+        }
+
+        .playlist-link:hover {
+            transform: scale(1.05);
+            background: #1ed760;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 20px 80px;
+        }
+
+        .track-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            margin-bottom: 32px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+            position: relative;
+        }
+
+        .track-card:hover {
+            border-color: var(--green-dim);
+        }
+
+        .track-hero {
+            position: relative;
+            padding: 24px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .track-hero-bg {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            filter: blur(40px) brightness(0.3);
+            transform: scale(1.5);
+        }
+
+        .track-art {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            object-fit: cover;
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .track-info {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .track-name {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .track-artist {
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.7);
+        }
+
+        .track-album {
+            font-size: 0.8rem;
+            color: rgba(255,255,255,0.4);
+            margin-top: 2px;
+        }
+
+        .track-badge {
+            position: relative;
+            z-index: 1;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--green);
+            white-space: nowrap;
+        }
+
+        .spotify-embed {
+            padding: 0 24px;
+            margin: 0 0 8px;
+        }
+
+        .spotify-embed iframe {
+            border-radius: 12px;
+        }
+
+        .commits {
+            padding: 0 24px 24px;
+        }
+
+        .commit {
+            display: flex;
+            gap: 12px;
+            padding: 12px 0;
+            border-top: 1px solid var(--border);
+            align-items: flex-start;
+        }
+
+        .commit:first-child {
+            border-top: none;
+        }
+
+        .commit-hash {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.8rem;
+            color: var(--green);
+            background: rgba(29, 185, 84, 0.08);
+            padding: 2px 8px;
+            border-radius: 4px;
+            flex-shrink: 0;
+            text-decoration: none;
+        }
+
+        .commit-hash:hover {
+            background: rgba(29, 185, 84, 0.15);
+        }
+
+        .commit-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .commit-subject {
+            font-size: 0.9rem;
+            color: var(--text);
+            word-break: break-word;
+        }
+
+        .commit-type {
+            display: inline-block;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 1px 6px;
+            border-radius: 3px;
+            margin-right: 4px;
+        }
+
+        .type-feat { background: rgba(29, 185, 84, 0.15); color: var(--commit-type-feat); }
+        .type-fix { background: rgba(231, 76, 60, 0.15); color: var(--commit-type-fix); }
+        .type-test { background: rgba(155, 89, 182, 0.15); color: var(--commit-type-test); }
+        .type-ci { background: rgba(52, 152, 219, 0.15); color: var(--commit-type-ci); }
+        .type-refactor { background: rgba(243, 156, 18, 0.15); color: var(--commit-type-refactor); }
+        .type-docs { background: rgba(26, 188, 156, 0.15); color: var(--commit-type-docs); }
+
+        .commit-meta {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-top: 2px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer a {
+            color: var(--green);
+            text-decoration: none;
+        }
+
+        @media (max-width: 600px) {
+            .hero h1 { font-size: 2.2rem; }
+            .stats { gap: 20px; }
+            .stat-value { font-size: 1.5rem; }
+            .track-hero { padding: 16px; }
+            .track-art { width: 60px; height: 60px; }
+            .spotify-embed, .commits { padding-left: 16px; padding-right: 16px; }
+            .track-badge { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>every commit has a <span>vibe</span></h1>
+        <p class="subtitle">This project requires every commit to include the Spotify track playing when the code was written. Here's the soundtrack.</p>
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value">4</div>
+                <div class="stat-label">Commits</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">3</div>
+                <div class="stat-label">Tracks</div>
+            </div>
+        </div>
+        
+    </div>
+
+    <div class="container">
+        
+        <div class="track-card">
+            <div class="track-hero">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273215cac8c30b47bb1bfb9d2d1')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02215cac8c30b47bb1bfb9d2d1" alt="Potato Salad" loading="lazy">
+                <div class="track-info">
+                    <div class="track-name">Potato Salad</div>
+                    <div class="track-artist">Tyler, The Creator</div>
+                    <div class="track-album">Potato Salad</div>
+                </div>
+                <div class="track-badge">2 commits</div>
+            </div>
+            <div class="spotify-embed">
+                <iframe
+                    src="https://open.spotify.com/embed/track/1jzIJcHCXneHw7ojC6LXiF?utm_source=generator&theme=0"
+                    width="100%" height="80"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy">
+                </iframe>
+            </div>
+            <div class="commits">
+                
+                <div class="commit">
+                    <code class="commit-hash">c585635</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-test">test</span>test: push coverage from 47% to 52.8% — clears Sentinel Gate 50% threshold (#21)</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
+                    </div>
+                </div>
+                <div class="commit">
+                    <code class="commit-hash">22acd13</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-feat">feat</span>feat: Spotify vibe check CI — no track URL, no merge</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="track-card">
+            <div class="track-hero">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273ff2db662746917b1675281fc')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02ff2db662746917b1675281fc" alt="Low Teens (Deluxe Edition)" loading="lazy">
+                <div class="track-info">
+                    <div class="track-name">Map Change</div>
+                    <div class="track-artist">Every Time I Die</div>
+                    <div class="track-album">Low Teens (Deluxe Edition)</div>
+                </div>
+                <div class="track-badge">1 commit</div>
+            </div>
+            <div class="spotify-embed">
+                <iframe
+                    src="https://open.spotify.com/embed/track/6wqBUUWSTn39vEXVM67avV?utm_source=generator&theme=0"
+                    width="100%" height="80"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy">
+                </iframe>
+            </div>
+            <div class="commits">
+                
+                <div class="commit">
+                    <code class="commit-hash">d6df3b4</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-refactor">refactor</span>refactor: unify config dir, fix PHPStan, remove legacy fallbacks</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="track-card">
+            <div class="track-hero">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273b5bc4686d08a5812a63f180d')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02b5bc4686d08a5812a63f180d" alt="In Love and Death" loading="lazy">
+                <div class="track-info">
+                    <div class="track-name">All That I&#039;ve Got</div>
+                    <div class="track-artist">The Used</div>
+                    <div class="track-album">In Love and Death</div>
+                </div>
+                <div class="track-badge">1 commit</div>
+            </div>
+            <div class="spotify-embed">
+                <iframe
+                    src="https://open.spotify.com/embed/track/6IxQ0PdozaZKch1m8tGCwb?utm_source=generator&theme=0"
+                    width="100%" height="80"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy">
+                </iframe>
+            </div>
+            <div class="commits">
+                
+                <div class="commit">
+                    <code class="commit-hash">9f07631</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-feat">feat</span>feat: queue:fill command using Spotify recommendations API</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Generated February 23, 2026 at 2:16 AM<br>
+        Every commit is a <a href="https://github.com/the-shit/music">vibe check</a>
+    </div>
+</body>
+</html>
