@@ -184,8 +184,8 @@ class DaemonSetupCommand extends Command
         $this->newLine();
 
         info('Usage:');
-        info('  spotify play "song name" --device="Spotify CLI"');
-        info('  spotify daemon start');
+        info('  spotify daemon start --name="My Device"');
+        info('  spotify play "song name" --device="My Device"');
         info('  spotify daemon stop');
         $this->newLine();
     }
