@@ -1,0 +1,73 @@
+name: Spotify Vibe Check
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  vibe-check:
+    name: Vibe Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check commits for Spotify URLs
+        run: |
+          # Get all commits in this push/PR
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            COMMITS=$(git log --format="%H %s" origin/${{ github.base_ref }}..HEAD)
+          else
+            COMMITS=$(git log --format="%H %s" ${{ github.event.before }}..${{ github.sha }} 2>/dev/null || git log --format="%H %s" -1)
+          fi
+
+          echo "Checking commits for Spotify track URLs..."
+          echo ""
+
+          FAILED=0
+          FAILED_COMMITS=""
+
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+
+            HASH=$(echo "$line" | cut -d' ' -f1)
+            MSG=$(git log --format="%B" -n 1 "$HASH")
+
+            SHORT="${HASH:0:7}"
+
+            if echo "$MSG" | grep -qE "open\.spotify\.com/track/[A-Za-z0-9]+"; then
+              TRACK_URL=$(echo "$MSG" | grep -oE "https://open\.spotify\.com/track/[A-Za-z0-9]+" | head -1)
+              echo "✅ $SHORT — vibing ($TRACK_URL)"
+            else
+              echo "❌ $SHORT — no Spotify track URL found"
+              echo ""
+              echo "   Commit message:"
+              echo "$MSG" | sed 's/^/   | /'
+              echo ""
+              FAILED=1
+              FAILED_COMMITS="$FAILED_COMMITS $SHORT"
+            fi
+          done <<< "$COMMITS"
+
+          if [ "$FAILED" = "1" ]; then
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🎵 VIBE CHECK FAILED"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+            echo "This repo requires every commit to include the Spotify"
+            echo "track you were listening to when you wrote the code."
+            echo ""
+            echo "See CONTRIBUTING.md for setup instructions."
+            echo ""
+            echo "Commits missing a track:$FAILED_COMMITS"
+            exit 1
+          fi
+
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "🎵 VIBE CHECK PASSED — good taste confirmed"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

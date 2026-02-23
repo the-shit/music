@@ -1,0 +1,79 @@
+#!/bin/bash
+# Spotify Now-Playing commit trailer
+# Appends the currently playing Spotify track to commit messages.
+# Skips silently for work repos (pstrax) or when nothing is playing.
+
+COMMIT_MSG_FILE="$1"
+COMMIT_SOURCE="$2"  # message, template, merge, squash, commit
+
+# Only run on fresh commits (not amends, merges, squashes)
+if [ "$COMMIT_SOURCE" = "merge" ] || [ "$COMMIT_SOURCE" = "squash" ] || [ "$COMMIT_SOURCE" = "commit" ]; then
+    exit 0
+fi
+
+# Safety: never run on work repos
+REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+if echo "$REMOTE_URL" | grep -qiE "pstrax"; then
+    exit 0
+fi
+
+# Get access token from ~/.shit-music/token.json
+TOKEN_FILE="$HOME/.shit-music/token.json"
+if [ ! -f "$TOKEN_FILE" ]; then
+    exit 0
+fi
+
+ACCESS_TOKEN=$(python3 -c "
+import json, sys
+try:
+    d = json.load(open('$TOKEN_FILE'))
+    t = d.get('access_token', '')
+    exp = d.get('expires_at', 0)
+    import time
+    if t and exp > time.time():
+        print(t)
+except:
+    pass
+" 2>/dev/null)
+
+if [ -z "$ACCESS_TOKEN" ]; then
+    exit 0
+fi
+
+# Call Spotify API for current playback
+RESPONSE=$(curl -sf --max-time 3 \
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
+    "https://api.spotify.com/v1/me/player/currently-playing" 2>/dev/null)
+
+if [ -z "$RESPONSE" ]; then
+    exit 0
+fi
+
+# Parse track info
+TRACK_INFO=$(python3 -c "
+import json, sys
+try:
+    d = json.loads('''$RESPONSE''')
+    if not d.get('is_playing'):
+        sys.exit(1)
+    item = d.get('item', {})
+    if not item:
+        sys.exit(1)
+    name = item.get('name', '')
+    artist = item.get('artists', [{}])[0].get('name', '')
+    track_id = item.get('id', '')
+    url = f'https://open.spotify.com/track/{track_id}'
+    print(f'{artist} - {name}|{url}')
+except:
+    sys.exit(1)
+" 2>/dev/null)
+
+if [ -z "$TRACK_INFO" ]; then
+    exit 0
+fi
+
+DISPLAY="${TRACK_INFO%%|*}"
+URL="${TRACK_INFO##*|}"
+
+# Append as a git trailer (blank line + trailer)
+printf "\n\n🎵 Now playing: %s\n   %s\n" "$DISPLAY" "$URL" >> "$COMMIT_MSG_FILE"
