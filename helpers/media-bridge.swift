@@ -29,13 +29,13 @@ class MediaBridge: NSObject {
 
         center.playCommand.isEnabled = true
         center.playCommand.addTarget { [weak self] _ in
-            self?.run("resume")
+            self?.runAndRefresh("resume")
             return .success
         }
 
         center.pauseCommand.isEnabled = true
         center.pauseCommand.addTarget { [weak self] _ in
-            self?.run("pause")
+            self?.runAndRefresh("pause")
             return .success
         }
 
@@ -47,13 +47,13 @@ class MediaBridge: NSObject {
 
         center.nextTrackCommand.isEnabled = true
         center.nextTrackCommand.addTarget { [weak self] _ in
-            self?.run("skip")
+            self?.runAndRefresh("skip", delay: 1.5)
             return .success
         }
 
         center.previousTrackCommand.isEnabled = true
         center.previousTrackCommand.addTarget { [weak self] _ in
-            self?.run("skip", args: ["--previous"])
+            self?.runAndRefresh("skip", args: ["--previous"], delay: 1.5)
             return .success
         }
 
@@ -63,7 +63,7 @@ class MediaBridge: NSObject {
                 return .commandFailed
             }
             let ms = Int(posEvent.positionTime * 1000)
-            self?.run("seek", args: [String(ms)])
+            self?.runAndRefresh("seek", args: [String(ms)])
             return .success
         }
     }
@@ -127,18 +127,21 @@ class MediaBridge: NSObject {
 
     // MARK: - CLI execution
 
+    private func runAndRefresh(_ command: String, args: [String] = [], delay: Double = 0.5) {
+        run(command, args: args)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.updateNowPlaying()
+        }
+    }
+
     private func togglePlayPause() {
         let output = runCapture("current", args: ["--json"])
         if let data = output.data(using: .utf8),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let isPlaying = json["is_playing"] as? Bool {
-            run(isPlaying ? "pause" : "resume")
+            runAndRefresh(isPlaying ? "pause" : "resume")
         } else {
-            run("resume")
-        }
-        // Immediate UI update
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.updateNowPlaying()
+            runAndRefresh("resume")
         }
     }
 
