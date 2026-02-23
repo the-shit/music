@@ -34,9 +34,15 @@ jobs:
             [ -z "$line" ] && continue
 
             HASH=$(echo "$line" | cut -d' ' -f1)
+            SHORT="${HASH:0:7}"
             MSG=$(git log --format="%B" -n 1 "$HASH")
 
-            SHORT="${HASH:0:7}"
+            # Skip merge commits
+            PARENT_COUNT=$(git cat-file -p "$HASH" | grep -c "^parent ")
+            if [ "$PARENT_COUNT" -gt 1 ]; then
+              echo "⏭️  $SHORT — merge commit (skipped)"
+              continue
+            fi
 
             if echo "$MSG" | grep -qE "open\.spotify\.com/track/[A-Za-z0-9]+"; then
               TRACK_URL=$(echo "$MSG" | grep -oE "https://open\.spotify\.com/track/[A-Za-z0-9]+" | head -1)
