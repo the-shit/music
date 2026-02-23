@@ -80,4 +80,114 @@ describe('PlayCommand', function () {
             ->assertExitCode(1);
     });
 
+    it('plays with --json flag suppresses normal output', function () {
+        $searchResult = [
+            'uri' => 'spotify:track:abc',
+            'name' => 'JSON Song',
+            'artist' => 'JSON Artist',
+        ];
+
+        $this->mock(SpotifyService::class, function ($mock) use ($searchResult) {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            $mock->shouldReceive('search')->once()->andReturn($searchResult);
+            $mock->shouldReceive('play')->once()->with('spotify:track:abc', null);
+        });
+
+        $this->artisan('play', ['query' => 'test', '--json' => true])
+            ->doesntExpectOutput('🎵 Searching for: test')
+            ->doesntExpectOutput('▶️  Playing: JSON Song by JSON Artist')
+            ->assertExitCode(0);
+    });
+
+    it('adds to queue with --queue flag', function () {
+        $searchResult = [
+            'uri' => 'spotify:track:456',
+            'name' => 'Queue Song',
+            'artist' => 'Queue Artist',
+        ];
+
+        $this->mock(SpotifyService::class, function ($mock) use ($searchResult) {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            $mock->shouldReceive('search')->once()->andReturn($searchResult);
+            $mock->shouldReceive('addToQueue')->once()->with('spotify:track:456');
+        });
+
+        $this->artisan('play', ['query' => 'test', '--queue' => true])
+            ->expectsOutputToContain('Added to queue: Queue Song by Queue Artist')
+            ->assertExitCode(0);
+    });
+
+    it('adds to queue with --queue and --json flags', function () {
+        $searchResult = [
+            'uri' => 'spotify:track:789',
+            'name' => 'Queue JSON Song',
+            'artist' => 'Queue Artist',
+        ];
+
+        $this->mock(SpotifyService::class, function ($mock) use ($searchResult) {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            $mock->shouldReceive('search')->once()->andReturn($searchResult);
+            $mock->shouldReceive('addToQueue')->once()->with('spotify:track:789');
+        });
+
+        $this->artisan('play', ['query' => 'test', '--queue' => true, '--json' => true])
+            ->assertExitCode(0);
+    });
+
+    it('outputs json on no search results with --json flag', function () {
+        $this->mock(SpotifyService::class, function ($mock) {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            $mock->shouldReceive('search')->once()->andReturn(null);
+        });
+
+        $this->artisan('play', ['query' => 'nothing', '--json' => true])
+            ->assertExitCode(1);
+    });
+
+    it('outputs json error on API exception with --json flag', function () {
+        $this->mock(SpotifyService::class, function ($mock) {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            $mock->shouldReceive('search')->once()->andThrow(new Exception('API down'));
+        });
+
+        $this->artisan('play', ['query' => 'test', '--json' => true])
+            ->assertExitCode(1);
+    });
+
+    it('finds device by name and plays on it', function () {
+        $searchResult = [
+            'uri' => 'spotify:track:device1',
+            'name' => 'Device Song',
+            'artist' => 'Artist',
+        ];
+
+        $devices = [
+            ['id' => 'device-id-123', 'name' => 'Living Room Speaker'],
+        ];
+
+        $this->mock(SpotifyService::class, function ($mock) use ($searchResult, $devices) {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            $mock->shouldReceive('getDevices')->once()->andReturn($devices);
+            $mock->shouldReceive('search')->once()->andReturn($searchResult);
+            $mock->shouldReceive('play')->once()->with('spotify:track:device1', 'device-id-123');
+        });
+
+        $this->artisan('play', ['query' => 'test', '--device' => 'Living Room'])
+            ->expectsOutputToContain('Using device: Living Room Speaker')
+            ->assertExitCode(0);
+    });
+
+    it('fails when specified device is not found', function () {
+        $this->mock(SpotifyService::class, function ($mock) {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            $mock->shouldReceive('getDevices')->once()->andReturn([
+                ['id' => 'device-1', 'name' => 'Kitchen'],
+            ]);
+        });
+
+        $this->artisan('play', ['query' => 'test', '--device' => 'nonexistent'])
+            ->expectsOutputToContain("Device 'nonexistent' not found")
+            ->assertExitCode(1);
+    });
+
 });

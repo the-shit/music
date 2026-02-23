@@ -239,10 +239,9 @@ echo "Waiting for Spotify callback...";
         return $serverScript;
     }
 
-    private function waitForAuthCode(): ?string
+    private function waitForAuthCode(int $timeout = 60): ?string
     {
         $codeFile = sys_get_temp_dir().'/spotify_code.txt';
-        $timeout = 60;
         $start = time();
 
         // Clear old code file if exists
