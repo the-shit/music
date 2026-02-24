@@ -58,6 +58,7 @@ describe('VibesCommand', function () {
                 ->once()
                 ->with(['4iV5W9uYEdYUVa79Axb7Rh'])
                 ->andReturn([]);
+            $mock->shouldReceive('getTracksViaOEmbed')->andReturn([]);
         });
 
         $tempFile = sys_get_temp_dir().'/vibes-test-'.uniqid().'.html';
@@ -102,6 +103,7 @@ describe('VibesCommand', function () {
             $mock->shouldReceive('getTracks')
                 ->once()
                 ->andReturn([]);
+            $mock->shouldReceive('getTracksViaOEmbed')->andReturn([]);
         });
 
         Artisan::call('vibes', ['--json' => true]);
@@ -130,6 +132,7 @@ describe('VibesCommand', function () {
         $this->mock(SpotifyService::class, function ($mock) {
             $mock->shouldReceive('isConfigured')->andReturn(false);
             $mock->shouldNotReceive('getTracks');
+            $mock->shouldReceive('getTracksViaOEmbed')->andReturn([]);
         });
 
         $tempFile = sys_get_temp_dir().'/vibes-test-'.uniqid().'.html';
