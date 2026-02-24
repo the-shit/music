@@ -59,13 +59,14 @@ describe('SetupCommand', function () {
     describe('reset flag', function () {
 
         it('allows reset even when already configured', function () {
-            $envFile = base_path('.env');
-            $content = "SPOTIFY_CLIENT_ID=existingclientid1234567890\n";
-            $content .= "SPOTIFY_CLIENT_SECRET=existingclientsecret12345\n";
-            file_put_contents($envFile, $content);
+            // Write credentials to the test config directory (not .env)
+            $credentialsFile = $this->testConfigDir.'/credentials.json';
+            file_put_contents($credentialsFile, json_encode([
+                'client_id' => 'existingclientid1234567890',
+                'client_secret' => 'existingclientsecret12345',
+            ]));
 
             // With reset flag, it should proceed to setup
-            // We'll just verify it doesn't immediately return "already configured"
             Prompt::interactive(false);
 
             $this->artisan('setup', ['--reset' => true])
@@ -74,17 +75,11 @@ describe('SetupCommand', function () {
 
     });
 
-    describe('env file handling', function () {
+    describe('config dir handling', function () {
 
-        it('creates env file if it does not exist', function () {
-            $envFile = base_path('.env');
-
-            // Ensure env file exists for testing
-            if (! file_exists($envFile)) {
-                file_put_contents($envFile, '');
-            }
-
-            expect(file_exists($envFile))->toBeTrue();
+        it('uses config dir for credential storage', function () {
+            $configDir = config('spotify.config_dir');
+            expect(is_dir($configDir))->toBeTrue();
         });
 
     });

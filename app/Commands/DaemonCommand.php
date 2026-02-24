@@ -429,6 +429,11 @@ class DaemonCommand extends Command
             return false;
         }
 
+        // Only interact with a LaunchAgent we installed (plist must exist at our expected path)
+        if (! $this->hasLaunchAgent()) {
+            return false;
+        }
+
         $output = trim((string) shell_exec('launchctl list '.self::LAUNCH_AGENT_LABEL.' 2>&1'));
 
         return ! empty($output) && ! str_contains($output, 'Could not find');
