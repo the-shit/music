@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
+use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -65,7 +66,9 @@ class DaemonCommand extends Command
             warning("Found orphaned spotifyd (PID: {$orphanPid}) — adopting it");
             $this->savePid((int) $orphanPid);
             info('✅ Daemon adopted');
-            info('📱 Run: spotify devices');
+
+            $deviceName = $this->option('name') ?: 'Work Mac';
+            $this->transferPlaybackToDaemon($deviceName);
 
             return self::SUCCESS;
         }
@@ -110,7 +113,9 @@ class DaemonCommand extends Command
 
         $this->savePid($pid);
         info('✅ Daemon started');
-        info('📱 Give it a moment, then run: spotify devices');
+
+        $deviceName = $this->option('name') ?: 'Work Mac';
+        $this->transferPlaybackToDaemon($deviceName);
 
         return self::SUCCESS;
     }
@@ -237,6 +242,42 @@ class DaemonCommand extends Command
 
         file_put_contents($this->pidFile, $pid);
         chmod($this->pidFile, 0600);
+    }
+
+    private function transferPlaybackToDaemon(string $deviceName): void
+    {
+        try {
+            $spotify = app(SpotifyService::class);
+
+            if (! $spotify->isConfigured()) {
+                return;
+            }
+
+            // Poll for the daemon device to appear (up to 8 seconds)
+            $device = null;
+            for ($i = 0; $i < 8; $i++) {
+                $devices = $spotify->getDevices();
+                foreach ($devices as $d) {
+                    if (($d['name'] ?? '') === $deviceName) {
+                        $device = $d;
+                        break 2;
+                    }
+                }
+                sleep(1);
+            }
+
+            if (! $device) {
+                warning("Device \"{$deviceName}\" not yet visible to Spotify — run: spotify devices");
+
+                return;
+            }
+
+            $spotify->transferPlayback($device['id'], true);
+            info("📱 Playback transferred to \"{$deviceName}\"");
+        } catch (\Throwable $e) {
+            warning('Could not transfer playback: '.$e->getMessage());
+            info('📱 Run: spotify devices');
+        }
     }
 
     private function invalidAction(string $action): int
