@@ -48,6 +48,16 @@ class VibesCommand extends Command
             );
         }
 
+        // Fall back to oEmbed for any tracks missing metadata (no auth needed)
+        $missingIds = array_diff($trackIds, array_keys($trackMeta));
+        if (! empty($missingIds)) {
+            $oembedMeta = spin(
+                fn () => $spotify->getTracksViaOEmbed($missingIds),
+                'Fetching track info via oEmbed...'
+            );
+            $trackMeta = array_merge($trackMeta, $oembedMeta);
+        }
+
         // Enrich groups with metadata
         foreach ($grouped as &$group) {
             $group['meta'] = $trackMeta[$group['track_id']] ?? null;

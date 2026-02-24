@@ -910,6 +910,68 @@ class SpotifyService
     }
 
     /**
+     * Fetch track metadata via oEmbed + page scraping (no auth required).
+     * Used as fallback when API credentials aren't available.
+     */
+    public function getTracksViaOEmbed(array $trackIds): array
+    {
+        $tracks = [];
+
+        foreach ($trackIds as $trackId) {
+            try {
+                $trackUrl = "https://open.spotify.com/track/{$trackId}";
+
+                // oEmbed gives us title + thumbnail (no auth required)
+                $oembed = Http::timeout(5)
+                    ->get("https://open.spotify.com/oembed", ['url' => $trackUrl])
+                    ->json();
+
+                if (! $oembed) {
+                    continue;
+                }
+
+                $name = $oembed['title'] ?? 'Unknown Track';
+                $thumbnail = $oembed['thumbnail_url'] ?? null;
+
+                // Fetch page meta tags for artist name
+                $artist = 'Unknown Artist';
+                $album = '';
+                $pageResponse = Http::timeout(5)->get($trackUrl);
+                if ($pageResponse->successful()) {
+                    $html = $pageResponse->body();
+                    if (preg_match('/music:musician_description"\s+content="([^"]+)"/', $html, $m)) {
+                        $artist = $m[1];
+                    }
+                    if (preg_match('/og:description"\s+content="([^"]+)"/', $html, $m)) {
+                        // Format: "Artist · Album · Song · Year"
+                        $parts = array_map('trim', explode('·', html_entity_decode($m[1])));
+                        $album = $parts[1] ?? '';
+                    }
+                }
+
+                // Spotify CDN image prefixes: 0000b273=640px, 00001e02=300px, 00004851=64px
+                $imageLarge = $thumbnail ? str_replace('00001e02', '0000b273', $thumbnail) : null;
+                $imageSmall = $thumbnail ? str_replace('00001e02', '00004851', $thumbnail) : null;
+
+                $tracks[$trackId] = [
+                    'id' => $trackId,
+                    'name' => $name,
+                    'artist' => $artist,
+                    'album' => $album,
+                    'uri' => "spotify:track:{$trackId}",
+                    'image_large' => $imageLarge,
+                    'image_medium' => $thumbnail,
+                    'image_small' => $imageSmall,
+                ];
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return $tracks;
+    }
+
+    /**
      * Create a playlist for the authenticated user
      */
     public function createPlaylist(string $name, string $description = '', bool $public = true): ?array
