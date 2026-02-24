@@ -8,6 +8,8 @@ Usage:
     spotify watch --json --interval=3 | python3 nowplaying-bridge.py
 """
 
+import os
+import shutil
 import sys
 import json
 import subprocess
@@ -19,8 +21,16 @@ from Foundation import NSObject, NSRunLoop, NSDate
 from AppKit import NSApplication
 import MediaPlayer
 
-SPOTIFY_CLI = "/Users/jordanpartridge/packages/the-shit/spotify-cli/spotify"
-PHP_BIN = "/Users/jordanpartridge/Library/Application Support/Herd/bin/php"
+# Derive paths dynamically so the bridge works on any machine.
+# SCRIPT_DIR = the directory this script lives in (i.e. <project>/bin/)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(SCRIPT_DIR)
+
+# The 'spotify' Laravel Zero binary lives at the project root.
+SPOTIFY_CLI = os.path.join(PROJECT_DIR, "spotify")
+
+# Find PHP on the system PATH — works with Herd, Homebrew, or any other install.
+PHP_BIN = shutil.which("php") or "php"
 
 
 class NowPlayingBridge(NSObject):
