@@ -25,13 +25,12 @@ class NowPlayingCommand extends Command
             return self::FAILURE;
         }
 
-        $scriptDir = dirname(__DIR__, 2).'/bin';
-        $bridgeScript = $scriptDir.'/nowplaying-bridge.py';
-        $spotifyBin = dirname(__DIR__, 2).'/spotify';
+        $bridgeScript = $this->resolveBinFile('nowplaying-bridge.py');
+        $spotifyBin = $this->resolveSpotifyBin();
         $interval = max(2, (int) $this->option('interval'));
 
-        if (! file_exists($bridgeScript)) {
-            $this->error("Bridge script not found: {$bridgeScript}");
+        if (! $bridgeScript || ! file_exists($bridgeScript)) {
+            $this->error('Bridge script not found: nowplaying-bridge.py');
 
             return self::FAILURE;
         }
@@ -60,6 +59,63 @@ class NowPlayingCommand extends Command
         passthru($cmd, $exitCode);
 
         return $exitCode === 0 ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * Resolve a file from the bin/ directory, extracting from PHAR if needed.
+     *
+     * Inside a PHAR, external processes (python3, bash) cannot read files at
+     * phar:// URIs, so we copy the file to a temp directory first.
+     */
+    private function resolveBinFile(string $filename): ?string
+    {
+        $pharPath = \Phar::running(false);
+
+        if ($pharPath !== '') {
+            // Running inside a PHAR — extract to temp
+            $pharBinPath = \Phar::running(true) . '/bin/' . $filename;
+
+            if (! file_exists($pharBinPath)) {
+                return null;
+            }
+
+            $tempDir = sys_get_temp_dir() . '/spotify-cli-bin';
+            if (! is_dir($tempDir)) {
+                mkdir($tempDir, 0755, true);
+            }
+
+            $tempFile = $tempDir . '/' . $filename;
+
+            // Re-extract if missing or PHAR is newer than cached copy
+            if (! file_exists($tempFile) || filemtime($pharPath) > filemtime($tempFile)) {
+                copy($pharBinPath, $tempFile);
+                chmod($tempFile, 0755);
+            }
+
+            return $tempFile;
+        }
+
+        // Not in a PHAR — use the file directly from the project tree
+        $path = dirname(__DIR__, 2) . '/bin/' . $filename;
+
+        return file_exists($path) ? $path : null;
+    }
+
+    /**
+     * Resolve the spotify binary path.
+     *
+     * Inside a PHAR the binary IS the PHAR file itself.
+     * Outside a PHAR it's the `spotify` script at the project root.
+     */
+    private function resolveSpotifyBin(): string
+    {
+        $pharPath = \Phar::running(false);
+
+        if ($pharPath !== '') {
+            return $pharPath;
+        }
+
+        return dirname(__DIR__, 2) . '/spotify';
     }
 
     private function stopBridge(): int
