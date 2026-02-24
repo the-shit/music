@@ -15,6 +15,7 @@ describe('QueueFillCommand', function () {
                 ],
                 'queue' => [],
             ]);
+            $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
                 ->with(['track123'], ['artist456'], 10)
@@ -45,6 +46,7 @@ describe('QueueFillCommand', function () {
                     ['uri' => 'spotify:track:existing1'],
                 ],
             ]);
+            $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
                 ->andReturn([
@@ -57,6 +59,36 @@ describe('QueueFillCommand', function () {
 
         $this->artisan('queue:fill')
             ->expectsOutputToContain('Queued: New Track by Fresh')
+            ->assertExitCode(0);
+    });
+
+    it('skips recently played tracks', function () {
+        $this->mock(SpotifyService::class, function ($mock) {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            $mock->shouldReceive('getQueue')->once()->andReturn([
+                'currently_playing' => [
+                    'id' => 'track123',
+                    'uri' => 'spotify:track:track123',
+                    'artists' => [['id' => 'artist456']],
+                ],
+                'queue' => [],
+            ]);
+            $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([
+                ['uri' => 'spotify:track:old1'],
+                ['uri' => 'spotify:track:old2'],
+            ]);
+            $mock->shouldReceive('getRecommendations')
+                ->once()
+                ->andReturn([
+                    ['uri' => 'spotify:track:old1', 'name' => 'Old One', 'artist' => 'Past'],
+                    ['uri' => 'spotify:track:old2', 'name' => 'Old Two', 'artist' => 'Past'],
+                    ['uri' => 'spotify:track:fresh1', 'name' => 'Fresh Track', 'artist' => 'New'],
+                ]);
+            $mock->shouldReceive('addToQueue')->once()->with('spotify:track:fresh1');
+        });
+
+        $this->artisan('queue:fill')
+            ->expectsOutputToContain('Queued: Fresh Track by New')
             ->assertExitCode(0);
     });
 
@@ -83,6 +115,7 @@ describe('QueueFillCommand', function () {
                 'currently_playing' => null,
                 'queue' => [],
             ]);
+            $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
                 ->andReturn([]);
@@ -104,6 +137,7 @@ describe('QueueFillCommand', function () {
                 ],
                 'queue' => [],
             ]);
+            $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
                 ->andReturn([
@@ -145,6 +179,7 @@ describe('QueueFillCommand', function () {
                 ],
                 'queue' => [],
             ]);
+            $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
                 ->with(['track123'], ['artist456'], 8)
@@ -196,6 +231,7 @@ describe('QueueFillCommand', function () {
                 ],
                 'queue' => [],
             ]);
+            $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
                 ->andReturn([
