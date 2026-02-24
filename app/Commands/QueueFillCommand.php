@@ -56,13 +56,16 @@ class QueueFillCommand extends Command
                 }
             }
 
-            // Collect URIs already in queue to avoid duplicates
+            // Collect URIs already in queue and recently played to avoid duplicates
             $existingUris = [];
             if ($currentlyPlaying) {
                 $existingUris[] = $currentlyPlaying['uri'] ?? '';
             }
             foreach ($currentQueue as $item) {
                 $existingUris[] = $item['uri'] ?? '';
+            }
+            foreach ($spotify->getRecentlyPlayed(20) as $recent) {
+                $existingUris[] = $recent['uri'] ?? '';
             }
 
             // Let Spotify's algorithm pick the tracks

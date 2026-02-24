@@ -9,6 +9,8 @@ it('queues flow tracks and outputs json', function () {
         ['uri' => 'spotify:track:1', 'name' => 'Focus Track', 'artist' => 'Ambient Artist', 'album' => 'Focus Album'],
         ['uri' => 'spotify:track:2', 'name' => 'Study Beat', 'artist' => 'Lofi Producer', 'album' => 'Study Album'],
     ]);
+    $mock->shouldReceive('getQueue')->once()->andReturn(['queue' => [], 'currently_playing' => null]);
+    $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
     $mock->shouldReceive('play')->once()->with('spotify:track:1');
     $mock->shouldReceive('addToQueue')->once()->with('spotify:track:2');
     $this->app->instance(SpotifyService::class, $mock);
@@ -23,6 +25,8 @@ it('displays flow tracks in human format', function () {
     $mock->shouldReceive('searchMultiple')->andReturn([
         ['uri' => 'spotify:track:1', 'name' => 'Focus Track', 'artist' => 'Artist', 'album' => 'Album'],
     ]);
+    $mock->shouldReceive('getQueue')->once()->andReturn(['queue' => [], 'currently_playing' => null]);
+    $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
     $mock->shouldReceive('play')->once();
     $this->app->instance(SpotifyService::class, $mock);
 

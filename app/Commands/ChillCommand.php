@@ -90,6 +90,27 @@ class ChillCommand extends Command
 
     private function queueTracks(SpotifyService $spotify, array $tracks): array
     {
+        // Build dedup set from current queue and recently played
+        $excludeUris = [];
+        try {
+            $queueData = $spotify->getQueue();
+            foreach ($queueData['queue'] ?? [] as $item) {
+                $excludeUris[$item['uri'] ?? ''] = true;
+            }
+            if (isset($queueData['currently_playing']['uri'])) {
+                $excludeUris[$queueData['currently_playing']['uri']] = true;
+            }
+            foreach ($spotify->getRecentlyPlayed(20) as $recent) {
+                $excludeUris[$recent['uri']] = true;
+            }
+        } catch (\Exception) {
+            // If we can't fetch queue/recent, proceed without dedup
+        }
+
+        // Filter out duplicates
+        $tracks = array_filter($tracks, fn ($track) => ! isset($excludeUris[$track['uri']]));
+        $tracks = array_values($tracks);
+
         $queued = [];
 
         foreach ($tracks as $i => $track) {
