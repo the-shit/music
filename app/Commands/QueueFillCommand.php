@@ -71,6 +71,17 @@ class QueueFillCommand extends Command
             // Let Spotify's algorithm pick the tracks
             $recommendations = $spotify->getRecommendations($seedTrackIds, $seedArtistIds, $needed + 5);
 
+            // Fall back to search-based discovery if recommendations API returns empty
+            // (the /v1/recommendations endpoint was deprecated in Nov 2024)
+            if (empty($recommendations) && $currentlyPlaying) {
+                $artistName = $currentlyPlaying['artists'][0]['name'] ?? null;
+                $trackName = $currentlyPlaying['name'] ?? null;
+
+                if ($artistName && $trackName) {
+                    $recommendations = $spotify->getRelatedTracks($artistName, $trackName, $needed + 5);
+                }
+            }
+
             if (empty($recommendations)) {
                 if ($this->option('json')) {
                     $this->line(json_encode([

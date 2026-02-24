@@ -108,7 +108,7 @@ describe('QueueFillCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('warns when no recommendations available', function () {
+    it('warns when no recommendations available and no current track for fallback', function () {
         $this->mock(SpotifyService::class, function ($mock) {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
@@ -118,6 +118,104 @@ describe('QueueFillCommand', function () {
             $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
+                ->andReturn([]);
+        });
+
+        $this->artisan('queue:fill')
+            ->expectsOutputToContain('No recommendations available')
+            ->assertExitCode(0);
+    });
+
+    it('falls back to search when recommendations API returns empty', function () {
+        $this->mock(SpotifyService::class, function ($mock) {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            $mock->shouldReceive('getQueue')->once()->andReturn([
+                'currently_playing' => [
+                    'id' => 'track123',
+                    'uri' => 'spotify:track:track123',
+                    'name' => 'Test Song',
+                    'artists' => [['id' => 'artist456', 'name' => 'Test Artist']],
+                ],
+                'queue' => [],
+            ]);
+            $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
+            $mock->shouldReceive('getRecommendations')
+                ->once()
+                ->with(['track123'], ['artist456'], 10)
+                ->andReturn([]);
+            $mock->shouldReceive('getRelatedTracks')
+                ->once()
+                ->with('Test Artist', 'Test Song', 10)
+                ->andReturn([
+                    ['uri' => 'spotify:track:search1', 'name' => 'Search Result 1', 'artist' => 'Test Artist'],
+                    ['uri' => 'spotify:track:search2', 'name' => 'Search Result 2', 'artist' => 'Test Artist'],
+                ]);
+            $mock->shouldReceive('addToQueue')->twice();
+        });
+
+        $this->artisan('queue:fill')
+            ->expectsOutputToContain('Queued: Search Result 1 by Test Artist')
+            ->expectsOutputToContain('Queued: Search Result 2 by Test Artist')
+            ->expectsOutputToContain('Queue: 2/5')
+            ->assertExitCode(0);
+    });
+
+    it('deduplicates search fallback results against queue and recently played', function () {
+        $this->mock(SpotifyService::class, function ($mock) {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            $mock->shouldReceive('getQueue')->once()->andReturn([
+                'currently_playing' => [
+                    'id' => 'track123',
+                    'uri' => 'spotify:track:track123',
+                    'name' => 'Test Song',
+                    'artists' => [['id' => 'artist456', 'name' => 'Test Artist']],
+                ],
+                'queue' => [
+                    ['uri' => 'spotify:track:queued1'],
+                ],
+            ]);
+            $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([
+                ['uri' => 'spotify:track:recent1'],
+            ]);
+            $mock->shouldReceive('getRecommendations')
+                ->once()
+                ->andReturn([]);
+            $mock->shouldReceive('getRelatedTracks')
+                ->once()
+                ->with('Test Artist', 'Test Song', 9)
+                ->andReturn([
+                    ['uri' => 'spotify:track:track123', 'name' => 'Test Song', 'artist' => 'Test Artist'],
+                    ['uri' => 'spotify:track:queued1', 'name' => 'Queued', 'artist' => 'Test Artist'],
+                    ['uri' => 'spotify:track:recent1', 'name' => 'Recent', 'artist' => 'Test Artist'],
+                    ['uri' => 'spotify:track:fresh1', 'name' => 'Fresh One', 'artist' => 'Test Artist'],
+                ]);
+            $mock->shouldReceive('addToQueue')->once()->with('spotify:track:fresh1');
+        });
+
+        $this->artisan('queue:fill')
+            ->expectsOutputToContain('Queued: Fresh One by Test Artist')
+            ->assertExitCode(0);
+    });
+
+    it('warns when both recommendations and search fallback return empty', function () {
+        $this->mock(SpotifyService::class, function ($mock) {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            $mock->shouldReceive('getQueue')->once()->andReturn([
+                'currently_playing' => [
+                    'id' => 'track123',
+                    'uri' => 'spotify:track:track123',
+                    'name' => 'Test Song',
+                    'artists' => [['id' => 'artist456', 'name' => 'Test Artist']],
+                ],
+                'queue' => [],
+            ]);
+            $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
+            $mock->shouldReceive('getRecommendations')
+                ->once()
+                ->andReturn([]);
+            $mock->shouldReceive('getRelatedTracks')
+                ->once()
+                ->with('Test Artist', 'Test Song', 10)
                 ->andReturn([]);
         });
 

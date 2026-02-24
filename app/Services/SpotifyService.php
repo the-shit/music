@@ -755,6 +755,39 @@ class SpotifyService
     }
 
     /**
+     * Get related tracks using search as a fallback for the deprecated recommendations API.
+     *
+     * Searches for more tracks by the same artist and shuffles
+     * the results to add variety.
+     */
+    public function getRelatedTracks(string $artistName, string $trackName, int $limit = 10): array
+    {
+        // Search for more tracks by the same artist (excluding the current track)
+        $artistTracks = $this->searchMultiple("artist:\"{$artistName}\"", 'track', $limit + 5);
+
+        // Also search with a looser query to get related-sounding tracks
+        $relatedTracks = $this->searchMultiple("\"{$artistName}\"", 'track', $limit);
+
+        // Merge and deduplicate by URI
+        $seen = [];
+        $merged = [];
+
+        foreach (array_merge($artistTracks, $relatedTracks) as $track) {
+            $uri = $track['uri'];
+            if (isset($seen[$uri])) {
+                continue;
+            }
+            $seen[$uri] = true;
+            $merged[] = $track;
+        }
+
+        // Shuffle to avoid always returning the same top results
+        shuffle($merged);
+
+        return array_slice($merged, 0, $limit);
+    }
+
+    /**
      * Set shuffle state
      */
     public function setShuffle(bool $state): bool
