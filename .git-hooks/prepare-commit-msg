@@ -1,7 +1,7 @@
 #!/bin/bash
 # Spotify Now-Playing commit trailer
 # Appends the currently playing Spotify track to commit messages.
-# Skips silently for work repos (pstrax) or when nothing is playing.
+# Uses the CLI for token refresh. Skips silently for work repos or when nothing is playing.
 
 COMMIT_MSG_FILE="$1"
 COMMIT_SOURCE="$2"  # message, template, merge, squash, commit
@@ -17,40 +17,44 @@ if echo "$REMOTE_URL" | grep -qiE "pstrax"; then
     exit 0
 fi
 
-# Get access token from ~/.config/spotify-cli/token.json
-TOKEN_FILE="$HOME/.config/spotify-cli/token.json"
-if [ ! -f "$TOKEN_FILE" ]; then
-    exit 0
-fi
+# Find the spotify CLI — check repo first, then PATH
+REPO_DIR="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [ -f "$REPO_DIR/spotify" ]; then
+    SPOTIFY="php $REPO_DIR/spotify"
+elif command -v spotify &>/dev/null; then
+    SPOTIFY="spotify"
+else
+    # Fallback: try the raw API approach (no token refresh)
+    TOKEN_FILE="$HOME/.config/spotify-cli/token.json"
+    if [ ! -f "$TOKEN_FILE" ]; then
+        exit 0
+    fi
 
-ACCESS_TOKEN=$(python3 -c "
-import json, sys
+    ACCESS_TOKEN=$(python3 -c "
+import json, sys, time
 try:
     d = json.load(open('$TOKEN_FILE'))
     t = d.get('access_token', '')
     exp = d.get('expires_at', 0)
-    import time
     if t and exp > time.time():
         print(t)
 except:
     pass
 " 2>/dev/null)
 
-if [ -z "$ACCESS_TOKEN" ]; then
-    exit 0
-fi
+    if [ -z "$ACCESS_TOKEN" ]; then
+        exit 0
+    fi
 
-# Call Spotify API for current playback
-RESPONSE=$(curl -sf --max-time 3 \
-    -H "Authorization: Bearer $ACCESS_TOKEN" \
-    "https://api.spotify.com/v1/me/player/currently-playing" 2>/dev/null)
+    RESPONSE=$(curl -sf --max-time 3 \
+        -H "Authorization: Bearer $ACCESS_TOKEN" \
+        "https://api.spotify.com/v1/me/player/currently-playing" 2>/dev/null)
 
-if [ -z "$RESPONSE" ]; then
-    exit 0
-fi
+    if [ -z "$RESPONSE" ]; then
+        exit 0
+    fi
 
-# Parse track info
-TRACK_INFO=$(python3 -c "
+    TRACK_INFO=$(python3 -c "
 import json, sys
 try:
     d = json.loads('''$RESPONSE''')
@@ -62,6 +66,42 @@ try:
     name = item.get('name', '')
     artist = item.get('artists', [{}])[0].get('name', '')
     track_id = item.get('id', '')
+    url = f'https://open.spotify.com/track/{track_id}'
+    print(f'{artist} - {name}|{url}')
+except:
+    sys.exit(1)
+" 2>/dev/null)
+
+    if [ -z "$TRACK_INFO" ]; then
+        exit 0
+    fi
+
+    DISPLAY="${TRACK_INFO%%|*}"
+    URL="${TRACK_INFO##*|}"
+    printf "\n\n🎵 Now playing: %s\n   %s\n" "$DISPLAY" "$URL" >> "$COMMIT_MSG_FILE"
+    exit 0
+fi
+
+# Use the CLI — handles token refresh automatically
+JSON=$($SPOTIFY current --json 2>/dev/null)
+
+if [ -z "$JSON" ]; then
+    exit 0
+fi
+
+TRACK_INFO=$(python3 -c "
+import json, sys
+try:
+    d = json.loads('''$JSON''')
+    if not d.get('is_playing'):
+        sys.exit(1)
+    name = d.get('name') or d.get('track', '')
+    artist = d.get('artist', '')
+    uri = d.get('uri', '')
+    # Extract track ID from uri (spotify:track:XXXXX)
+    track_id = uri.split(':')[-1] if uri else ''
+    if not name or not track_id:
+        sys.exit(1)
     url = f'https://open.spotify.com/track/{track_id}'
     print(f'{artist} - {name}|{url}')
 except:

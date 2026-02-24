@@ -42,14 +42,14 @@ describe('DaemonCommand', function () {
         it('handles invalid action', function () {
             $this->artisan('daemon', ['action' => 'invalid'])
                 ->expectsOutputToContain('Invalid action: invalid')
-                ->expectsOutputToContain('Available actions: start, stop, status')
+                ->expectsOutputToContain('Available actions: start, stop, status, install, uninstall')
                 ->assertExitCode(1);
         });
 
         it('handles restart as invalid action', function () {
             $this->artisan('daemon', ['action' => 'restart'])
                 ->expectsOutputToContain('Invalid action: restart')
-                ->expectsOutputToContain('Available actions: start, stop, status')
+                ->expectsOutputToContain('Available actions: start, stop, status, install, uninstall')
                 ->assertExitCode(1);
         });
 
@@ -68,6 +68,22 @@ describe('DaemonCommand', function () {
             $this->artisan('daemon', ['action' => 'status'])
                 ->expectsOutputToContain('Daemon is not running')
                 ->assertExitCode(0);
+        });
+
+        it('routes to install action', function () {
+            if (PHP_OS_FAMILY !== 'Darwin') {
+                $this->artisan('daemon', ['action' => 'install'])
+                    ->assertExitCode(1);
+            } else {
+                // On macOS, exits 0 (success) or 1 (spotifyd missing)
+                $this->artisan('daemon', ['action' => 'install']);
+                expect(true)->toBeTrue();
+            }
+        });
+
+        it('routes to uninstall action', function () {
+            $this->artisan('daemon', ['action' => 'uninstall'])
+                ->assertExitCode(PHP_OS_FAMILY === 'Darwin' ? 0 : 1);
         });
 
     });
@@ -246,6 +262,114 @@ describe('DaemonCommand', function () {
 
     });
 
+    describe('install action', function () {
+
+        it('creates plist file on macOS when spotifyd available', function () {
+            if (PHP_OS_FAMILY !== 'Darwin') {
+                $this->markTestSkipped('LaunchAgent tests require macOS');
+            }
+
+            $spotifyd = trim((string) shell_exec('which spotifyd 2>/dev/null'));
+            if (! $spotifyd) {
+                // No spotifyd — should fail
+                $this->artisan('daemon', ['action' => 'install'])
+                    ->expectsOutputToContain('spotifyd not found')
+                    ->assertExitCode(1);
+
+                return;
+            }
+
+            $this->artisan('daemon', ['action' => 'install'])
+                ->expectsOutputToContain('LaunchAgent installed')
+                ->assertExitCode(0);
+
+            $plistPath = $this->tempDir.'/Library/LaunchAgents/com.spotify-cli.spotifyd.plist';
+            expect(file_exists($plistPath))->toBeTrue();
+            expect(file_get_contents($plistPath))->toContain('com.spotify-cli.spotifyd');
+        });
+
+        it('reports when already installed', function () {
+            if (PHP_OS_FAMILY !== 'Darwin') {
+                $this->markTestSkipped('LaunchAgent tests require macOS');
+            }
+
+            $plistDir = $this->tempDir.'/Library/LaunchAgents';
+            mkdir($plistDir, 0755, true);
+            file_put_contents($plistDir.'/com.spotify-cli.spotifyd.plist', 'test');
+
+            $this->artisan('daemon', ['action' => 'install'])
+                ->expectsOutputToContain('LaunchAgent is already installed')
+                ->assertExitCode(0);
+        });
+
+    });
+
+    describe('uninstall action', function () {
+
+        it('fails on non-macOS', function () {
+            if (PHP_OS_FAMILY === 'Darwin') {
+                // On macOS with no plist, reports not installed
+                $this->artisan('daemon', ['action' => 'uninstall'])
+                    ->expectsOutputToContain('LaunchAgent is not installed')
+                    ->assertExitCode(0);
+            } else {
+                $this->artisan('daemon', ['action' => 'uninstall'])
+                    ->expectsOutputToContain('LaunchAgent is only supported on macOS')
+                    ->assertExitCode(1);
+            }
+        });
+
+        it('reports when not installed', function () {
+            if (PHP_OS_FAMILY !== 'Darwin') {
+                $this->markTestSkipped('LaunchAgent tests require macOS');
+            }
+
+            $this->artisan('daemon', ['action' => 'uninstall'])
+                ->expectsOutputToContain('LaunchAgent is not installed')
+                ->assertExitCode(0);
+        });
+
+        it('removes plist file when installed', function () {
+            if (PHP_OS_FAMILY !== 'Darwin') {
+                $this->markTestSkipped('LaunchAgent tests require macOS');
+            }
+
+            $plistDir = $this->tempDir.'/Library/LaunchAgents';
+            mkdir($plistDir, 0755, true);
+            $plistPath = $plistDir.'/com.spotify-cli.spotifyd.plist';
+            file_put_contents($plistPath, 'test');
+
+            $this->artisan('daemon', ['action' => 'uninstall'])
+                ->expectsOutputToContain('LaunchAgent removed')
+                ->assertExitCode(0);
+
+            expect(file_exists($plistPath))->toBeFalse();
+        });
+
+    });
+
+    describe('LaunchAgent plist generation', function () {
+
+        it('generates valid plist XML', function () {
+            $command = $this->app->make(DaemonCommand::class);
+            $reflection = new ReflectionClass($command);
+            $method = $reflection->getMethod('generateLaunchAgentPlist');
+            $method->setAccessible(true);
+
+            $plist = $method->invoke($command, '/usr/local/bin/spotifyd');
+
+            expect($plist)->toContain('com.spotify-cli.spotifyd');
+            expect($plist)->toContain('/usr/local/bin/spotifyd');
+            expect($plist)->toContain('--config-path');
+            expect($plist)->toContain('--no-daemon');
+            expect($plist)->toContain('<key>RunAtLoad</key>');
+            expect($plist)->toContain('<true/>');
+            expect($plist)->toContain('spotifyd.conf');
+            expect($plist)->toContain('spotifyd.log');
+        });
+
+    });
+
     describe('output messages', function () {
 
         it('shows device guidance when not running', function () {
@@ -258,7 +382,7 @@ describe('DaemonCommand', function () {
         it('lists valid actions when invalid action provided', function () {
             $this->artisan('daemon', ['action' => 'unknown'])
                 ->expectsOutputToContain('Invalid action: unknown')
-                ->expectsOutputToContain('Available actions: start, stop, status')
+                ->expectsOutputToContain('Available actions: start, stop, status, install, uninstall')
                 ->assertExitCode(1);
         });
 
