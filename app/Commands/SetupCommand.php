@@ -11,6 +11,7 @@ use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\password;
+use function Laravel\Prompts\select;
 use function Laravel\Prompts\spin;
 use function Laravel\Prompts\text;
 use function Laravel\Prompts\warning;
@@ -198,7 +199,13 @@ class SetupCommand extends Command
                 $this->newLine();
                 info('🚀 Starting Spotify authentication...');
 
-                return $this->call('login');
+                $loginResult = $this->call('login');
+
+                if ($loginResult === self::SUCCESS) {
+                    $this->offerPlaybackSetup();
+                }
+
+                return $loginResult;
             }
 
             return self::SUCCESS;
@@ -208,6 +215,54 @@ class SetupCommand extends Command
             note('You can try running the setup again');
 
             return self::FAILURE;
+        }
+    }
+
+    private function offerPlaybackSetup(): void
+    {
+        $this->newLine();
+        info('🎧 Playback Setup');
+        note('Choose how you want to play music:');
+
+        $mode = select(
+            label: 'Playback mode',
+            options: [
+                'app' => 'Spotify app or browser (default — use an existing device)',
+                'daemon' => 'Headless daemon (auto-starts on login, no Spotify app needed)',
+            ],
+            default: 'app',
+        );
+
+        if ($mode === 'app') {
+            $this->newLine();
+            info('✅ You\'re all set!');
+            note('Open Spotify on any device, then control it from the CLI:');
+            note('  spotify devices');
+            note('  spotify play "Never Gonna Give You Up"');
+
+            return;
+        }
+
+        // Daemon mode — set up dependencies and LaunchAgent
+        $this->newLine();
+        info('🔧 Setting up headless daemon...');
+
+        $daemonSetupResult = $this->call('daemon:setup');
+
+        if ($daemonSetupResult !== self::SUCCESS) {
+            warning('Daemon setup had issues — you can retry with: spotify daemon:setup');
+
+            return;
+        }
+
+        // Offer LaunchAgent installation on macOS
+        if (PHP_OS_FAMILY === 'Darwin') {
+            $this->newLine();
+            $installAgent = confirm('Install LaunchAgent to auto-start daemon on login?', true);
+
+            if ($installAgent) {
+                $this->call('daemon', ['action' => 'install']);
+            }
         }
     }
 
