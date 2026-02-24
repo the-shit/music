@@ -144,7 +144,7 @@ describe('DaemonCommand', function () {
 
         it('has correct description', function () {
             $command = $this->app->make(DaemonCommand::class);
-            expect($command->getDescription())->toBe('Manage the Spotify daemon for terminal playback (experimental)');
+            expect($command->getDescription())->toBe('Manage the Spotify daemon for terminal playback');
         });
 
         it('requires action argument', function () {
