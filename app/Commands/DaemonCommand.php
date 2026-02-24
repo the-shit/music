@@ -25,7 +25,7 @@ class DaemonCommand extends Command
     {
         parent::__construct();
 
-        $this->configDir = $_SERVER['HOME'].'/.config/spotify-cli';
+        $this->configDir = ($_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp').'/.config/spotify-cli';
         $this->pidFile = $this->configDir.'/daemon.pid';
     }
 
@@ -59,8 +59,9 @@ class DaemonCommand extends Command
 
         // Detect orphaned spotifyd processes using our config
         $configFile = $this->configDir.'/spotifyd.conf';
-        $orphanPid = trim((string) shell_exec("pgrep -f 'spotifyd.*{$configFile}' 2>/dev/null"));
-        if ($orphanPid) {
+        $orphanPid = trim((string) shell_exec("pgrep -f 'spotifyd.*{$configFile}' 2>/dev/null | head -1"));
+        $orphanComm = $orphanPid ? trim((string) shell_exec("ps -p {$orphanPid} -o comm= 2>/dev/null")) : '';
+        if ($orphanPid && $orphanComm === 'spotifyd') {
             warning("Found orphaned spotifyd (PID: {$orphanPid}) — adopting it");
             $this->savePid((int) $orphanPid);
             info('✅ Daemon adopted');
@@ -70,8 +71,8 @@ class DaemonCommand extends Command
         }
 
         // Prefer rodio build over portaudio (better audio buffering)
-        $rodioPath = $_SERVER['HOME'].'/.local/bin/spotifyd-rodio';
-        $spotifyd = file_exists($rodioPath) ? $rodioPath : trim(shell_exec('which spotifyd 2>/dev/null'));
+        $rodioPath = ($_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp').'/.local/bin/spotifyd-rodio';
+        $spotifyd = file_exists($rodioPath) ? $rodioPath : trim((string) shell_exec('which spotifyd 2>/dev/null'));
         if (! $spotifyd) {
             error('spotifyd not found');
             $this->newLine();

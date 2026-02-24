@@ -220,7 +220,7 @@ class SetupCommand extends Command
 
     private function displayAppConfiguration(int $port): void
     {
-        $username = trim(shell_exec('whoami')) ?: 'Developer';
+        $username = trim((string) shell_exec('whoami')) ?: 'Developer';
         $appName = "Music CLI - {$username}";
         $redirectUri = "http://127.0.0.1:{$port}/callback";
 

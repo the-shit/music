@@ -54,7 +54,7 @@ class DaemonSetupCommand extends Command
         $issues = [];
 
         // Check sox
-        $sox = trim(shell_exec('which play 2>/dev/null'));
+        $sox = trim((string) shell_exec('which play 2>/dev/null'));
         if (! $sox) {
             warning('❌ sox not found (required for audio playback)');
             $issues[] = 'sox';
@@ -63,7 +63,7 @@ class DaemonSetupCommand extends Command
         }
 
         // Check spotifyd
-        $spotifyd = trim(shell_exec('which spotifyd 2>/dev/null'));
+        $spotifyd = trim((string) shell_exec('which spotifyd 2>/dev/null'));
         if (! $spotifyd) {
             warning('❌ spotifyd not found (required for Spotify Connect)');
             $issues[] = 'spotifyd';
@@ -111,9 +111,9 @@ class DaemonSetupCommand extends Command
         // Verify
         foreach ($issues as $dep) {
             if ($dep === 'sox') {
-                $check = trim(shell_exec('which play 2>/dev/null'));
+                $check = trim((string) shell_exec('which play 2>/dev/null'));
             } else {
-                $check = trim(shell_exec('which '.$dep.' 2>/dev/null'));
+                $check = trim((string) shell_exec('which '.$dep.' 2>/dev/null'));
             }
 
             if (! $check) {
@@ -134,7 +134,7 @@ class DaemonSetupCommand extends Command
         info('🔐 Setting up Spotify authentication...');
         $this->newLine();
 
-        $cachePath = $_SERVER['HOME'].'/.config/spotify-cli/cache';
+        $cachePath = ($_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp').'/.config/spotify-cli/cache';
         if (! is_dir($cachePath)) {
             mkdir($cachePath, 0755, true);
         }
@@ -151,7 +151,7 @@ class DaemonSetupCommand extends Command
         info('After authenticating, return here.');
         $this->newLine();
 
-        $spotifyd = trim(shell_exec('which spotifyd')) ?: '/opt/homebrew/opt/spotifyd/bin/spotifyd';
+        $spotifyd = trim((string) shell_exec('which spotifyd')) ?: '/opt/homebrew/opt/spotifyd/bin/spotifyd';
 
         passthru("{$spotifyd} authenticate --cache-path {$cachePath}");
 
