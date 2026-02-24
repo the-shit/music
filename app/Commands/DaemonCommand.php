@@ -14,9 +14,9 @@ class DaemonCommand extends Command
 {
     use RequiresSpotifyConfig;
 
-    protected $signature = 'daemon {action : start, stop, or status} {--name= : Device name for Spotify Connect}';
+    protected $signature = 'daemon {action : start, stop, or status} {--name= : Device name for Spotify Connect} {--audio-device= : Audio output device (e.g. "Wave Link Stream")}';
 
-    protected $description = 'Manage the Spotify daemon for terminal playback (experimental)';
+    protected $description = 'Manage the Spotify daemon for terminal playback';
 
     private string $pidFile;
 
@@ -32,12 +32,6 @@ class DaemonCommand extends Command
 
     public function handle()
     {
-        warning('⚠️  Daemon mode is experimental and finicky on macOS');
-        warning('💡 Try using existing devices instead:');
-        warning('   spotify play "song" --device="Your Device Name"');
-        warning('   spotify devices  # list available devices');
-        $this->newLine();
-
         $action = $this->argument('action');
 
         return match ($action) {
@@ -142,6 +136,11 @@ class DaemonCommand extends Command
                   "bitrate = 320\n".
                   "volume_normalisation = true\n".
                   "cache_path = \"{$configDir}/cache\"\n";
+
+        $audioDevice = $this->option('audio-device');
+        if ($audioDevice) {
+            $config .= "device = \"{$audioDevice}\"\n";
+        }
 
         file_put_contents($configFile, $config);
 
