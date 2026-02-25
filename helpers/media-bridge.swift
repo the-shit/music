@@ -11,8 +11,33 @@ class MediaBridge: NSObject {
 
     override init() {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        self.spotifyCli = home + "/Code/music/spotify"
-        self.phpPath = home + "/Library/Application Support/Herd/bin/php"
+
+        // Resolve spotifyCli: prefer PROJECT_DIR env, fall back to common locations
+        if let projectDir = ProcessInfo.processInfo.environment["PROJECT_DIR"] {
+            self.spotifyCli = projectDir + "/spotify"
+        } else if FileManager.default.fileExists(atPath: home + "/Code/music/spotify") {
+            self.spotifyCli = home + "/Code/music/spotify"
+        } else if FileManager.default.fileExists(atPath: home + "/packages/music/spotify") {
+            self.spotifyCli = home + "/packages/music/spotify"
+        } else {
+            // Last resort: check if 'spotify' is a global composer binary
+            self.spotifyCli = home + "/.composer/vendor/bin/spotify"
+        }
+
+        // Resolve PHP: prefer PHP_BIN env, then check common paths
+        if let phpBin = ProcessInfo.processInfo.environment["PHP_BIN"],
+           FileManager.default.fileExists(atPath: phpBin) {
+            self.phpPath = phpBin
+        } else {
+            let candidates = [
+                home + "/Library/Application Support/Herd/bin/php",
+                "/opt/homebrew/bin/php",
+                "/usr/local/bin/php",
+                "/usr/bin/php",
+            ]
+            self.phpPath = candidates.first { FileManager.default.fileExists(atPath: $0) } ?? "/usr/bin/php"
+        }
+
         super.init()
     }
 
