@@ -683,7 +683,11 @@ class SpotifyService
     }
 
     /**
-     * Get track recommendations from Spotify's algorithm
+     * Get track recommendations from Spotify's algorithm.
+     *
+     * NOTE: The /v1/recommendations endpoint was deprecated Nov 2024 for
+     * development-mode apps.  This method tries it first, then falls through
+     * to getSmartRecommendations() which uses only live endpoints.
      */
     public function getRecommendations(array $seedTrackIds = [], array $seedArtistIds = [], int $limit = 10, array $audioFeatures = []): array
     {
@@ -738,38 +742,134 @@ class SpotifyService
                 ];
             }
 
-            return $tracks;
+            if (! empty($tracks)) {
+                return $tracks;
+            }
+
+            // Deprecated endpoint returned empty — log it once and fall through
+            error_log('[SpotifyService] /recommendations returned empty (deprecated endpoint). Using smart discovery.');
+        } else {
+            error_log("[SpotifyService] /recommendations HTTP {$response->status()}. Using smart discovery.");
         }
 
-        return [];
+        // Fall through to multi-strategy discovery
+        return $this->getSmartRecommendations($limit);
+    }
+
+    /**
+     * Multi-strategy track discovery using only live Spotify endpoints.
+     *
+     * Combines top artists, top tracks, genre search, Discover Weekly /
+     * Daily Mix playlists, and recently played to build a diverse pool
+     * of recommendations without the deprecated /v1/recommendations API.
+     */
+    public function getSmartRecommendations(int $limit = 10, ?string $currentArtist = null): array
+    {
+        $this->requireAuth();
+
+        $seen = [];
+        $pool = [];
+
+        $collect = function (array $tracks) use (&$seen, &$pool): void {
+            foreach ($tracks as $t) {
+                $uri = $t['uri'] ?? '';
+                if ($uri && ! isset($seen[$uri])) {
+                    $seen[$uri] = true;
+                    $pool[] = $t;
+                }
+            }
+        };
+
+        // Strategy 1: Top tracks across time ranges for variety
+        $collect($this->getTopTracks('short_term', 15));
+        $collect($this->getTopTracks('medium_term', 15));
+
+        // Strategy 2: Tracks from top artists (discover deeper cuts)
+        $topArtists = $this->getTopArtists('short_term', 5);
+        foreach ($topArtists as $artist) {
+            $collect($this->searchMultiple("artist:\"{$artist['name']}\"", 'track', 5));
+        }
+
+        // Strategy 3: Genre-adjacent search from top artists
+        $genres = [];
+        foreach ($topArtists as $artist) {
+            foreach ($artist['genres'] ?? [] as $genre) {
+                $genres[$genre] = true;
+            }
+        }
+        foreach (array_slice(array_keys($genres), 0, 3) as $genre) {
+            $collect($this->searchMultiple("genre:\"{$genre}\"", 'track', 5));
+        }
+
+        // Strategy 4: "Similar to" search if we know the current artist
+        if ($currentArtist) {
+            $collect($this->searchMultiple("{$currentArtist} similar", 'track', 5));
+        }
+
+        // Strategy 5: Discover Weekly / Daily Mixes (Spotify's own algo, still works)
+        $playlists = $this->getPlaylists(50);
+        foreach ($playlists as $playlist) {
+            $name = strtolower($playlist['name'] ?? '');
+            if (str_contains($name, 'discover weekly')
+                || str_contains($name, 'release radar')
+                || str_starts_with($name, 'daily mix')) {
+                $items = $this->getPlaylistTracks($playlist['id']);
+                foreach ($items as $item) {
+                    if (isset($item['track']['uri'], $item['track']['name'])) {
+                        $collect([[
+                            'uri' => $item['track']['uri'],
+                            'name' => $item['track']['name'],
+                            'artist' => $item['track']['artists'][0]['name'] ?? 'Unknown',
+                            'album' => $item['track']['album']['name'] ?? 'Unknown',
+                        ]]);
+                    }
+                }
+                // Only pull from 2 discovery playlists to keep API calls reasonable
+                if (count($pool) > $limit * 3) {
+                    break;
+                }
+            }
+        }
+
+        shuffle($pool);
+
+        return array_slice($pool, 0, $limit);
     }
 
     /**
      * Get related tracks using search as a fallback for the deprecated recommendations API.
      *
-     * Searches for more tracks by the same artist and shuffles
-     * the results to add variety.
+     * Broadened to search beyond just the current artist: includes title-based
+     * search, loose artist queries, and top-tracks padding for diversity.
      */
     public function getRelatedTracks(string $artistName, string $trackName, int $limit = 10): array
     {
-        // Search for more tracks by the same artist (excluding the current track)
-        $artistTracks = $this->searchMultiple("artist:\"{$artistName}\"", 'track', $limit + 5);
-
-        // Also search with a looser query to get related-sounding tracks
-        $relatedTracks = $this->searchMultiple("\"{$artistName}\"", 'track', $limit);
-
-        // Merge and deduplicate by URI
         $seen = [];
         $merged = [];
 
-        foreach (array_merge($artistTracks, $relatedTracks) as $track) {
-            $uri = $track['uri'];
-            if (isset($seen[$uri])) {
-                continue;
+        $collect = function (array $tracks) use (&$seen, &$merged): void {
+            foreach ($tracks as $track) {
+                $uri = $track['uri'] ?? '';
+                if ($uri && ! isset($seen[$uri])) {
+                    $seen[$uri] = true;
+                    $merged[] = $track;
+                }
             }
-            $seen[$uri] = true;
-            $merged[] = $track;
+        };
+
+        // 1. Same artist — deep cuts
+        $collect($this->searchMultiple("artist:\"{$artistName}\"", 'track', $limit + 5));
+
+        // 2. Loose artist search — catches features, remixes, collaborations
+        $collect($this->searchMultiple("\"{$artistName}\"", 'track', $limit));
+
+        // 3. Track title search — finds covers, similar-titled songs across artists
+        if ($trackName) {
+            $collect($this->searchMultiple("\"{$trackName}\"", 'track', 5));
         }
+
+        // 4. User's top tracks as diversity padding (guaranteed fresh material)
+        $collect($this->getTopTracks('short_term', 10));
 
         // Shuffle to avoid always returning the same top results
         shuffle($merged);

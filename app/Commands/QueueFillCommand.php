@@ -68,11 +68,11 @@ class QueueFillCommand extends Command
                 $existingUris[] = $recent['uri'] ?? '';
             }
 
-            // Let Spotify's algorithm pick the tracks
+            // getRecommendations auto-falls through to smart discovery
+            // when the deprecated /v1/recommendations endpoint returns empty
             $recommendations = $spotify->getRecommendations($seedTrackIds, $seedArtistIds, $needed + 5);
 
-            // Fall back to search-based discovery if recommendations API returns empty
-            // (the /v1/recommendations endpoint was deprecated in Nov 2024)
+            // If still empty, fall back to improved related tracks
             if (empty($recommendations) && $currentlyPlaying) {
                 $artistName = $currentlyPlaying['artists'][0]['name'] ?? null;
                 $trackName = $currentlyPlaying['name'] ?? null;

@@ -26,10 +26,13 @@ class AutopilotCommand extends Command
 
     private const LAUNCH_AGENT_LABEL = 'com.theshit.autopilot';
 
-    /** @var array<string, true> */
-    private array $sessionUris = [];
+    /** @var array<string, int> URI => timestamp when queued */
+    private array $sessionUriTimestamps = [];
 
     private ?string $lastRefillTime = null;
+
+    /** Tracks older than this many seconds can be re-queued */
+    private const DEDUP_WINDOW_SECONDS = 1800; // 30 minutes
 
     public function handle(): int
     {
@@ -360,6 +363,13 @@ XML;
     {
         $needed = $threshold - count($queue);
 
+        // Expire old entries from the dedup window so tracks can be re-queued
+        $cutoff = time() - self::DEDUP_WINDOW_SECONDS;
+        $this->sessionUriTimestamps = array_filter(
+            $this->sessionUriTimestamps,
+            fn (int $ts) => $ts > $cutoff
+        );
+
         // Build seed from current track
         $seedTrackIds = [];
         $seedArtistIds = [];
@@ -388,8 +398,8 @@ XML;
             }
         }
 
-        // Build the dedup set
-        $excludeUris = $this->sessionUris;
+        // Build the dedup set — time-bounded session URIs + current context
+        $excludeUris = array_fill_keys(array_keys($this->sessionUriTimestamps), true);
 
         if (isset($current['uri'])) {
             $excludeUris[$current['uri']] = true;
@@ -401,12 +411,15 @@ XML;
             $excludeUris[$recent['uri']] = true;
         }
 
+        // getRecommendations now auto-falls through to getSmartRecommendations
+        // when the deprecated endpoint returns empty
+        $currentArtist = $current['artist'] ?? null;
         $recommendations = $spotify->getRecommendations($seedTrackIds, $seedArtistIds, $needed + 10, $moodParams);
 
-        // Fall back to related tracks search if recommendations API returned nothing
-        if (empty($recommendations) && isset($current['artist'])) {
-            $this->line('  <fg=gray>Recommendations unavailable — falling back to related tracks</>');
-            $recommendations = $spotify->getRelatedTracks($current['artist'], $current['name'] ?? '', $needed + 10);
+        // If still empty (unlikely now), fall back to improved related tracks
+        if (empty($recommendations) && $currentArtist) {
+            $this->line('  <fg=gray>Smart discovery empty — falling back to related tracks</>');
+            $recommendations = $spotify->getRelatedTracks($currentArtist, $current['name'] ?? '', $needed + 10);
         }
 
         $added = 0;
@@ -421,7 +434,7 @@ XML;
 
             try {
                 $spotify->addToQueue($track['uri']);
-                $this->sessionUris[$track['uri']] = true;
+                $this->sessionUriTimestamps[$track['uri']] = time();
                 $excludeUris[$track['uri']] = true;
                 $added++;
                 $this->line("  Queued: <fg=green>{$track['name']}</> by {$track['artist']}");
