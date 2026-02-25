@@ -283,9 +283,9 @@ describe('DaemonCommand', function () {
                 ->expectsOutputToContain('LaunchAgent installed')
                 ->assertExitCode(0);
 
-            $plistPath = $this->tempDir.'/Library/LaunchAgents/com.spotify-cli.spotifyd.plist';
+            $plistPath = $this->tempDir.'/Library/LaunchAgents/com.theshit.spotifyd.plist';
             expect(file_exists($plistPath))->toBeTrue();
-            expect(file_get_contents($plistPath))->toContain('com.spotify-cli.spotifyd');
+            expect(file_get_contents($plistPath))->toContain('com.theshit.spotifyd');
         });
 
         it('reports when already installed', function () {
@@ -295,7 +295,7 @@ describe('DaemonCommand', function () {
 
             $plistDir = $this->tempDir.'/Library/LaunchAgents';
             mkdir($plistDir, 0755, true);
-            file_put_contents($plistDir.'/com.spotify-cli.spotifyd.plist', 'test');
+            file_put_contents($plistDir.'/com.theshit.spotifyd.plist', 'test');
 
             $this->artisan('daemon', ['action' => 'install'])
                 ->expectsOutputToContain('LaunchAgent is already installed')
@@ -336,7 +336,7 @@ describe('DaemonCommand', function () {
 
             $plistDir = $this->tempDir.'/Library/LaunchAgents';
             mkdir($plistDir, 0755, true);
-            $plistPath = $plistDir.'/com.spotify-cli.spotifyd.plist';
+            $plistPath = $plistDir.'/com.theshit.spotifyd.plist';
             file_put_contents($plistPath, 'test');
 
             $this->artisan('daemon', ['action' => 'uninstall'])
@@ -358,7 +358,7 @@ describe('DaemonCommand', function () {
 
             $plist = $method->invoke($command, '/usr/local/bin/spotifyd');
 
-            expect($plist)->toContain('com.spotify-cli.spotifyd');
+            expect($plist)->toContain('com.theshit.spotifyd');
             expect($plist)->toContain('/usr/local/bin/spotifyd');
             expect($plist)->toContain('--config-path');
             expect($plist)->toContain('--no-daemon');
@@ -366,6 +366,19 @@ describe('DaemonCommand', function () {
             expect($plist)->toContain('<true/>');
             expect($plist)->toContain('spotifyd.conf');
             expect($plist)->toContain('spotifyd.log');
+        });
+
+        it('includes KeepAlive and ThrottleInterval in plist', function () {
+            $command = $this->app->make(DaemonCommand::class);
+            $reflection = new ReflectionClass($command);
+            $method = $reflection->getMethod('generateLaunchAgentPlist');
+            $method->setAccessible(true);
+
+            $plist = $method->invoke($command, '/usr/local/bin/spotifyd');
+
+            expect($plist)->toContain('<key>KeepAlive</key>');
+            expect($plist)->toContain('<key>ThrottleInterval</key>');
+            expect($plist)->toContain('<integer>5</integer>');
         });
 
     });

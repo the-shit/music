@@ -18,7 +18,9 @@ class DaemonCommand extends Command
 
     protected $description = 'Manage the Spotify daemon for terminal playback';
 
-    private const LAUNCH_AGENT_LABEL = 'com.spotify-cli.spotifyd';
+    private const LAUNCH_AGENT_LABEL = 'com.theshit.spotifyd';
+
+    private const LEGACY_LAUNCH_AGENT_LABEL = 'com.spotify-cli.spotifyd';
 
     private string $pidFile;
 
@@ -48,6 +50,8 @@ class DaemonCommand extends Command
 
     private function start(): int
     {
+        $this->cleanupLegacyAgent();
+
         if ($this->isDaemonRunning()) {
             warning('Daemon is already running');
             info('Use "spotify daemon status" to check status');
@@ -151,7 +155,8 @@ class DaemonCommand extends Command
             shell_exec('launchctl stop '.self::LAUNCH_AGENT_LABEL.' 2>&1');
             @unlink($this->pidFile);
             info('✅ Daemon stopped');
-            info('It will restart on next login (LaunchAgent installed)');
+            info('Note: KeepAlive is enabled — launchd will restart it automatically.');
+            info('To stop permanently: spotify daemon uninstall');
 
             return self::SUCCESS;
         }
@@ -220,6 +225,8 @@ class DaemonCommand extends Command
 
             return self::FAILURE;
         }
+
+        $this->cleanupLegacyAgent();
 
         if ($this->hasLaunchAgent()) {
             warning('LaunchAgent is already installed');
@@ -450,7 +457,7 @@ class DaemonCommand extends Command
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.spotify-cli.spotifyd</string>
+    <string>com.theshit.spotifyd</string>
     <key>ProgramArguments</key>
     <array>
         <string>{$spotifydPath}</string>
@@ -460,6 +467,10 @@ class DaemonCommand extends Command
     </array>
     <key>RunAtLoad</key>
     <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
     <key>StandardOutPath</key>
     <string>{$logFile}</string>
     <key>StandardErrorPath</key>
@@ -467,6 +478,29 @@ class DaemonCommand extends Command
 </dict>
 </plist>
 XML;
+    }
+
+    private function cleanupLegacyAgent(): void
+    {
+        if (PHP_OS_FAMILY !== 'Darwin') {
+            return;
+        }
+
+        $home = $_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp';
+        $legacyPlist = $home.'/Library/LaunchAgents/'.self::LEGACY_LAUNCH_AGENT_LABEL.'.plist';
+
+        if (! file_exists($legacyPlist)) {
+            return;
+        }
+
+        // Unload the old agent if it's loaded
+        $output = trim((string) shell_exec('launchctl list '.self::LEGACY_LAUNCH_AGENT_LABEL.' 2>&1'));
+        if (! empty($output) && ! str_contains($output, 'Could not find')) {
+            shell_exec('launchctl unload '.$legacyPlist.' 2>&1');
+        }
+
+        @unlink($legacyPlist);
+        info('🧹 Cleaned up legacy LaunchAgent ('.self::LEGACY_LAUNCH_AGENT_LABEL.')');
     }
 
     private function savePid(int $pid): void
