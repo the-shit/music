@@ -6,6 +6,7 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\warning;
 
@@ -16,9 +17,14 @@ class AutopilotCommand extends Command
     protected $signature = 'autopilot
         {--threshold=3 : Refill when queue has fewer than N tracks}
         {--mood=flow : Mood for recommendations (chill/flow/hype)}
-        {--interval=3 : Watch polling interval in seconds}';
+        {--interval=3 : Watch polling interval in seconds}
+        {--install : Install autopilot as a background LaunchAgent}
+        {--uninstall : Remove the autopilot LaunchAgent}
+        {--status : Check autopilot daemon status}';
 
     protected $description = 'Auto-refill the queue on every track change (event-driven)';
+
+    private const LAUNCH_AGENT_LABEL = 'com.theshit.autopilot';
 
     /** @var array<string, true> */
     private array $sessionUris = [];
@@ -26,6 +32,23 @@ class AutopilotCommand extends Command
     private ?string $lastRefillTime = null;
 
     public function handle(): int
+    {
+        if ($this->option('install')) {
+            return $this->installDaemon();
+        }
+
+        if ($this->option('uninstall')) {
+            return $this->uninstallDaemon();
+        }
+
+        if ($this->option('status')) {
+            return $this->daemonStatus();
+        }
+
+        return $this->runAutopilot();
+    }
+
+    private function runAutopilot(): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -103,6 +126,217 @@ class AutopilotCommand extends Command
 
         return self::SUCCESS;
     }
+
+    // ── Daemon management ──────────────────────────────────────────
+
+    private function installDaemon(): int
+    {
+        if (PHP_OS_FAMILY !== 'Darwin') {
+            $this->error('LaunchAgent is only supported on macOS');
+
+            return self::FAILURE;
+        }
+
+        $threshold = $this->option('threshold');
+        $mood = $this->option('mood');
+        $interval = $this->option('interval');
+
+        // Unload existing if present
+        $plistPath = $this->getLaunchAgentPath();
+        if (file_exists($plistPath)) {
+            shell_exec('launchctl unload '.escapeshellarg($plistPath).' 2>&1');
+            usleep(500000);
+            info('🔄 Unloaded existing autopilot');
+        }
+
+        $home = $_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp';
+        $configDir = $home.'/.config/spotify-cli';
+        $logFile = $configDir.'/autopilot.log';
+
+        // Resolve PHP and the spotify CLI binary
+        $phpBin = PHP_BINARY;
+        $spotifyCli = realpath($_SERVER['argv'][0] ?? base_path('spotify')) ?: base_path('spotify');
+
+        $plist = <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.theshit.autopilot</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{$phpBin}</string>
+        <string>{$spotifyCli}</string>
+        <string>autopilot</string>
+        <string>--threshold={$threshold}</string>
+        <string>--mood={$mood}</string>
+        <string>--interval={$interval}</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>{$logFile}</string>
+
+    <key>StandardErrorPath</key>
+    <string>{$logFile}</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>{$home}</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>
+XML;
+
+        $plistDir = dirname($plistPath);
+        if (! is_dir($plistDir)) {
+            mkdir($plistDir, 0755, true);
+        }
+
+        file_put_contents($plistPath, $plist);
+        shell_exec('launchctl load '.escapeshellarg($plistPath).' 2>&1');
+        shell_exec('launchctl start '.self::LAUNCH_AGENT_LABEL.' 2>&1');
+
+        usleep(2000000);
+
+        $pid = $this->getAutopilotPid();
+
+        $this->newLine();
+        $this->line('  ╔═══════════════════════════════════════════╗');
+        $this->line('  ║  ✅ Autopilot Daemon Installed!           ║');
+        $this->line('  ╚═══════════════════════════════════════════╝');
+        $this->newLine();
+
+        if ($pid) {
+            info("✅ Running (PID: {$pid}) — mood: {$mood}, threshold: {$threshold}");
+        } else {
+            warning('Loaded but not yet running — may be waiting for playback');
+        }
+
+        info("Logs: tail -f {$logFile}");
+        $this->newLine();
+        info('Commands:');
+        info('  spotify autopilot --status');
+        info('  spotify autopilot --uninstall');
+        $this->newLine();
+        info('Note: RunAtLoad is off — autopilot starts on demand via launchctl start');
+        info('  launchctl start '.self::LAUNCH_AGENT_LABEL);
+
+        return self::SUCCESS;
+    }
+
+    private function uninstallDaemon(): int
+    {
+        $plistPath = $this->getLaunchAgentPath();
+
+        if (! file_exists($plistPath)) {
+            warning('Autopilot LaunchAgent is not installed');
+
+            return self::SUCCESS;
+        }
+
+        if ($this->isLaunchAgentLoaded()) {
+            shell_exec('launchctl unload '.escapeshellarg($plistPath).' 2>&1');
+        }
+
+        @unlink($plistPath);
+
+        info('✅ Autopilot LaunchAgent removed');
+
+        if (confirm('Also clear autopilot log?', false)) {
+            $home = $_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp';
+            @unlink($home.'/.config/spotify-cli/autopilot.log');
+            info('✅ Log cleared');
+        }
+
+        return self::SUCCESS;
+    }
+
+    private function daemonStatus(): int
+    {
+        $plistPath = $this->getLaunchAgentPath();
+        $installed = file_exists($plistPath);
+        $pid = $this->getAutopilotPid();
+
+        $home = $_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp';
+        $logFile = $home.'/.config/spotify-cli/autopilot.log';
+
+        $this->newLine();
+        info('🤖 Autopilot Status');
+        $this->newLine();
+
+        if ($pid) {
+            info("✅ Running (PID: {$pid})");
+        } else {
+            warning('❌ Not running');
+        }
+
+        if ($installed) {
+            $loaded = $this->isLaunchAgentLoaded();
+            info('📋 LaunchAgent: installed'.($loaded ? ' (loaded)' : ' (not loaded)'));
+
+            // Show configured mood/threshold from plist
+            $plistContent = file_get_contents($plistPath);
+            if (preg_match('/--mood=(\w+)/', $plistContent, $m)) {
+                info("🎵 Mood: {$m[1]}");
+            }
+            if (preg_match('/--threshold=(\d+)/', $plistContent, $m)) {
+                info("📊 Threshold: {$m[1]}");
+            }
+        } else {
+            warning('📋 LaunchAgent: not installed');
+            info('Install with: spotify autopilot --install');
+        }
+
+        if (file_exists($logFile)) {
+            $this->newLine();
+            info('📝 Recent logs:');
+            $lines = array_slice(file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES), -8);
+            foreach ($lines as $line) {
+                $this->line("  {$line}");
+            }
+        }
+
+        return self::SUCCESS;
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────
+
+    private function getLaunchAgentPath(): string
+    {
+        $home = $_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp';
+
+        return $home.'/Library/LaunchAgents/'.self::LAUNCH_AGENT_LABEL.'.plist';
+    }
+
+    private function getAutopilotPid(): ?int
+    {
+        $pid = trim((string) shell_exec("pgrep -f 'spotify.*autopilot' 2>/dev/null | head -1"));
+
+        return $pid ? (int) $pid : null;
+    }
+
+    private function isLaunchAgentLoaded(): bool
+    {
+        $output = trim((string) shell_exec('launchctl list '.self::LAUNCH_AGENT_LABEL.' 2>&1'));
+
+        return ! empty($output) && ! str_contains($output, 'Could not find');
+    }
+
+    // ── Queue logic ───────────────────────────────────────────────
 
     private function maybeRefill(SpotifyService $spotify, int $threshold, string $mood): void
     {
