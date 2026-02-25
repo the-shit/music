@@ -878,6 +878,22 @@ class SpotifyService
     }
 
     /**
+     * Seek to a position in the current track
+     */
+    public function seek(int $positionMs): void
+    {
+        $this->requireAuth();
+
+        $response = Http::withToken($this->accessToken)
+            ->put($this->baseUri.'me/player/seek?position_ms='.$positionMs);
+
+        if (! $response->successful()) {
+            $error = $response->json();
+            throw new \Exception($error['error']['message'] ?? 'Failed to seek');
+        }
+    }
+
+    /**
      * Set shuffle state
      */
     public function setShuffle(bool $state): bool
