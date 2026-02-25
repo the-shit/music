@@ -4,3 +4,4 @@
 /.vagrant
 .phpunit.result.cache
 /coverage
+bin/media-bridge

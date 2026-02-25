@@ -696,7 +696,7 @@ class SpotifyService
     /**
      * Get track recommendations from Spotify's algorithm
      */
-    public function getRecommendations(array $seedTrackIds = [], array $seedArtistIds = [], int $limit = 10): array
+    public function getRecommendations(array $seedTrackIds = [], array $seedArtistIds = [], int $limit = 10, array $audioFeatures = []): array
     {
         if (! $this->accessToken) {
             throw new \Exception('Not authenticated. Run "music login" first.');
@@ -729,6 +729,11 @@ class SpotifyService
 
         if (! empty($seedArtistIds)) {
             $params['seed_artists'] = implode(',', array_slice($seedArtistIds, 0, 5));
+        }
+
+        // Merge mood-based audio feature targets (e.g. target_energy, target_valence, target_tempo)
+        foreach ($audioFeatures as $key => $value) {
+            $params[$key] = $value;
         }
 
         $response = Http::withToken($this->accessToken)
