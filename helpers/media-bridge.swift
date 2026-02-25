@@ -9,6 +9,15 @@ class MediaBridge: NSObject {
     private var pollTimer: Timer?
     private var cachedArt: (url: String, image: NSImage)?
 
+    // Track state to avoid redundant pushes
+    private var lastTrackUri: String = ""
+    private var lastIsPlaying: Bool = false
+
+    // Progress interpolation — timestamp when we last received progress from API
+    private var lastPollTime: Date = Date()
+    private var lastProgressMs: Int = 0
+    private var lastDurationMs: Int = 0
+
     override init() {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
 
@@ -78,17 +87,25 @@ class MediaBridge: NSObject {
 
         center.previousTrackCommand.isEnabled = true
         center.previousTrackCommand.addTarget { [weak self] _ in
-            self?.runAndRefresh("skip", args: ["--previous"], delay: 1.5)
+            self?.runAndRefresh("skip", args: ["previous"], delay: 1.5)
             return .success
         }
 
         center.changePlaybackPositionCommand.isEnabled = true
         center.changePlaybackPositionCommand.addTarget { [weak self] event in
-            guard let posEvent = event as? MPChangePlaybackPositionCommandEvent else {
+            guard let self = self,
+                  let posEvent = event as? MPChangePlaybackPositionCommandEvent else {
                 return .commandFailed
             }
             let ms = Int(posEvent.positionTime * 1000)
-            self?.runAndRefresh("seek", args: [String(ms)])
+
+            // Immediately update the progress bar so it feels instant
+            self.lastProgressMs = ms
+            self.lastPollTime = Date()
+            self.pushProgress(positionMs: ms, durationMs: self.lastDurationMs, isPlaying: self.lastIsPlaying)
+
+            // Then send the seek to Spotify
+            self.runAndRefresh("seek", args: [String(ms)])
             return .success
         }
     }
@@ -119,14 +136,33 @@ class MediaBridge: NSObject {
         let album = json["album"] as? String ?? ""
         let progressMs = json["progress_ms"] as? Int ?? 0
         let durationMs = json["duration_ms"] as? Int ?? 0
+        let uri = json["uri"] as? String ?? ""
 
-        NSLog("MediaBridge: \(track) by \(artist) — \(isPlaying ? "playing" : "paused")")
+        let trackChanged = uri != lastTrackUri
+        let stateChanged = isPlaying != lastIsPlaying
+
+        // Store state for interpolation
+        lastPollTime = Date()
+        lastProgressMs = progressMs
+        lastDurationMs = durationMs
+        lastIsPlaying = isPlaying
+        lastTrackUri = uri
+
+        // Only log on track change or state change to reduce noise
+        if trackChanged || stateChanged {
+            NSLog("MediaBridge: \(track) by \(artist) — \(isPlaying ? "playing" : "paused")")
+        }
+
+        // Compensate for API latency: the progress_ms value is already slightly stale
+        // by the time we receive it. macOS will extrapolate forward from here using
+        // the playback rate, so this gives a more accurate starting point.
+        let compensatedMs = isPlaying ? progressMs + 200 : progressMs
 
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: track,
             MPMediaItemPropertyArtist: artist,
             MPMediaItemPropertyAlbumTitle: album,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: Double(progressMs) / 1000.0,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: Double(compensatedMs) / 1000.0,
             MPMediaItemPropertyPlaybackDuration: Double(durationMs) / 1000.0,
             MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
         ]
@@ -150,6 +186,17 @@ class MediaBridge: NSObject {
         MPNowPlayingInfoCenter.default().playbackState = isPlaying ? .playing : .paused
     }
 
+    /// Push only progress/rate without re-setting track metadata.
+    /// Used for immediate feedback on seek without waiting for next poll.
+    private func pushProgress(positionMs: Int, durationMs: Int, isPlaying: Bool) {
+        if var info = MPNowPlayingInfoCenter.default().nowPlayingInfo {
+            info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(positionMs) / 1000.0
+            info[MPMediaItemPropertyPlaybackDuration] = Double(durationMs) / 1000.0
+            info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        }
+    }
+
     // MARK: - CLI execution
 
     private func runAndRefresh(_ command: String, args: [String] = [], delay: Double = 0.5) {
@@ -160,13 +207,22 @@ class MediaBridge: NSObject {
     }
 
     private func togglePlayPause() {
-        let output = runCapture("current", args: ["--json"])
-        if let data = output.data(using: .utf8),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let isPlaying = json["is_playing"] as? Bool {
-            runAndRefresh(isPlaying ? "pause" : "resume")
-        } else {
-            runAndRefresh("resume")
+        // Use cached state instead of extra API call
+        let wasPlaying = lastIsPlaying
+        runAndRefresh(wasPlaying ? "pause" : "resume")
+
+        // Immediately flip the playback state for responsive feel
+        lastIsPlaying = !wasPlaying
+        if var info = MPNowPlayingInfoCenter.default().nowPlayingInfo {
+            // When pausing, freeze the progress at the interpolated position
+            if wasPlaying {
+                let elapsed = Date().timeIntervalSince(lastPollTime)
+                let currentMs = lastProgressMs + Int(elapsed * 1000)
+                info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = Double(min(currentMs, lastDurationMs)) / 1000.0
+            }
+            info[MPNowPlayingInfoPropertyPlaybackRate] = wasPlaying ? 0.0 : 1.0
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+            MPNowPlayingInfoCenter.default().playbackState = wasPlaying ? .paused : .playing
         }
     }
 
