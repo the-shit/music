@@ -923,7 +923,7 @@ class SpotifyService
 
                 // oEmbed gives us title + thumbnail (no auth required)
                 $oembed = Http::timeout(5)
-                    ->get("https://open.spotify.com/oembed", ['url' => $trackUrl])
+                    ->get('https://open.spotify.com/oembed', ['url' => $trackUrl])
                     ->json();
 
                 if (! $oembed) {

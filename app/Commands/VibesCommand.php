@@ -96,7 +96,7 @@ class VibesCommand extends Command
         $html = $this->generateHtml($grouped, count($commits), $playlistUrl);
         file_put_contents($outputPath, $html);
 
-        info("Generated vibes page: ".count($grouped)." tracks, ".count($commits)." commits");
+        info('Generated vibes page: '.count($grouped).' tracks, '.count($commits).' commits');
         info("  {$outputPath}");
 
         if (! $this->option('no-open')) {

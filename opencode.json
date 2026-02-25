@@ -1,13 +1,13 @@
 {
     "$schema": "https://opencode.ai/config.json",
-    "instructions": "This is the-shit/music — a Laravel Zero Spotify CLI. When working here, use the CLI directly (php spotify <command>) rather than the MCP Spotify server. Run `composer quality` before committing. Tests use Pest.",
+    "instructions": [],
     "mcp": {
         "spotify": {
             "type": "local",
             "enabled": true,
             "command": [
                 "php",
-                "/Users/jordan/Code/music/spotify",
+                "spotify",
                 "mcp:start",
                 "spotify"
             ]

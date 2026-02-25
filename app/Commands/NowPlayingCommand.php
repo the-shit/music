@@ -73,18 +73,18 @@ class NowPlayingCommand extends Command
 
         if ($pharPath !== '') {
             // Running inside a PHAR — extract to temp
-            $pharBinPath = \Phar::running(true) . '/bin/' . $filename;
+            $pharBinPath = \Phar::running(true).'/bin/'.$filename;
 
             if (! file_exists($pharBinPath)) {
                 return null;
             }
 
-            $tempDir = sys_get_temp_dir() . '/spotify-cli-bin';
+            $tempDir = sys_get_temp_dir().'/spotify-cli-bin';
             if (! is_dir($tempDir)) {
                 mkdir($tempDir, 0755, true);
             }
 
-            $tempFile = $tempDir . '/' . $filename;
+            $tempFile = $tempDir.'/'.$filename;
 
             // Re-extract if missing or PHAR is newer than cached copy
             if (! file_exists($tempFile) || filemtime($pharPath) > filemtime($tempFile)) {
@@ -96,7 +96,7 @@ class NowPlayingCommand extends Command
         }
 
         // Not in a PHAR — use the file directly from the project tree
-        $path = dirname(__DIR__, 2) . '/bin/' . $filename;
+        $path = dirname(__DIR__, 2).'/bin/'.$filename;
 
         return file_exists($path) ? $path : null;
     }
@@ -115,7 +115,7 @@ class NowPlayingCommand extends Command
             return $pharPath;
         }
 
-        return dirname(__DIR__, 2) . '/spotify';
+        return dirname(__DIR__, 2).'/spotify';
     }
 
     private function stopBridge(): int

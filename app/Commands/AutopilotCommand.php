@@ -15,11 +15,10 @@ class AutopilotCommand extends Command
 
     protected $signature = 'autopilot
         {--threshold=3 : Refill when queue has fewer than N tracks}
-        {--mood=flow : Mood for recommendations (chill/flow/hype)}';
+        {--mood=flow : Mood for recommendations (chill/flow/hype)}
+        {--interval=3 : Watch polling interval in seconds}';
 
-    protected $description = 'Watch playback and auto-refill the queue when it runs low';
-
-    private ?string $lastTrackUri = null;
+    protected $description = 'Auto-refill the queue on every track change (event-driven)';
 
     /** @var array<string, true> */
     private array $sessionUris = [];
@@ -35,6 +34,7 @@ class AutopilotCommand extends Command
         $spotify = app(SpotifyService::class);
         $threshold = max(1, (int) $this->option('threshold'));
         $mood = $this->option('mood');
+        $interval = max(1, (int) $this->option('interval'));
 
         if (! in_array($mood, ['chill', 'flow', 'hype'])) {
             warning("Unknown mood '{$mood}' — using 'flow'");
@@ -42,62 +42,84 @@ class AutopilotCommand extends Command
         }
 
         info("Autopilot engaged — mood: {$mood}, threshold: {$threshold}");
-        info('Polling every 10s — Ctrl+C to stop');
+        info('Listening for track changes — Ctrl+C to stop');
         $this->newLine();
 
-        // Register signal handler for clean shutdown
+        // Open a pipe to `watch --json` so we get one JSON line per event
+        $php = PHP_BINARY;
+        $self = $_SERVER['argv'][0] ?? 'spotify';
+        $cmd = escapeshellarg($php).' '.escapeshellarg($self)
+                   .' watch --json --interval='.escapeshellarg((string) $interval);
+
+        $pipe = popen($cmd, 'r');
+
+        if (! $pipe) {
+            $this->error('Failed to open watch pipe.');
+
+            return self::FAILURE;
+        }
+
         if (function_exists('pcntl_signal')) {
-            pcntl_signal(SIGINT, function () {
+            pcntl_signal(SIGINT, function () use ($pipe) {
+                pclose($pipe);
                 $this->newLine();
                 info('Autopilot disengaged.');
                 exit(0);
             });
         }
 
-        while (true) {
-            try {
-                $this->poll($spotify, $threshold, $mood);
-            } catch (\Exception $e) {
-                warning("API error: {$e->getMessage()}");
-            }
-
+        while (! feof($pipe)) {
             if (function_exists('pcntl_signal_dispatch')) {
                 pcntl_signal_dispatch();
             }
 
-            sleep(10);
+            $line = fgets($pipe);
+
+            if ($line === false || trim($line) === '') {
+                continue;
+            }
+
+            $event = json_decode(trim($line), true);
+
+            if (! is_array($event)) {
+                continue;
+            }
+
+            // Only act on track changes
+            if (($event['type'] ?? null) !== 'track_changed') {
+                continue;
+            }
+
+            $this->line("Track changed: <fg=cyan>{$event['track']}</> by {$event['artist']}");
+
+            try {
+                $this->maybeRefill($spotify, $threshold, $mood);
+            } catch (\Exception $e) {
+                warning("Refill error: {$e->getMessage()}");
+            }
         }
+
+        pclose($pipe);
+
+        return self::SUCCESS;
     }
 
-    private function poll(SpotifyService $spotify, int $threshold, string $mood): void
+    private function maybeRefill(SpotifyService $spotify, int $threshold, string $mood): void
     {
+        $queueData = $spotify->getQueue();
+        $queue = $queueData['queue'] ?? [];
+        $queueDepth = count($queue);
         $current = $spotify->getCurrentPlayback();
 
-        if (! $current || ! ($current['is_playing'] ?? false)) {
-            $this->renderStatus(null, null, null);
+        $this->line("  Queue depth: {$queueDepth} / threshold: {$threshold}");
+
+        if ($queueDepth >= $threshold) {
+            $this->line('  <fg=gray>Queue healthy — no refill needed</>');
 
             return;
         }
 
-        $currentUri = $current['uri'] ?? null;
-        $trackChanged = $currentUri !== null && $currentUri !== $this->lastTrackUri;
-
-        if ($trackChanged) {
-            $this->lastTrackUri = $currentUri;
-            $this->line("Now playing: <fg=cyan>{$current['name']}</> by {$current['artist']}");
-        }
-
-        // Check queue depth
-        $queueData = $spotify->getQueue();
-        $queue = $queueData['queue'] ?? [];
-        $queueDepth = count($queue);
-
-        // Only refill on track change AND when queue is below threshold
-        if ($trackChanged && $queueDepth < $threshold) {
-            $this->refill($spotify, $current, $queue, $threshold, $mood);
-        }
-
-        $this->renderStatus($current, $queueDepth, $this->lastRefillTime);
+        $this->refill($spotify, $current ?? [], $queue, $threshold, $mood);
     }
 
     private function refill(SpotifyService $spotify, array $current, array $queue, int $threshold, string $mood): void
@@ -112,7 +134,14 @@ class AutopilotCommand extends Command
             $seedTrackIds[] = $m[1];
         }
 
-        // Add seeds from recent history for variety
+        // Add mood-specific audio feature targets if the recommendations API supports it
+        $moodParams = match ($mood) {
+            'chill' => ['target_energy' => 0.3, 'target_valence' => 0.5, 'target_tempo' => 90],
+            'hype' => ['target_energy' => 0.9, 'target_valence' => 0.8, 'target_tempo' => 140],
+            default => ['target_energy' => 0.6, 'target_valence' => 0.6, 'target_tempo' => 120], // flow
+        };
+
+        // Seed from recent history for variety
         $recentlyPlayed = $spotify->getRecentlyPlayed(5);
         foreach ($recentlyPlayed as $recent) {
             if (count($seedTrackIds) >= 3) {
@@ -125,7 +154,7 @@ class AutopilotCommand extends Command
             }
         }
 
-        // Build the dedup set: queue + recently played + session history
+        // Build the dedup set
         $excludeUris = $this->sessionUris;
 
         if (isset($current['uri'])) {
@@ -138,8 +167,13 @@ class AutopilotCommand extends Command
             $excludeUris[$recent['uri']] = true;
         }
 
-        // Request extra recommendations to account for dedup filtering
-        $recommendations = $spotify->getRecommendations($seedTrackIds, $seedArtistIds, $needed + 10);
+        $recommendations = $spotify->getRecommendations($seedTrackIds, $seedArtistIds, $needed + 10, $moodParams);
+
+        // Fall back to related tracks search if recommendations API returned nothing
+        if (empty($recommendations) && isset($current['artist'])) {
+            $this->line('  <fg=gray>Recommendations unavailable — falling back to related tracks</>');
+            $recommendations = $spotify->getRelatedTracks($current['artist'], $current['name'] ?? '', $needed + 10);
+        }
 
         $added = 0;
         foreach ($recommendations as $track) {
@@ -164,24 +198,9 @@ class AutopilotCommand extends Command
 
         if ($added > 0) {
             $this->lastRefillTime = now()->format('H:i:s');
-            info("Refilled {$added} tracks ({$mood} mood)");
+            info("Refilled {$added} tracks ({$mood} mood) at {$this->lastRefillTime}");
         } else {
             warning('No fresh recommendations available to add');
         }
-    }
-
-    private function renderStatus(?array $current, ?int $queueDepth, ?string $lastRefill): void
-    {
-        if (! $current) {
-            return;
-        }
-
-        $track = $current['name'] ?? 'Unknown';
-        $artist = $current['artist'] ?? 'Unknown';
-        $refillInfo = $lastRefill ? " | Last refill: {$lastRefill}" : '';
-
-        $this->line(
-            "<fg=gray>[{$track} by {$artist} | Queue: {$queueDepth}{$refillInfo}]</>"
-        );
     }
 }
