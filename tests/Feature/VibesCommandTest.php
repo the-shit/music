@@ -98,7 +98,7 @@ describe('VibesCommand', function () {
             'git log *' => Process::result(output: $gitLog, exitCode: 0),
         ]);
 
-        $this->mock(SpotifyService::class, function ($mock) use ($trackId) {
+        $this->mock(SpotifyService::class, function ($mock) {
             $mock->shouldReceive('isConfigured')->andReturn(true);
             $mock->shouldReceive('getTracks')
                 ->once()
