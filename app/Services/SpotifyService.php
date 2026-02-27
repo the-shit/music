@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Exception;
 use Illuminate\Support\Facades\Http;
 
 class SpotifyService
@@ -394,7 +395,7 @@ class SpotifyService
 
         if (! $response->successful()) {
             $error = $response->json();
-            throw new \Exception($error['error']['message'] ?? 'Failed to transfer playback');
+            throw new Exception($error['error']['message'] ?? 'Failed to transfer playback');
         }
     }
 
