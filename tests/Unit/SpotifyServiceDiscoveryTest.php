@@ -39,6 +39,64 @@ afterEach(function () {
 
 describe('Discovery Methods', function () {
 
+    it('passes mood audio features to recommendations endpoint', function () {
+        Http::fake([
+            'api.spotify.com/v1/recommendations*' => Http::response([
+                'tracks' => [[
+                    'id' => 'rec1',
+                    'uri' => 'spotify:track:rec1',
+                    'name' => 'Mood Track',
+                    'artists' => [['name' => 'Mood Artist']],
+                    'album' => ['name' => 'Mood Album'],
+                ]],
+            ]),
+        ]);
+
+        $tracks = $this->service->getRecommendations(
+            ['seed_track_1'],
+            ['seed_artist_1'],
+            12,
+            ['target_energy' => 0.3, 'target_valence' => 0.5, 'target_tempo' => 90]
+        );
+
+        expect($tracks)->toHaveCount(1);
+        expect($tracks[0]['name'])->toBe('Mood Track');
+
+        Http::assertSent(function (Request $request) {
+            $url = urldecode($request->url());
+
+            return str_contains($url, '/recommendations?')
+                && str_contains($url, 'seed_tracks=seed_track_1')
+                && str_contains($url, 'seed_artists=seed_artist_1')
+                && str_contains($url, 'limit=12')
+                && str_contains($url, 'target_energy=0.3')
+                && str_contains($url, 'target_valence=0.5')
+                && str_contains($url, 'target_tempo=90');
+        });
+    });
+
+    it('requests recommendations without audio features by default', function () {
+        Http::fake([
+            'api.spotify.com/v1/recommendations*' => Http::response([
+                'tracks' => [],
+            ]),
+            'api.spotify.com/v1/me/top/tracks*' => Http::response(['items' => []]),
+            'api.spotify.com/v1/me/top/artists*' => Http::response(['items' => []]),
+            'api.spotify.com/v1/me/playlists*' => Http::response(['items' => []]),
+        ]);
+
+        $this->service->getRecommendations(['seed_track_1'], [], 10);
+
+        Http::assertSent(function (Request $request) {
+            $url = urldecode($request->url());
+
+            return str_contains($url, '/recommendations?')
+                && ! str_contains($url, 'target_energy=')
+                && ! str_contains($url, 'target_valence=')
+                && ! str_contains($url, 'target_tempo=');
+        });
+    });
+
     it('gets top tracks', function () {
         Http::fake([
             'api.spotify.com/v1/me/top/tracks*' => Http::response([
