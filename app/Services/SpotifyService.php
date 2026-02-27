@@ -658,6 +658,7 @@ class SpotifyService
                     'uri' => $track['uri'],
                     'name' => $track['name'],
                     'artist' => $track['artists'][0]['name'] ?? 'Unknown',
+                    'artist_id' => $track['artists'][0]['id'] ?? null,
                     'album' => $track['album']['name'] ?? 'Unknown',
                     'played_at' => $item['played_at'] ?? null,
                 ];
@@ -689,7 +690,7 @@ class SpotifyService
      * development-mode apps.  This method tries it first, then falls through
      * to getSmartRecommendations() which uses only live endpoints.
      */
-    public function getRecommendations(array $seedTrackIds = [], array $seedArtistIds = [], int $limit = 10, array $audioFeatures = []): array
+    public function getRecommendations(array $seedTrackIds = [], array $seedArtistIds = [], int $limit = 10, array $audioFeatures = [], ?string $currentArtist = null): array
     {
         $this->requireAuth();
 
@@ -706,7 +707,7 @@ class SpotifyService
             }
 
             if (empty($seedTrackIds)) {
-                return [];
+                return $this->getSmartRecommendations($limit, $currentArtist, $audioFeatures);
             }
         }
 
@@ -753,7 +754,7 @@ class SpotifyService
         }
 
         // Fall through to multi-strategy discovery
-        return $this->getSmartRecommendations($limit);
+        return $this->getSmartRecommendations($limit, $currentArtist, $audioFeatures);
     }
 
     /**
@@ -763,7 +764,7 @@ class SpotifyService
      * Daily Mix playlists, and recently played to build a diverse pool
      * of recommendations without the deprecated /v1/recommendations API.
      */
-    public function getSmartRecommendations(int $limit = 10, ?string $currentArtist = null): array
+    public function getSmartRecommendations(int $limit = 10, ?string $currentArtist = null, array $audioFeatures = []): array
     {
         $this->requireAuth();
 
@@ -801,12 +802,26 @@ class SpotifyService
             $collect($this->searchMultiple("genre:\"{$genre}\"", 'track', 5));
         }
 
-        // Strategy 4: "Similar to" search if we know the current artist
+        // Strategy 4: Mood-aware terms so fallback still follows recommendation intent
+        $moodTerms = $this->deriveMoodTerms($audioFeatures);
+        foreach ($moodTerms as $term) {
+            $collect($this->searchMultiple($term, 'track', 5));
+
+            if ($currentArtist) {
+                $collect($this->searchMultiple("artist:\"{$currentArtist}\" {$term}", 'track', 3));
+            }
+
+            foreach (array_slice(array_keys($genres), 0, 2) as $genre) {
+                $collect($this->searchMultiple("genre:\"{$genre}\" {$term}", 'track', 3));
+            }
+        }
+
+        // Strategy 5: "Similar to" search if we know the current artist
         if ($currentArtist) {
             $collect($this->searchMultiple("{$currentArtist} similar", 'track', 5));
         }
 
-        // Strategy 5: Discover Weekly / Daily Mixes (Spotify's own algo, still works)
+        // Strategy 6: Discover Weekly / Daily Mixes (Spotify's own algo, still works)
         $playlists = $this->getPlaylists(50);
         foreach ($playlists as $playlist) {
             $name = strtolower($playlist['name'] ?? '');
@@ -834,6 +849,53 @@ class SpotifyService
         shuffle($pool);
 
         return array_slice($pool, 0, $limit);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function deriveMoodTerms(array $audioFeatures): array
+    {
+        $terms = [];
+
+        $energy = (float) ($audioFeatures['target_energy'] ?? 0);
+        $valence = (float) ($audioFeatures['target_valence'] ?? 0);
+        $tempo = (float) ($audioFeatures['target_tempo'] ?? 0);
+        $danceability = (float) ($audioFeatures['target_danceability'] ?? 0);
+        $instrumentalness = (float) ($audioFeatures['target_instrumentalness'] ?? 0);
+        $acousticness = (float) ($audioFeatures['target_acousticness'] ?? 0);
+
+        if ($energy >= 0.8) {
+            $terms[] = 'energetic';
+        } elseif ($energy > 0 && $energy <= 0.3) {
+            $terms[] = 'calm';
+        }
+
+        if ($valence >= 0.75) {
+            $terms[] = 'upbeat';
+        } elseif ($valence > 0 && $valence <= 0.3) {
+            $terms[] = 'melancholy';
+        }
+
+        if ($tempo >= 135) {
+            $terms[] = 'workout';
+        } elseif ($tempo > 0 && $tempo <= 85) {
+            $terms[] = 'ambient';
+        }
+
+        if ($danceability >= 0.75) {
+            $terms[] = 'dance';
+        }
+
+        if ($instrumentalness >= 0.6) {
+            $terms[] = 'instrumental';
+        }
+
+        if ($acousticness >= 0.6) {
+            $terms[] = 'acoustic';
+        }
+
+        return array_values(array_unique($terms));
     }
 
     /**
@@ -949,6 +1011,7 @@ class SpotifyService
                     'name' => $data['item']['name'],
                     'track' => $data['item']['name'],
                     'artist' => $data['item']['artists'][0]['name'] ?? 'Unknown',
+                    'artist_id' => $data['item']['artists'][0]['id'] ?? null,
                     'album' => $data['item']['album']['name'] ?? 'Unknown',
                     'album_art_url' => $albumImages[0]['url'] ?? null,
                     'progress_ms' => $data['progress_ms'] ?? 0,

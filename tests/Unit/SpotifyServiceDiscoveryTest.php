@@ -97,6 +97,79 @@ describe('Discovery Methods', function () {
         });
     });
 
+    it('preserves mood intent when recommendations fallback to smart discovery', function () {
+        Http::fake([
+            'api.spotify.com/v1/recommendations*' => Http::response(['tracks' => []]),
+            'api.spotify.com/v1/me/top/tracks*' => Http::response(['items' => []]),
+            'api.spotify.com/v1/me/top/artists*' => Http::response(['items' => []]),
+            'api.spotify.com/v1/me/playlists*' => Http::response(['items' => []]),
+            'api.spotify.com/v1/search*' => Http::response([
+                'tracks' => [
+                    'items' => [[
+                        'uri' => 'spotify:track:fallback1',
+                        'name' => 'Fallback Mood Track',
+                        'artists' => [['name' => 'Fallback Artist']],
+                        'album' => ['name' => 'Fallback Album'],
+                    ]],
+                ],
+            ]),
+        ]);
+
+        $tracks = $this->service->getRecommendations(
+            ['seed_track_1'],
+            [],
+            5,
+            ['target_energy' => 0.9, 'target_valence' => 0.8, 'target_tempo' => 142],
+            'Current Artist'
+        );
+
+        expect($tracks)->not->toBeEmpty();
+
+        Http::assertSent(function (Request $request) {
+            $url = urldecode($request->url());
+
+            return str_contains($url, '/search?')
+                && str_contains($url, 'artist:"Current Artist" energetic');
+        });
+    });
+
+    it('falls back to smart discovery when no recommendation seeds are available', function () {
+        Http::fake([
+            'api.spotify.com/v1/me/player/recently-played*' => Http::response(['items' => []]),
+            'api.spotify.com/v1/me/top/tracks*' => Http::response(['items' => []]),
+            'api.spotify.com/v1/me/top/artists*' => Http::response(['items' => []]),
+            'api.spotify.com/v1/me/playlists*' => Http::response(['items' => []]),
+            'api.spotify.com/v1/search*' => Http::response([
+                'tracks' => [
+                    'items' => [[
+                        'uri' => 'spotify:track:fallback2',
+                        'name' => 'No Seed Track',
+                        'artists' => [['name' => 'No Seed Artist']],
+                        'album' => ['name' => 'No Seed Album'],
+                    ]],
+                ],
+            ]),
+        ]);
+
+        $tracks = $this->service->getRecommendations(
+            [],
+            [],
+            5,
+            ['target_energy' => 0.85],
+            'Current Artist'
+        );
+
+        expect($tracks)->toHaveCount(1);
+        expect($tracks[0]['name'])->toBe('No Seed Track');
+
+        Http::assertSent(function (Request $request) {
+            $url = urldecode($request->url());
+
+            return str_contains($url, '/search?')
+                && str_contains($url, 'energetic');
+        });
+    });
+
     it('gets top tracks', function () {
         Http::fake([
             'api.spotify.com/v1/me/top/tracks*' => Http::response([

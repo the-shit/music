@@ -16,7 +16,7 @@ class AutopilotCommand extends Command
 
     protected $signature = 'autopilot
         {--threshold=3 : Refill when queue has fewer than N tracks}
-        {--mood=flow : Mood preset for recommendations}
+        {--mood=flow : Mood preset (chill/flow/hype/focus/party/upbeat/melancholy/ambient/workout/sleep)}
         {--interval=3 : Watch polling interval in seconds}
         {--install : Install autopilot as a background LaunchAgent}
         {--uninstall : Remove the autopilot LaunchAgent}
@@ -33,74 +33,6 @@ class AutopilotCommand extends Command
 
     /** Tracks older than this many seconds can be re-queued */
     private const DEDUP_WINDOW_SECONDS = 1800; // 30 minutes
-
-    private const MOOD_PRESETS = [
-        'chill' => [
-            'target_energy' => 0.3,
-            'target_valence' => 0.5,
-            'target_tempo' => 90,
-            'target_danceability' => 0.5,
-            'target_acousticness' => 0.6,
-        ],
-        'flow' => [
-            'target_energy' => 0.6,
-            'target_valence' => 0.6,
-            'target_tempo' => 120,
-            'target_danceability' => 0.6,
-            'target_instrumentalness' => 0.2,
-        ],
-        'hype' => [
-            'target_energy' => 0.9,
-            'target_valence' => 0.8,
-            'target_tempo' => 140,
-            'target_danceability' => 0.85,
-        ],
-        'focus' => [
-            'target_energy' => 0.45,
-            'target_valence' => 0.4,
-            'target_tempo' => 105,
-            'target_instrumentalness' => 0.7,
-            'target_speechiness' => 0.08,
-        ],
-        'party' => [
-            'target_energy' => 0.92,
-            'target_valence' => 0.85,
-            'target_tempo' => 128,
-            'target_danceability' => 0.9,
-        ],
-        'upbeat' => [
-            'target_energy' => 0.78,
-            'target_valence' => 0.82,
-            'target_tempo' => 124,
-            'target_danceability' => 0.78,
-        ],
-        'melancholy' => [
-            'target_energy' => 0.4,
-            'target_valence' => 0.2,
-            'target_tempo' => 95,
-            'target_acousticness' => 0.45,
-        ],
-        'ambient' => [
-            'target_energy' => 0.2,
-            'target_valence' => 0.4,
-            'target_tempo' => 78,
-            'target_acousticness' => 0.7,
-            'target_instrumentalness' => 0.85,
-        ],
-        'workout' => [
-            'target_energy' => 0.95,
-            'target_valence' => 0.7,
-            'target_tempo' => 150,
-            'target_danceability' => 0.82,
-        ],
-        'sleep' => [
-            'target_energy' => 0.12,
-            'target_valence' => 0.28,
-            'target_tempo' => 65,
-            'target_acousticness' => 0.82,
-            'target_instrumentalness' => 0.9,
-        ],
-    ];
 
     public function handle(): int
     {
@@ -127,14 +59,8 @@ class AutopilotCommand extends Command
 
         $spotify = app(SpotifyService::class);
         $threshold = max(1, (int) $this->option('threshold'));
-        $mood = $this->option('mood');
+        $mood = $this->resolveMood((string) $this->option('mood'));
         $interval = max(1, (int) $this->option('interval'));
-
-        if (! array_key_exists($mood, self::MOOD_PRESETS)) {
-            $allowed = implode(', ', array_keys(self::MOOD_PRESETS));
-            warning("Unknown mood '{$mood}' — using 'flow' ({$allowed})");
-            $mood = 'flow';
-        }
 
         info("Autopilot engaged — mood: {$mood}, threshold: {$threshold}");
         info('Listening for track changes — Ctrl+C to stop');
@@ -210,7 +136,7 @@ class AutopilotCommand extends Command
         }
 
         $threshold = $this->option('threshold');
-        $mood = $this->option('mood');
+        $mood = $this->resolveMood((string) $this->option('mood'));
         $interval = $this->option('interval');
 
         // Unload existing if present
@@ -362,7 +288,7 @@ XML;
 
             // Show configured mood/threshold from plist
             $plistContent = file_get_contents($plistPath);
-            if (preg_match('/--mood=(\w+)/', $plistContent, $m)) {
+            if (preg_match('/--mood=([a-z0-9_-]+)/i', $plistContent, $m)) {
                 info("🎵 Mood: {$m[1]}");
             }
             if (preg_match('/--threshold=(\d+)/', $plistContent, $m)) {
@@ -376,7 +302,7 @@ XML;
         if (file_exists($logFile)) {
             $this->newLine();
             info('📝 Recent logs:');
-            $lines = array_slice(file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES), -8);
+            $lines = $this->tailLogLines($logFile, 8);
             foreach ($lines as $line) {
                 $this->line("  {$line}");
             }
@@ -396,13 +322,32 @@ XML;
 
     private function getAutopilotPid(): ?int
     {
-        $pid = trim((string) shell_exec("pgrep -f 'spotify.*autopilot' 2>/dev/null | head -1"));
+        $launchctlOutput = (string) shell_exec('launchctl list '.self::LAUNCH_AGENT_LABEL.' 2>/dev/null');
+        $launchctlPid = $this->parseLaunchctlPid($launchctlOutput);
+        if ($launchctlPid && $this->isPidRunning($launchctlPid) && $this->autopilotProcessLooksValid($launchctlPid)) {
+            return $launchctlPid;
+        }
 
-        return $pid ? (int) $pid : null;
+        $pid = trim((string) shell_exec("pgrep -f 'autopilot' 2>/dev/null | head -1"));
+
+        if (! $pid) {
+            return null;
+        }
+
+        $pidInt = (int) $pid;
+        if (! $this->isPidRunning($pidInt) || ! $this->autopilotProcessLooksValid($pidInt)) {
+            return null;
+        }
+
+        return $pidInt;
     }
 
     private function isLaunchAgentLoaded(): bool
     {
+        if (PHP_OS_FAMILY !== 'Darwin' || ! file_exists($this->getLaunchAgentPath())) {
+            return false;
+        }
+
         $output = trim((string) shell_exec('launchctl list '.self::LAUNCH_AGENT_LABEL.' 2>&1'));
 
         return ! empty($output) && ! str_contains($output, 'Could not find');
@@ -439,28 +384,11 @@ XML;
             fn (int $ts) => $ts > $cutoff
         );
 
-        // Build seed from current track
-        $seedTrackIds = [];
-        $seedArtistIds = [];
-
-        if (isset($current['uri']) && preg_match('/spotify:track:(.+)/', $current['uri'], $m)) {
-            $seedTrackIds[] = $m[1];
-        }
-
-        $moodParams = self::MOOD_PRESETS[$mood] ?? self::MOOD_PRESETS['flow'];
-
         // Seed from recent history for variety
         $recentlyPlayed = $spotify->getRecentlyPlayed(5);
-        foreach ($recentlyPlayed as $recent) {
-            if (count($seedTrackIds) >= 3) {
-                break;
-            }
-            if (preg_match('/spotify:track:(.+)/', $recent['uri'], $m)) {
-                if (! in_array($m[1], $seedTrackIds)) {
-                    $seedTrackIds[] = $m[1];
-                }
-            }
-        }
+
+        [$seedTrackIds, $seedArtistIds] = $this->buildRecommendationSeeds($current, $recentlyPlayed);
+        $moodParams = $this->moodPresets()[$mood] ?? $this->moodPresets()['flow'];
 
         // Build the dedup set — time-bounded session URIs + current context
         $excludeUris = array_fill_keys(array_keys($this->sessionUriTimestamps), true);
@@ -478,7 +406,7 @@ XML;
         // getRecommendations now auto-falls through to getSmartRecommendations
         // when the deprecated endpoint returns empty
         $currentArtist = $current['artist'] ?? null;
-        $recommendations = $spotify->getRecommendations($seedTrackIds, $seedArtistIds, $needed + 10, $moodParams);
+        $recommendations = $spotify->getRecommendations($seedTrackIds, $seedArtistIds, $needed + 10, $moodParams, $currentArtist);
 
         // If still empty (unlikely now), fall back to improved related tracks
         if (empty($recommendations) && $currentArtist) {
@@ -513,5 +441,103 @@ XML;
         } else {
             warning('No fresh recommendations available to add');
         }
+    }
+
+    private function resolveMood(string $mood): string
+    {
+        $presets = $this->moodPresets();
+        if (array_key_exists($mood, $presets)) {
+            return $mood;
+        }
+
+        $allowed = implode(', ', array_keys($presets));
+        warning("Unknown mood '{$mood}' — using 'flow' ({$allowed})");
+
+        return 'flow';
+    }
+
+    /**
+     * @return array<string, array<string, int|float>>
+     */
+    private function moodPresets(): array
+    {
+        return config('autopilot.mood_presets', []);
+    }
+
+    /**
+     * @param  array<string, mixed>  $current
+     * @param  array<int, array<string, mixed>>  $recentlyPlayed
+     * @return array{0: array<int, string>, 1: array<int, string>}
+     */
+    private function buildRecommendationSeeds(array $current, array $recentlyPlayed): array
+    {
+        $seedTrackIds = [];
+        $seedArtistIds = [];
+
+        if (isset($current['uri']) && preg_match('/spotify:track:(.+)/', $current['uri'], $m)) {
+            $seedTrackIds[] = $m[1];
+        }
+
+        if (! empty($current['artist_id'])) {
+            $seedArtistIds[] = (string) $current['artist_id'];
+        }
+
+        foreach ($recentlyPlayed as $recent) {
+            if (count($seedTrackIds) < 3 && preg_match('/spotify:track:(.+)/', $recent['uri'] ?? '', $m)) {
+                if (! in_array($m[1], $seedTrackIds, true)) {
+                    $seedTrackIds[] = $m[1];
+                }
+            }
+
+            if (count($seedArtistIds) < 5 && ! empty($recent['artist_id'])) {
+                $artistId = (string) $recent['artist_id'];
+                if (! in_array($artistId, $seedArtistIds, true)) {
+                    $seedArtistIds[] = $artistId;
+                }
+            }
+
+            if (count($seedTrackIds) >= 3 && count($seedArtistIds) >= 5) {
+                break;
+            }
+        }
+
+        return [$seedTrackIds, $seedArtistIds];
+    }
+
+    private function parseLaunchctlPid(string $launchctlOutput): ?int
+    {
+        if (! preg_match('/"?pid"?\s*=\s*(\d+)/i', $launchctlOutput, $matches)) {
+            return null;
+        }
+
+        $pid = (int) $matches[1];
+
+        return $pid > 0 ? $pid : null;
+    }
+
+    private function isPidRunning(int $pid): bool
+    {
+        return function_exists('posix_kill') ? @posix_kill($pid, 0) : true;
+    }
+
+    private function autopilotProcessLooksValid(int $pid): bool
+    {
+        $command = trim((string) shell_exec('ps -p '.(int) $pid.' -o command= 2>/dev/null'));
+
+        return str_contains($command, 'autopilot') && str_contains($command, 'spotify');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function tailLogLines(string $logFile, int $maxLines): array
+    {
+        if ($maxLines < 1 || ! is_readable($logFile)) {
+            return [];
+        }
+
+        $lines = file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+
+        return array_slice($lines, -$maxLines);
     }
 }
