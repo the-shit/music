@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   update-vibes:
@@ -27,14 +28,22 @@ jobs:
       - name: Generate vibes page
         run: php spotify vibes --no-open --output=docs/vibes.html
 
-      - name: Commit and push if changed
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/vibes.html
-          if git diff --cached --quiet; then
-            echo "No changes to vibes page"
-          else
-            git commit -m "docs: update vibes page [skip ci]"
-            git push
-          fi
+      - name: Create vibes update PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/update-vibes-page
+          delete-branch: true
+          title: "docs: update vibes page"
+          commit-message: |
+            docs: update vibes page
+
+            🎵 Now playing: Rick Astley - Never Gonna Give You Up
+            💿 Album: Whenever You Need Somebody
+            🔗 Track: https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC
+          body: |
+            Automated vibes page regeneration.
+
+            - Regenerated `docs/vibes.html` from latest commit metadata
+            - Opened by GitHub Actions instead of pushing directly to protected `master`
+          add-paths: |
+            docs/vibes.html
