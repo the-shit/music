@@ -6,6 +6,89 @@
 COMMIT_MSG_FILE="$1"
 COMMIT_SOURCE="$2"  # message, template, merge, squash, commit
 
+append_track_trailer() {
+    local track_info="$1"
+    local captured_at
+
+    local display="${track_info%%|*}"
+    local remainder="${track_info#*|}"
+    local album="${remainder%%|*}"
+    local url="${remainder##*|}"
+    captured_at=$(date '+%Y-%m-%d %H:%M:%S %Z')
+
+    printf "\n\n🎵 Now playing: %s\n" "$display" >> "$COMMIT_MSG_FILE"
+    if [ -n "$album" ]; then
+        printf "💿 Album: %s\n" "$album" >> "$COMMIT_MSG_FILE"
+    fi
+    printf "🔗 Track: %s\n" "$url" >> "$COMMIT_MSG_FILE"
+    printf "🕒 Captured: %s\n" "$captured_at" >> "$COMMIT_MSG_FILE"
+}
+
+pick_less_repeated_track() {
+    local track_info="$1"
+    local current_url="${track_info##*|}"
+    local recent_json
+    local alt_track
+    local last_urls
+
+    last_urls=$(git log --format=%B -n 20 | grep -oE 'https://open\.spotify\.com/track/[A-Za-z0-9]+' | head -n 8 | tr '\n' ' ')
+
+    if [ -z "$last_urls" ] || ! echo " $last_urls " | grep -q " $current_url "; then
+        printf "%s" "$track_info"
+        return 0
+    fi
+
+    recent_json=$($SPOTIFY recent --limit=20 --json 2>/dev/null || true)
+    if [ -z "$recent_json" ]; then
+        printf "%s" "$track_info"
+        return 0
+    fi
+
+    alt_track=$(CURRENT_URL="$current_url" LAST_URLS="$last_urls" RECENT_JSON="$recent_json" python3 - <<'PY'
+import json
+import os
+
+current_url = os.environ.get("CURRENT_URL", "")
+last_urls = {u for u in os.environ.get("LAST_URLS", "").split() if u}
+
+try:
+    items = json.loads(os.environ.get("RECENT_JSON", "[]"))
+except Exception:
+    items = []
+
+for item in items:
+    uri = item.get("uri", "")
+    if not uri.startswith("spotify:track:"):
+        continue
+    track_id = uri.split(":")[-1]
+    if not track_id:
+        continue
+    url = f"https://open.spotify.com/track/{track_id}"
+    if url == current_url or url in last_urls:
+        continue
+
+    name = item.get("name", "")
+    if not name:
+        continue
+    artist = item.get("artist", "")
+    album = item.get("album", "")
+    print(f"{artist} - {name}|{album}|{url}")
+    break
+PY
+)
+
+    if [ -n "$alt_track" ]; then
+        printf "%s" "$alt_track"
+    else
+        printf "%s" "$track_info"
+    fi
+}
+
+# Don't duplicate if a Spotify track URL already exists
+if grep -qE 'https://open\.spotify\.com/track/[A-Za-z0-9]+' "$COMMIT_MSG_FILE"; then
+    exit 0
+fi
+
 # Only run on fresh commits (not amends, merges, squashes)
 if [ "$COMMIT_SOURCE" = "merge" ] || [ "$COMMIT_SOURCE" = "squash" ] || [ "$COMMIT_SOURCE" = "commit" ]; then
     exit 0
@@ -65,9 +148,10 @@ try:
         sys.exit(1)
     name = item.get('name', '')
     artist = item.get('artists', [{}])[0].get('name', '')
+    album = item.get('album', {}).get('name', '')
     track_id = item.get('id', '')
     url = f'https://open.spotify.com/track/{track_id}'
-    print(f'{artist} - {name}|{url}')
+    print(f'{artist} - {name}|{album}|{url}')
 except:
     sys.exit(1)
 " 2>/dev/null)
@@ -76,9 +160,7 @@ except:
         exit 0
     fi
 
-    DISPLAY="${TRACK_INFO%%|*}"
-    URL="${TRACK_INFO##*|}"
-    printf "\n\n🎵 Now playing: %s\n   %s\n" "$DISPLAY" "$URL" >> "$COMMIT_MSG_FILE"
+    append_track_trailer "$TRACK_INFO"
     exit 0
 fi
 
@@ -97,13 +179,14 @@ try:
         sys.exit(1)
     name = d.get('name') or d.get('track', '')
     artist = d.get('artist', '')
+    album = d.get('album', '')
     uri = d.get('uri', '')
     # Extract track ID from uri (spotify:track:XXXXX)
     track_id = uri.split(':')[-1] if uri else ''
     if not name or not track_id:
         sys.exit(1)
     url = f'https://open.spotify.com/track/{track_id}'
-    print(f'{artist} - {name}|{url}')
+    print(f'{artist} - {name}|{album}|{url}')
 except:
     sys.exit(1)
 " 2>/dev/null)
@@ -112,8 +195,7 @@ if [ -z "$TRACK_INFO" ]; then
     exit 0
 fi
 
-DISPLAY="${TRACK_INFO%%|*}"
-URL="${TRACK_INFO##*|}"
+TRACK_INFO=$(pick_less_repeated_track "$TRACK_INFO")
 
 # Append as a git trailer (blank line + trailer)
-printf "\n\n🎵 Now playing: %s\n   %s\n" "$DISPLAY" "$URL" >> "$COMMIT_MSG_FILE"
+append_track_trailer "$TRACK_INFO"
