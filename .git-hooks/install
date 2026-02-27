@@ -1,0 +1,18 @@
+#!/bin/bash
+set -euo pipefail
+
+REPO_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+HOOKS_DIR="$REPO_DIR/.git/hooks"
+SOURCE_DIR="$REPO_DIR/.git-hooks"
+
+mkdir -p "$HOOKS_DIR"
+
+for hook in prepare-commit-msg post-commit; do
+  if [ -f "$SOURCE_DIR/$hook" ]; then
+    cp "$SOURCE_DIR/$hook" "$HOOKS_DIR/$hook"
+    chmod +x "$HOOKS_DIR/$hook"
+    echo "Installed $hook"
+  fi
+done
+
+echo "Git hooks installed from .git-hooks/"

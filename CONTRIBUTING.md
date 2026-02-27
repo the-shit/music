@@ -18,14 +18,17 @@ This is a Spotify CLI. You should be listening to music while you work on it. If
 
 The `prepare-commit-msg` hook appends the now-playing track automatically. You just commit normally.
 
-### Install the hook
+### Install the hooks
 
 ```bash
-cp .git-hooks/prepare-commit-msg .git/hooks/prepare-commit-msg
-chmod +x .git/hooks/prepare-commit-msg
+bash .git-hooks/install
 ```
 
-The hook reads your Spotify token from `~/.config/spotify-cli/token.json` (written by `./spotify login`) and appends the currently playing track as a trailer. If nothing is playing, it skips silently — but your commit will fail CI.
+This installs:
+- `prepare-commit-msg` (adds now-playing track metadata)
+- `post-commit` (regenerates `docs/vibes.html` in background)
+
+The hook reads your Spotify token from `~/.config/spotify-cli/token.json` (written by `./spotify login`) and appends the currently playing track as a trailer. It also avoids repeating the same track too often by preferring a recent different track when the current song already appears in recent commit history. If nothing is playing, it skips silently — but your commit will fail CI.
 
 ### What a valid commit looks like
 
@@ -33,7 +36,9 @@ The hook reads your Spotify token from `~/.config/spotify-cli/token.json` (writt
 fix: handle empty device list gracefully
 
 🎵 Now playing: Kendrick Lamar - Not Like Us
-   https://open.spotify.com/track/6AI3ezQ4o3HUoP6Dhudph3
+💿 Album: Not Like Us
+🔗 Track: https://open.spotify.com/track/6AI3ezQ4o3HUoP6Dhudph3
+🕒 Captured: 2026-02-27 02:05:03 PST
 ```
 
 ### If nothing is playing
