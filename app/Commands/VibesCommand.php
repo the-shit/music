@@ -207,11 +207,13 @@ class VibesCommand extends Command
     private function generateHtml(array $groups, int $totalCommits, ?string $playlistUrl): string
     {
         $trackCards = '';
-        foreach ($groups as $index => $group) {
-            $trackCards .= $this->renderTrackCard($group, $index);
+        foreach ($groups as $group) {
+            $trackCards .= $this->renderTrackCard($group);
         }
 
         $totalTracks = count($groups);
+        $topCommits = ! empty($groups) ? count($groups[0]['commits']) : 0;
+        $topTrack = ! empty($groups) ? htmlspecialchars($groups[0]['meta']['name'] ?? 'Unknown') : 'Unknown';
         $generatedAt = date('F j, Y \a\t g:i A');
         $playlistButton = $playlistUrl
             ? "<a href=\"{$playlistUrl}\" class=\"playlist-link\" target=\"_blank\">Listen to the full playlist</a>"
@@ -256,13 +258,17 @@ class VibesCommand extends Command
 
         .hero {
             text-align: center;
-            padding: 80px 20px 60px;
-            background: linear-gradient(180deg, #1DB95415 0%, transparent 100%);
+            padding: 96px 20px 72px;
+            background:
+                radial-gradient(circle at 15% 20%, rgba(29, 185, 84, 0.22), transparent 45%),
+                radial-gradient(circle at 82% 0%, rgba(29, 185, 84, 0.14), transparent 42%),
+                linear-gradient(180deg, #111 0%, #0a0a0a 100%);
             position: relative;
+            overflow: hidden;
         }
 
         .hero h1 {
-            font-size: 3.5rem;
+            font-size: 3.9rem;
             font-weight: 800;
             letter-spacing: -0.03em;
             margin-bottom: 12px;
@@ -320,7 +326,7 @@ class VibesCommand extends Command
         }
 
         .container {
-            max-width: 800px;
+            max-width: 980px;
             margin: 0 auto;
             padding: 0 20px 80px;
         }
@@ -331,12 +337,23 @@ class VibesCommand extends Command
             border-radius: 16px;
             margin-bottom: 32px;
             overflow: hidden;
-            transition: border-color 0.2s;
+            transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
             position: relative;
+            border-left: 3px solid var(--green-dim);
         }
 
-        .track-card:hover {
+        .track-card[data-type="feat"] { border-left-color: var(--commit-type-feat); }
+        .track-card[data-type="fix"] { border-left-color: var(--commit-type-fix); }
+        .track-card[data-type="test"] { border-left-color: var(--commit-type-test); }
+        .track-card[data-type="ci"] { border-left-color: var(--commit-type-ci); }
+        .track-card[data-type="refactor"] { border-left-color: var(--commit-type-refactor); }
+        .track-card[data-type="docs"] { border-left-color: var(--commit-type-docs); }
+
+        .track-card:hover,
+        .track-card.expanded {
             border-color: var(--green-dim);
+            transform: translateY(-2px);
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
         }
 
         .track-hero {
@@ -358,13 +375,18 @@ class VibesCommand extends Command
         }
 
         .track-art {
-            width: 80px;
-            height: 80px;
-            border-radius: 8px;
+            width: 110px;
+            height: 110px;
+            border-radius: 999px;
             object-fit: cover;
             position: relative;
             z-index: 1;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            transition: transform 0.5s ease;
+        }
+
+        .track-card:hover .track-art {
+            transform: rotate(360deg);
         }
 
         .track-info {
@@ -375,7 +397,7 @@ class VibesCommand extends Command
         }
 
         .track-name {
-            font-size: 1.15rem;
+            font-size: 1.28rem;
             font-weight: 700;
             color: #fff;
             white-space: nowrap;
@@ -399,7 +421,7 @@ class VibesCommand extends Command
             z-index: 1;
             background: rgba(255,255,255,0.1);
             backdrop-filter: blur(10px);
-            padding: 6px 14px;
+            padding: 8px 14px;
             border-radius: 20px;
             font-size: 0.8rem;
             font-weight: 600;
@@ -417,7 +439,39 @@ class VibesCommand extends Command
         }
 
         .commits {
-            padding: 0 24px 24px;
+            padding: 0 24px 18px;
+        }
+
+        .commits-head {
+            border-top: 1px solid var(--border);
+            padding: 12px 0;
+            color: var(--text-dim);
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .commits-head::after {
+            content: '▾';
+            transition: transform 0.2s;
+        }
+
+        .track-card.expanded .commits-head::after {
+            transform: rotate(180deg);
+        }
+
+        .commits-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.25s ease;
+        }
+
+        .track-card.expanded .commits-list {
+            max-height: 640px;
         }
 
         .commit {
@@ -475,6 +529,7 @@ class VibesCommand extends Command
         .type-ci { background: rgba(52, 152, 219, 0.15); color: var(--commit-type-ci); }
         .type-refactor { background: rgba(243, 156, 18, 0.15); color: var(--commit-type-refactor); }
         .type-docs { background: rgba(26, 188, 156, 0.15); color: var(--commit-type-docs); }
+        .type-chore { background: rgba(255, 255, 255, 0.1); color: rgba(255,255,255,0.8); }
 
         .commit-meta {
             font-size: 0.75rem;
@@ -489,6 +544,16 @@ class VibesCommand extends Command
             margin-bottom: 24px;
             padding-bottom: 12px;
             border-bottom: 1px solid var(--border);
+        }
+
+        .top-vibe {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            margin-top: 8px;
+        }
+
+        .top-vibe strong {
+            color: var(--green);
         }
 
         .footer {
@@ -550,11 +615,20 @@ class VibesCommand extends Command
             .stats { gap: 20px; }
             .stat-value { font-size: 1.5rem; }
             .track-hero { padding: 16px; }
-            .track-art { width: 60px; height: 60px; }
+            .track-art { width: 72px; height: 72px; }
             .spotify-embed, .commits { padding-left: 16px; padding-right: 16px; }
             .track-badge { display: none; }
         }
     </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.commits-head').forEach(function (head) {
+                head.addEventListener('click', function () {
+                    head.closest('.track-card').classList.toggle('expanded');
+                });
+            });
+        });
+    </script>
 </head>
 <body>
     <nav class="nav">
@@ -581,6 +655,7 @@ class VibesCommand extends Command
                 <div class="stat-label">Tracks</div>
             </div>
         </div>
+        <p class="top-vibe">Top track: <strong>{$topTrack}</strong> ({$topCommits} commits)</p>
         {$playlistButton}
     </div>
 
@@ -600,12 +675,20 @@ class VibesCommand extends Command
 HTML;
     }
 
-    private function renderTrackCard(array $group, int $index): string
+    private function renderTrackCard(array $group): string
     {
         $trackId = $group['track_id'];
         $meta = $group['meta'] ?? null;
         $commitCount = count($group['commits']);
         $s = $commitCount === 1 ? '' : 's';
+
+        $dominantType = 'feat';
+        foreach ($group['commits'] as $commit) {
+            if (preg_match('/^(feat|fix|test|ci|refactor|docs|chore)[\(:]/', $commit['subject'], $m)) {
+                $dominantType = $m[1];
+                break;
+            }
+        }
 
         // Track hero with album art
         $trackName = htmlspecialchars($meta['name'] ?? 'Unknown Track');
@@ -625,7 +708,7 @@ HTML;
 
         return <<<HTML
 
-        <div class="track-card">
+        <div class="track-card" data-type="{$dominantType}">
             <div class="track-hero">
                 {$artHtml}
                 <div class="track-info">
@@ -645,7 +728,10 @@ HTML;
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 {$commitRows}
+                </div>
             </div>
         </div>
 HTML;
@@ -668,6 +754,7 @@ HTML;
                 'ci' => 'type-ci',
                 'refactor' => 'type-refactor',
                 'docs' => 'type-docs',
+                'chore' => 'type-chore',
                 default => 'type-feat',
             };
             $typeHtml = "<span class=\"commit-type {$cssClass}\">{$type}</span>";

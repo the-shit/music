@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vibes — Commit Soundtrack</title>
-    <meta name="description" content="Every commit has a vibe. 51 commits, 26 tracks.">
+    <meta name="description" content="Every commit has a vibe. 60 commits, 30 tracks.">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -36,13 +36,17 @@
 
         .hero {
             text-align: center;
-            padding: 80px 20px 60px;
-            background: linear-gradient(180deg, #1DB95415 0%, transparent 100%);
+            padding: 96px 20px 72px;
+            background:
+                radial-gradient(circle at 15% 20%, rgba(29, 185, 84, 0.22), transparent 45%),
+                radial-gradient(circle at 82% 0%, rgba(29, 185, 84, 0.14), transparent 42%),
+                linear-gradient(180deg, #111 0%, #0a0a0a 100%);
             position: relative;
+            overflow: hidden;
         }
 
         .hero h1 {
-            font-size: 3.5rem;
+            font-size: 3.9rem;
             font-weight: 800;
             letter-spacing: -0.03em;
             margin-bottom: 12px;
@@ -100,7 +104,7 @@
         }
 
         .container {
-            max-width: 800px;
+            max-width: 980px;
             margin: 0 auto;
             padding: 0 20px 80px;
         }
@@ -111,12 +115,23 @@
             border-radius: 16px;
             margin-bottom: 32px;
             overflow: hidden;
-            transition: border-color 0.2s;
+            transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
             position: relative;
+            border-left: 3px solid var(--green-dim);
         }
 
-        .track-card:hover {
+        .track-card[data-type="feat"] { border-left-color: var(--commit-type-feat); }
+        .track-card[data-type="fix"] { border-left-color: var(--commit-type-fix); }
+        .track-card[data-type="test"] { border-left-color: var(--commit-type-test); }
+        .track-card[data-type="ci"] { border-left-color: var(--commit-type-ci); }
+        .track-card[data-type="refactor"] { border-left-color: var(--commit-type-refactor); }
+        .track-card[data-type="docs"] { border-left-color: var(--commit-type-docs); }
+
+        .track-card:hover,
+        .track-card.expanded {
             border-color: var(--green-dim);
+            transform: translateY(-2px);
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
         }
 
         .track-hero {
@@ -138,13 +153,18 @@
         }
 
         .track-art {
-            width: 80px;
-            height: 80px;
-            border-radius: 8px;
+            width: 110px;
+            height: 110px;
+            border-radius: 999px;
             object-fit: cover;
             position: relative;
             z-index: 1;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            transition: transform 0.5s ease;
+        }
+
+        .track-card:hover .track-art {
+            transform: rotate(360deg);
         }
 
         .track-info {
@@ -155,7 +175,7 @@
         }
 
         .track-name {
-            font-size: 1.15rem;
+            font-size: 1.28rem;
             font-weight: 700;
             color: #fff;
             white-space: nowrap;
@@ -179,7 +199,7 @@
             z-index: 1;
             background: rgba(255,255,255,0.1);
             backdrop-filter: blur(10px);
-            padding: 6px 14px;
+            padding: 8px 14px;
             border-radius: 20px;
             font-size: 0.8rem;
             font-weight: 600;
@@ -197,7 +217,39 @@
         }
 
         .commits {
-            padding: 0 24px 24px;
+            padding: 0 24px 18px;
+        }
+
+        .commits-head {
+            border-top: 1px solid var(--border);
+            padding: 12px 0;
+            color: var(--text-dim);
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .commits-head::after {
+            content: '▾';
+            transition: transform 0.2s;
+        }
+
+        .track-card.expanded .commits-head::after {
+            transform: rotate(180deg);
+        }
+
+        .commits-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.25s ease;
+        }
+
+        .track-card.expanded .commits-list {
+            max-height: 640px;
         }
 
         .commit {
@@ -255,6 +307,7 @@
         .type-ci { background: rgba(52, 152, 219, 0.15); color: var(--commit-type-ci); }
         .type-refactor { background: rgba(243, 156, 18, 0.15); color: var(--commit-type-refactor); }
         .type-docs { background: rgba(26, 188, 156, 0.15); color: var(--commit-type-docs); }
+        .type-chore { background: rgba(255, 255, 255, 0.1); color: rgba(255,255,255,0.8); }
 
         .commit-meta {
             font-size: 0.75rem;
@@ -269,6 +322,16 @@
             margin-bottom: 24px;
             padding-bottom: 12px;
             border-bottom: 1px solid var(--border);
+        }
+
+        .top-vibe {
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            margin-top: 8px;
+        }
+
+        .top-vibe strong {
+            color: var(--green);
         }
 
         .footer {
@@ -330,11 +393,20 @@
             .stats { gap: 20px; }
             .stat-value { font-size: 1.5rem; }
             .track-hero { padding: 16px; }
-            .track-art { width: 60px; height: 60px; }
+            .track-art { width: 72px; height: 72px; }
             .spotify-embed, .commits { padding-left: 16px; padding-right: 16px; }
             .track-badge { display: none; }
         }
     </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.commits-head').forEach(function (head) {
+                head.addEventListener('click', function () {
+                    head.closest('.track-card').classList.toggle('expanded');
+                });
+            });
+        });
+    </script>
 </head>
 <body>
     <nav class="nav">
@@ -353,14 +425,15 @@
         <p class="subtitle">A Spotify CLI where CI rejects your code if you weren't listening to music when you wrote it.</p>
         <div class="stats">
             <div class="stat">
-                <div class="stat-value">51</div>
+                <div class="stat-value">60</div>
                 <div class="stat-label">Commits</div>
             </div>
             <div class="stat">
-                <div class="stat-value">26</div>
+                <div class="stat-value">30</div>
                 <div class="stat-label">Tracks</div>
             </div>
         </div>
+        <p class="top-vibe">Top track: <strong>Wolf Totem</strong> (7 commits)</p>
         
     </div>
 
@@ -368,9 +441,9 @@
         <h2 class="section-title">The Soundtrack</h2>
 
         
-        <div class="track-card">
+        <div class="track-card" data-type="fix">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b273a849f2dea216228f9039f3e9')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02a849f2dea216228f9039f3e9" alt="The Gereg (Deluxe Edition)" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273a849f2dea216228f9039f3e9')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02a849f2dea216228f9039f3e9" alt="The Gereg (Deluxe Edition)" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Wolf Totem</div>
                     <div class="track-artist">The HU</div>
@@ -388,6 +461,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">b23dfe0</code>
@@ -438,11 +513,106 @@
                         <div class="commit-meta">Jordan Partridge · Feb 24, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="docs">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-ak.spotifycdn.com/image/ab67616d0000b2731e1ca90cd8fdbb0ac890a926')"></div><img class="track-art" src="https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e021e1ca90cd8fdbb0ac890a926" alt="An Awesome Wave" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273255e131abc1410833be95673')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02255e131abc1410833be95673" alt="Whenever You Need Somebody" loading="lazy">
+                <div class="track-info">
+                    <div class="track-name">Never Gonna Give You Up</div>
+                    <div class="track-artist">Rick Astley</div>
+                    <div class="track-album">Whenever You Need Somebody</div>
+                </div>
+                <div class="track-badge">3 commits</div>
+            </div>
+            <div class="spotify-embed">
+                <iframe
+                    src="https://open.spotify.com/embed/track/4uLU6hMCjMI75M1A2tKUQC?utm_source=generator&theme=0"
+                    width="100%" height="80"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy">
+                </iframe>
+            </div>
+            <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
+                
+                <div class="commit">
+                    <code class="commit-hash">bf7f9e9</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-docs">docs</span>docs: update vibes page (#62)</div>
+                        <div class="commit-meta">github-actions[bot] · Feb 27, 2026</div>
+                    </div>
+                </div>
+                <div class="commit">
+                    <code class="commit-hash">a137289</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-chore">chore</span>chore(ci): add PHPStan gate and improve vibe commit hooks (#52)</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
+                    </div>
+                </div>
+                <div class="commit">
+                    <code class="commit-hash">bf17786</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-chore">chore</span>chore(ci): enforce PHPStan and upgrade vibe hook metadata</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+        <div class="track-card" data-type="docs">
+            <div class="track-hero">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b27334199d91c91f8303bcb83abb')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e0234199d91c91f8303bcb83abb" alt="Don&#039;t Know How To Party" loading="lazy">
+                <div class="track-info">
+                    <div class="track-name">Someday I Suppose</div>
+                    <div class="track-artist">The Mighty Mighty Bosstones</div>
+                    <div class="track-album">Don&#039;t Know How To Party</div>
+                </div>
+                <div class="track-badge">3 commits</div>
+            </div>
+            <div class="spotify-embed">
+                <iframe
+                    src="https://open.spotify.com/embed/track/5IReyQMxi6LTLoIl5caW2B?utm_source=generator&theme=0"
+                    width="100%" height="80"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy">
+                </iframe>
+            </div>
+            <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
+                
+                <div class="commit">
+                    <code class="commit-hash">9f1d082</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-docs">docs</span>docs(site): polish docs page visual style (#60)</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
+                    </div>
+                </div>
+                <div class="commit">
+                    <code class="commit-hash">52a4fda</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-docs">docs</span>docs(site): polish docs page visual style</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
+                    </div>
+                </div>
+                <div class="commit">
+                    <code class="commit-hash">2a93c1a</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-docs">docs</span>docs(site): polish docs page visual style</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+        <div class="track-card" data-type="feat">
+            <div class="track-hero">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273609c89ad17eb28c2013c56c6')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02609c89ad17eb28c2013c56c6" alt="An Awesome Wave" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Breezeblocks</div>
                     <div class="track-artist">alt-J</div>
@@ -460,6 +630,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">47f3452</code>
@@ -482,14 +654,15 @@
                         <div class="commit-meta">Jordan Partridge · Feb 25, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="feat">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-ak.spotifycdn.com/image/ab67616d0000b27348024f0934bb357ee815d484')"></div><img class="track-art" src="https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e0248024f0934bb357ee815d484" alt="Energy" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b27348024f0934bb357ee815d484')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e0248024f0934bb357ee815d484" alt="Energy" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Energy</div>
-                    <div class="track-artist">Sampa the Great, Nadeem Din-Gabisi</div>
+                    <div class="track-artist">Sampa the Great</div>
                     <div class="track-album">Energy</div>
                 </div>
                 <div class="track-badge">3 commits</div>
@@ -504,6 +677,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">90c18e0</code>
@@ -526,11 +701,12 @@
                         <div class="commit-meta">Jordan Partridge · Feb 24, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="docs">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b27391b3adb195fd4017fd3d6400')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e0291b3adb195fd4017fd3d6400" alt="City of Evil" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b27391b3adb195fd4017fd3d6400')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e0291b3adb195fd4017fd3d6400" alt="City of Evil" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Bat Country</div>
                     <div class="track-artist">Avenged Sevenfold</div>
@@ -548,6 +724,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">ae7fb15</code>
@@ -570,11 +748,12 @@
                         <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="fix">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b2736b3463e7160d333ada4b175a')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e026b3463e7160d333ada4b175a" alt="Vol. 3 The Subliminal Verses" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273a2068bbfe06e5227c091cf3d')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02a2068bbfe06e5227c091cf3d" alt="Vol. 3 The Subliminal Verses" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Duality</div>
                     <div class="track-artist">Slipknot</div>
@@ -592,6 +771,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">2dc5097</code>
@@ -614,21 +795,22 @@
                         <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="fix">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b273255e131abc1410833be95673')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02255e131abc1410833be95673" alt="Whenever You Need Somebody" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b2736cdc5fd8a466421db1253383')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e026cdc5fd8a466421db1253383" alt="Pusselbitar" loading="lazy">
                 <div class="track-info">
-                    <div class="track-name">Never Gonna Give You Up</div>
-                    <div class="track-artist">Rick Astley</div>
-                    <div class="track-album">Whenever You Need Somebody</div>
+                    <div class="track-name">En high 5 &amp; 1 falafel</div>
+                    <div class="track-artist">Timbuktu</div>
+                    <div class="track-album">Pusselbitar</div>
                 </div>
                 <div class="track-badge">2 commits</div>
             </div>
             <div class="spotify-embed">
                 <iframe
-                    src="https://open.spotify.com/embed/track/4uLU6hMCjMI75M1A2tKUQC?utm_source=generator&theme=0"
+                    src="https://open.spotify.com/embed/track/1snteIZggayoaVFm6L50ZV?utm_source=generator&theme=0"
                     width="100%" height="80"
                     frameBorder="0"
                     allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
@@ -636,63 +818,29 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
-                    <code class="commit-hash">2f2075e</code>
+                    <code class="commit-hash">56eb548</code>
                     <div class="commit-info">
-                        <div class="commit-subject"><span class="commit-type type-docs">docs</span>docs: update vibes page</div>
-                        <div class="commit-meta">jordanpartridge · Feb 27, 2026</div>
+                        <div class="commit-subject"><span class="commit-type type-fix">fix</span>fix(ci): create PR for vibes regeneration on protected master (#61)</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
                     </div>
                 </div>
                 <div class="commit">
-                    <code class="commit-hash">a137289</code>
+                    <code class="commit-hash">db85305</code>
                     <div class="commit-info">
-                        <div class="commit-subject"><span class="commit-type type-feat">chore</span>chore(ci): add PHPStan gate and improve vibe commit hooks (#52)</div>
+                        <div class="commit-subject"><span class="commit-type type-fix">fix</span>fix(ci): create PR for vibes regeneration on protected master</div>
                         <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
                     </div>
+                </div>
                 </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="feat">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b27334199d91c91f8303bcb83abb')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e0234199d91c91f8303bcb83abb" alt="Don&#039;t Know How To Party" loading="lazy">
-                <div class="track-info">
-                    <div class="track-name">Someday I Suppose</div>
-                    <div class="track-artist">The Mighty Mighty Bosstones</div>
-                    <div class="track-album">Don&#039;t Know How To Party</div>
-                </div>
-                <div class="track-badge">2 commits</div>
-            </div>
-            <div class="spotify-embed">
-                <iframe
-                    src="https://open.spotify.com/embed/track/5IReyQMxi6LTLoIl5caW2B?utm_source=generator&theme=0"
-                    width="100%" height="80"
-                    frameBorder="0"
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                    loading="lazy">
-                </iframe>
-            </div>
-            <div class="commits">
-                
-                <div class="commit">
-                    <code class="commit-hash">9f1d082</code>
-                    <div class="commit-info">
-                        <div class="commit-subject"><span class="commit-type type-docs">docs</span>docs(site): polish docs page visual style (#60)</div>
-                        <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
-                    </div>
-                </div>
-                <div class="commit">
-                    <code class="commit-hash">2a93c1a</code>
-                    <div class="commit-info">
-                        <div class="commit-subject"><span class="commit-type type-docs">docs</span>docs(site): polish docs page visual style</div>
-                        <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="track-card">
-            <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-ak.spotifycdn.com/image/ab67616d0000b2737e09670f90cd47b3fb9a23e0')"></div><img class="track-art" src="https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e027e09670f90cd47b3fb9a23e0" alt="August And Everything After" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b2737e09670f90cd47b3fb9a23e0')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e027e09670f90cd47b3fb9a23e0" alt="August And Everything After" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Mr. Jones</div>
                     <div class="track-artist">Counting Crows</div>
@@ -710,6 +858,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">532d0a7</code>
@@ -725,11 +875,52 @@
                         <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="chore">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-ak.spotifycdn.com/image/ab67616d0000b273eed722040c6810f7a7da93ea')"></div><img class="track-art" src="https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e02eed722040c6810f7a7da93ea" alt=".5: The Gray Chapter (Special Edition)" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273baf89eb11ec7c657805d2da0')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02baf89eb11ec7c657805d2da0" alt="Whenever You Need Somebody" loading="lazy">
+                <div class="track-info">
+                    <div class="track-name">Never Gonna Give You Up</div>
+                    <div class="track-artist">Rick Astley</div>
+                    <div class="track-album">Whenever You Need Somebody</div>
+                </div>
+                <div class="track-badge">2 commits</div>
+            </div>
+            <div class="spotify-embed">
+                <iframe
+                    src="https://open.spotify.com/embed/track/4cOdK2wGLETKBW3PvgPWqT?utm_source=generator&theme=0"
+                    width="100%" height="80"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy">
+                </iframe>
+            </div>
+            <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
+                
+                <div class="commit">
+                    <code class="commit-hash">95591b4</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-chore">chore</span>chore(ci): disable Sentinel auto-merge for protected master (#48)</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
+                    </div>
+                </div>
+                <div class="commit">
+                    <code class="commit-hash">f80b8f1</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-chore">chore</span>chore(ci): disable Sentinel auto-merge for protected master</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+        <div class="track-card" data-type="fix">
+            <div class="track-hero">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273eed722040c6810f7a7da93ea')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02eed722040c6810f7a7da93ea" alt=".5: The Gray Chapter (Special Edition)" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">The Devil in I</div>
                     <div class="track-artist">Slipknot</div>
@@ -747,6 +938,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">f25070a</code>
@@ -762,11 +955,12 @@
                         <div class="commit-meta">Jordan Partridge · Feb 25, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="feat">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b273850d8da4ce418aba90f156d0')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02850d8da4ce418aba90f156d0" alt="The Used" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273850d8da4ce418aba90f156d0')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02850d8da4ce418aba90f156d0" alt="The Used" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">The Taste of Ink</div>
                     <div class="track-artist">The Used</div>
@@ -784,6 +978,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">7773197</code>
@@ -799,11 +995,52 @@
                         <div class="commit-meta">Jordan Partridge · Feb 25, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="feat">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b27347daa44983fa6079910ed295')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e0247daa44983fa6079910ed295" alt="Ænima" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273053f006079bce979e5fef1e1')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02053f006079bce979e5fef1e1" alt="Evil Empire" loading="lazy">
+                <div class="track-info">
+                    <div class="track-name">Bulls On Parade</div>
+                    <div class="track-artist">Rage Against The Machine</div>
+                    <div class="track-album">Evil Empire</div>
+                </div>
+                <div class="track-badge">2 commits</div>
+            </div>
+            <div class="spotify-embed">
+                <iframe
+                    src="https://open.spotify.com/embed/track/0tZ3mElWcr74OOhKEiNz1x?utm_source=generator&theme=0"
+                    width="100%" height="80"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy">
+                </iframe>
+            </div>
+            <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
+                
+                <div class="commit">
+                    <code class="commit-hash">f554e26</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-feat">feat</span>feat: Swift media bridge + autopilot daemon + macOS service stack (#42)</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 25, 2026</div>
+                    </div>
+                </div>
+                <div class="commit">
+                    <code class="commit-hash">33de8ad</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-feat">feat</span>feat: add setup:media-bridge command for Swift media bridge integration\n\n- Adds new Laravel Zero command to compile and daemonize media-bridge.swift\n- Fixes hardcoded paths in Swift file\n- Updates README with setup instructions\n- Removes deprecated Python bridge files\n\nCo-authored-by: Grok &lt;grok@x.ai&gt;</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 25, 2026</div>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+        <div class="track-card" data-type="feat">
+            <div class="track-hero">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b27347daa44983fa6079910ed295')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e0247daa44983fa6079910ed295" alt="Ænima" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Forty Six &amp; 2</div>
                     <div class="track-artist">TOOL</div>
@@ -821,6 +1058,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">cbd5049</code>
@@ -836,11 +1075,12 @@
                         <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="docs">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-ak.spotifycdn.com/image/ab67616d0000b27381e0d9617e70d75e7ae11fa6')"></div><img class="track-art" src="https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e0281e0d9617e70d75e7ae11fa6" alt="Slipknot" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b27381e0d9617e70d75e7ae11fa6')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e0281e0d9617e70d75e7ae11fa6" alt="Slipknot" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Eyeless</div>
                     <div class="track-artist">Slipknot</div>
@@ -858,6 +1098,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">7bd544c</code>
@@ -873,11 +1115,12 @@
                         <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="feat">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-ak.spotifycdn.com/image/ab67616d0000b273e7fbc0883149094912559f2c')"></div><img class="track-art" src="https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e02e7fbc0883149094912559f2c" alt="All Hope Is Gone (10th Anniversary)" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273e7fbc0883149094912559f2c')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02e7fbc0883149094912559f2c" alt="All Hope Is Gone (10th Anniversary)" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Snuff</div>
                     <div class="track-artist">Slipknot</div>
@@ -895,6 +1138,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">1b3cb77</code>
@@ -910,11 +1155,12 @@
                         <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="feat">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b273f3d72bc62b3f0fc059da2e46')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02f3d72bc62b3f0fc059da2e46" alt="Take A Look In The Mirror" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b2731db105273d8af0e255e491ec')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e021db105273d8af0e255e491ec" alt="Take A Look In The Mirror" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Y&#039;all Want a Single</div>
                     <div class="track-artist">Korn</div>
@@ -932,6 +1178,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">1955e59</code>
@@ -947,11 +1195,12 @@
                         <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="feat">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-ak.spotifycdn.com/image/ab67616d0000b2730b1129853982ea17845d4eb6')"></div><img class="track-art" src="https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e020b1129853982ea17845d4eb6" alt="Around the Fur" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b2730b1129853982ea17845d4eb6')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e020b1129853982ea17845d4eb6" alt="Around the Fur" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">My Own Summer (Shove It)</div>
                     <div class="track-artist">Deftones</div>
@@ -969,6 +1218,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">ea40f23</code>
@@ -984,11 +1235,12 @@
                         <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="refactor">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-ak.spotifycdn.com/image/ab67616d0000b273b5bc4686d08a5812a63f180d')"></div><img class="track-art" src="https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e02b5bc4686d08a5812a63f180d" alt="In Love and Death" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273b5bc4686d08a5812a63f180d')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02b5bc4686d08a5812a63f180d" alt="In Love and Death" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">All That I&#039;ve Got</div>
                     <div class="track-artist">The Used</div>
@@ -1006,6 +1258,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">bc70c46</code>
@@ -1021,21 +1275,22 @@
                         <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="fix">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b2736cdc5fd8a466421db1253383')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e026cdc5fd8a466421db1253383" alt="Pusselbitar" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273dc60cf9a010f86354e6735dd')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02dc60cf9a010f86354e6735dd" alt="City to City" loading="lazy">
                 <div class="track-info">
-                    <div class="track-name">En high 5 &amp; 1 falafel</div>
-                    <div class="track-artist">Timbuktu</div>
-                    <div class="track-album">Pusselbitar</div>
+                    <div class="track-name">Baker Street</div>
+                    <div class="track-artist">Gerry Rafferty</div>
+                    <div class="track-album">City to City</div>
                 </div>
                 <div class="track-badge">1 commit</div>
             </div>
             <div class="spotify-embed">
                 <iframe
-                    src="https://open.spotify.com/embed/track/1snteIZggayoaVFm6L50ZV?utm_source=generator&theme=0"
+                    src="https://open.spotify.com/embed/track/5gOd6zDC8vhlYjqbQdJVWP?utm_source=generator&theme=0"
                     width="100%" height="80"
                     frameBorder="0"
                     allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
@@ -1043,29 +1298,32 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
-                    <code class="commit-hash">56eb548</code>
+                    <code class="commit-hash">6259368</code>
                     <div class="commit-info">
-                        <div class="commit-subject"><span class="commit-type type-fix">fix</span>fix(ci): create PR for vibes regeneration on protected master (#61)</div>
+                        <div class="commit-subject"><span class="commit-type type-fix">fix</span>fix(ci): align Sentinel PHP version with lockfile requirements</div>
                         <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="fix">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b273baf89eb11ec7c657805d2da0')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02baf89eb11ec7c657805d2da0" alt="Whenever You Need Somebody" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273f09b618bc81755c0d817bd20')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02f09b618bc81755c0d817bd20" alt="Van Halen II (Remastered)" loading="lazy">
                 <div class="track-info">
-                    <div class="track-name">Never Gonna Give You Up</div>
-                    <div class="track-artist">Rick Astley</div>
-                    <div class="track-album">Whenever You Need Somebody</div>
+                    <div class="track-name">Dance the Night Away - 2015 Remaster</div>
+                    <div class="track-artist">Van Halen</div>
+                    <div class="track-album">Van Halen II (Remastered)</div>
                 </div>
                 <div class="track-badge">1 commit</div>
             </div>
             <div class="spotify-embed">
                 <iframe
-                    src="https://open.spotify.com/embed/track/4cOdK2wGLETKBW3PvgPWqT?utm_source=generator&theme=0"
+                    src="https://open.spotify.com/embed/track/4RS9PmtHQe7I0o5fEeweOY?utm_source=generator&theme=0"
                     width="100%" height="80"
                     frameBorder="0"
                     allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
@@ -1073,49 +1331,88 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
-                    <code class="commit-hash">95591b4</code>
+                    <code class="commit-hash">5d674b8</code>
                     <div class="commit-info">
-                        <div class="commit-subject"><span class="commit-type type-feat">chore</span>chore(ci): disable Sentinel auto-merge for protected master (#48)</div>
-                        <div class="commit-meta">Jordan Partridge · Feb 27, 2026</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="track-card">
-            <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-ak.spotifycdn.com/image/ab67616d0000b273053f006079bce979e5fef1e1')"></div><img class="track-art" src="https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e02053f006079bce979e5fef1e1" alt="Evil Empire" loading="lazy">
-                <div class="track-info">
-                    <div class="track-name">Bulls On Parade</div>
-                    <div class="track-artist">Rage Against The Machine</div>
-                    <div class="track-album">Evil Empire</div>
-                </div>
-                <div class="track-badge">1 commit</div>
-            </div>
-            <div class="spotify-embed">
-                <iframe
-                    src="https://open.spotify.com/embed/track/0tZ3mElWcr74OOhKEiNz1x?utm_source=generator&theme=0"
-                    width="100%" height="80"
-                    frameBorder="0"
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                    loading="lazy">
-                </iframe>
-            </div>
-            <div class="commits">
-                
-                <div class="commit">
-                    <code class="commit-hash">f554e26</code>
-                    <div class="commit-info">
-                        <div class="commit-subject"><span class="commit-type type-feat">feat</span>feat: Swift media bridge + autopilot daemon + macOS service stack (#42)</div>
+                        <div class="commit-subject"><span class="commit-type type-fix">fix</span>fix: add audio feature params to getRecommendations for mood-based autopilot</div>
                         <div class="commit-meta">Jordan Partridge · Feb 25, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="feat">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b273947a926195193c56d1dc45d8')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02947a926195193c56d1dc45d8" alt="Veteran" loading="lazy">
+                
+                <div class="track-info">
+                    <div class="track-name">Unknown Track</div>
+                    <div class="track-artist">Unknown Artist</div>
+                    <div class="track-album"></div>
+                </div>
+                <div class="track-badge">1 commit</div>
+            </div>
+            <div class="spotify-embed">
+                <iframe
+                    src="https://open.spotify.com/embed/track/49Lzm7yxjaw8cBMCFklJSb?utm_source=generator&theme=0"
+                    width="100%" height="80"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy">
+                </iframe>
+            </div>
+            <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
+                
+                <div class="commit">
+                    <code class="commit-hash">c4a08d9</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-feat">feat</span>feat: add autopilot daemon support + document macOS service stack</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 25, 2026</div>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+        <div class="track-card" data-type="feat">
+            <div class="track-hero">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b2734d1db642d70b1b939ab42966')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e024d1db642d70b1b939ab42966" alt="Renegades" loading="lazy">
+                <div class="track-info">
+                    <div class="track-name">Renegades Of Funk</div>
+                    <div class="track-artist">Rage Against The Machine</div>
+                    <div class="track-album">Renegades</div>
+                </div>
+                <div class="track-badge">1 commit</div>
+            </div>
+            <div class="spotify-embed">
+                <iframe
+                    src="https://open.spotify.com/embed/track/5YBVDvTSSSiqv7KZDeUlXA?utm_source=generator&theme=0"
+                    width="100%" height="80"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy">
+                </iframe>
+            </div>
+            <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
+                
+                <div class="commit">
+                    <code class="commit-hash">34be2a2</code>
+                    <div class="commit-info">
+                        <div class="commit-subject"><span class="commit-type type-feat">feat</span>feat: rewrite setup:media-bridge to match work-mac production config</div>
+                        <div class="commit-meta">Jordan Partridge · Feb 25, 2026</div>
+                    </div>
+                </div>
+                </div>
+            </div>
+        </div>
+        <div class="track-card" data-type="docs">
+            <div class="track-hero">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273947a926195193c56d1dc45d8')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02947a926195193c56d1dc45d8" alt="Veteran" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Thug Tears</div>
                     <div class="track-artist">JPEGMAFIA</div>
@@ -1133,6 +1430,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">237f4f5</code>
@@ -1141,11 +1440,12 @@
                         <div class="commit-meta">Jordan Partridge · Feb 24, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="feat">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b273b17d34882944eaf0695153f2')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02b17d34882944eaf0695153f2" alt="Death to the Pixies" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273b17d34882944eaf0695153f2')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02b17d34882944eaf0695153f2" alt="Death to the Pixies" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Where Is My Mind?</div>
                     <div class="track-artist">Pixies</div>
@@ -1163,6 +1463,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">292ce34</code>
@@ -1171,11 +1473,12 @@
                         <div class="commit-meta">Jordan Partridge · Feb 24, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="fix">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b2733c2579a4f8cacd5b95b8fa68')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e023c2579a4f8cacd5b95b8fa68" alt="The Battle Of Los Angeles" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b2733c2579a4f8cacd5b95b8fa68')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e023c2579a4f8cacd5b95b8fa68" alt="The Battle Of Los Angeles" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Sleep Now In the Fire</div>
                     <div class="track-artist">Rage Against The Machine</div>
@@ -1193,6 +1496,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">4fea661</code>
@@ -1201,11 +1506,12 @@
                         <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="docs">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b273ee4644e12bef70636167c6bd')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02ee4644e12bef70636167c6bd" alt="Rage Against The Machine" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273ee4644e12bef70636167c6bd')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02ee4644e12bef70636167c6bd" alt="Rage Against The Machine" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Killing In the Name</div>
                     <div class="track-artist">Rage Against The Machine</div>
@@ -1223,6 +1529,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">6390d34</code>
@@ -1231,14 +1539,15 @@
                         <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="ci">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-ak.spotifycdn.com/image/ab67616d0000b2735d372fc451453e8b83900014')"></div><img class="track-art" src="https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e025d372fc451453e8b83900014" alt="Nightmote (Lofi Remix)" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b2735d372fc451453e8b83900014')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e025d372fc451453e8b83900014" alt="Nightmote (Lofi Remix)" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Nightmote - Lofi Remix</div>
-                    <div class="track-artist">Yoylecake Michael, 111robloxdude</div>
+                    <div class="track-artist">Yoylecake Michael</div>
                     <div class="track-album">Nightmote (Lofi Remix)</div>
                 </div>
                 <div class="track-badge">1 commit</div>
@@ -1253,6 +1562,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">e255f2c</code>
@@ -1261,11 +1572,12 @@
                         <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="refactor">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b273ff2db662746917b1675281fc')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02ff2db662746917b1675281fc" alt="Low Teens (Deluxe Edition)" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273ff2db662746917b1675281fc')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02ff2db662746917b1675281fc" alt="Low Teens (Deluxe Edition)" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Map Change</div>
                     <div class="track-artist">Every Time I Die</div>
@@ -1283,6 +1595,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">d6df3b4</code>
@@ -1291,14 +1605,15 @@
                         <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
-        <div class="track-card">
+        <div class="track-card" data-type="test">
             <div class="track-hero">
-                <div class="track-hero-bg" style="background-image: url('https://image-cdn-fa.spotifycdn.com/image/ab67616d0000b273215cac8c30b47bb1bfb9d2d1')"></div><img class="track-art" src="https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02215cac8c30b47bb1bfb9d2d1" alt="Potato Salad" loading="lazy">
+                <div class="track-hero-bg" style="background-image: url('https://i.scdn.co/image/ab67616d0000b273215cac8c30b47bb1bfb9d2d1')"></div><img class="track-art" src="https://i.scdn.co/image/ab67616d00001e02215cac8c30b47bb1bfb9d2d1" alt="Potato Salad" loading="lazy">
                 <div class="track-info">
                     <div class="track-name">Potato Salad</div>
-                    <div class="track-artist">Tyler, The Creator, A$AP Rocky</div>
+                    <div class="track-artist">Tyler, The Creator</div>
                     <div class="track-album">Potato Salad</div>
                 </div>
                 <div class="track-badge">1 commit</div>
@@ -1313,6 +1628,8 @@
                 </iframe>
             </div>
             <div class="commits">
+                <div class="commits-head">Commit History</div>
+                <div class="commits-list">
                 
                 <div class="commit">
                     <code class="commit-hash">c585635</code>
@@ -1321,13 +1638,14 @@
                         <div class="commit-meta">Jordan Partridge · Feb 23, 2026</div>
                     </div>
                 </div>
+                </div>
             </div>
         </div>
     </div>
 
     <div class="footer">
         <strong>S.H.I.T.</strong> &mdash; Scaling Humans Into Tomorrow<br>
-        Generated February 27, 2026 at 2:31 AM &middot;
+        Generated February 27, 2026 at 5:18 AM &middot;
         Every commit is a <a href="https://github.com/the-shit/music">vibe check</a>
     </div>
 </body>
