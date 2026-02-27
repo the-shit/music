@@ -20,7 +20,7 @@ spotify player     # Launch interactive TUI player
 
 - **Playback** — play, pause, skip, volume, shuffle, repeat
 - **Queue** — add tracks, view upcoming, auto-fill from recommendations
-- **Discovery** — search, mood queues (chill / flow / hype), top tracks
+- **Discovery** — search, mood queues, smart recommendations, top tracks
 - **Interactive Player** — TUI with progress bar and keyboard controls
 - **Daemon** — background playback via spotifyd, macOS media key integration
 - **Services** — spotifyd, Swift media bridge, autopilot — all managed via launchd
@@ -79,7 +79,7 @@ spotify autopilot --status                 # Check status
 spotify autopilot --uninstall              # Remove
 ```
 
-Watches for track changes and auto-refills the queue when it drops below a threshold. Supports mood-based recommendations (`chill` / `flow` / `hype`).
+Watches for track changes and auto-refills the queue when it drops below a threshold. Supports mood presets: `chill`, `flow`, `hype`, `focus`, `party`, `upbeat`, `melancholy`, `ambient`, `workout`, `sleep`.
 
 ### Service overview
 
