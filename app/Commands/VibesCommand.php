@@ -740,12 +740,13 @@ HTML;
     private function renderCommit(array $commit): string
     {
         $hash = htmlspecialchars($commit['short']);
-        $subject = htmlspecialchars($commit['subject']);
+        $rawSubject = (string) $commit['subject'];
+        $subject = htmlspecialchars($rawSubject);
         $date = date('M j, Y', strtotime($commit['date']));
         $author = htmlspecialchars($commit['author']);
 
         $typeHtml = '';
-        if (preg_match('/^(feat|fix|test|ci|refactor|docs|chore|style|perf)[\(:]/', $subject, $typeMatch)) {
+        if (preg_match('/^(feat|fix|test|ci|refactor|docs|chore|style|perf)(?:\([^\)]+\))?:\s*/', $rawSubject, $typeMatch)) {
             $type = $typeMatch[1];
             $cssClass = match ($type) {
                 'feat' => 'type-feat',
@@ -758,6 +759,7 @@ HTML;
                 default => 'type-feat',
             };
             $typeHtml = "<span class=\"commit-type {$cssClass}\">{$type}</span>";
+            $subject = htmlspecialchars((string) preg_replace('/^(feat|fix|test|ci|refactor|docs|chore|style|perf)(?:\([^\)]+\))?:\s*/', '', $rawSubject));
         }
 
         return <<<HTML
