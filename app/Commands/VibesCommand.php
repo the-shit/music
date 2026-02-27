@@ -206,10 +206,17 @@ class VibesCommand extends Command
 
     private function generateHtml(array $groups, int $totalCommits, ?string $playlistUrl): string
     {
-        $trackCards = '';
-        foreach ($groups as $group) {
-            $trackCards .= $this->renderTrackCard($group);
-        }
+        $totalTracks = count($groups);
+        $topCommits = ! empty($groups) ? count($groups[0]['commits']) : 0;
+        $topTrack = ! empty($groups) ? htmlspecialchars($groups[0]['meta']['name'] ?? 'Unknown') : 'Unknown';
+        $generatedAt = date('F j, Y \a\t g:i A');
+        $playlistButton = $playlistUrl
+            ? &quot;&lt;a href=\&quot;{$playlistUrl}\&quot; class=\&quot;playlist-link\&quot; target=\&quot;_blank\&quot;&gt;Listen to the full playlist&lt;/a&gt;&quot;
+            : ' ';
+
+        return View::make('vibes', compact('groups', 'totalCommits', 'totalTracks', 'topCommits', 'topTrack', 'generatedAt', 'playlistButton'))->render();
+    }
+}
 
         $totalTracks = count($groups);
         $topCommits = ! empty($groups) ? count($groups[0]['commits']) : 0;

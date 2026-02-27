@@ -10,6 +10,15 @@ class PlayCommand extends Command
 {
     use RequiresSpotifyConfig;
 
+    protected $spotify;
+
+    public function __construct(SpotifyService $spotify)
+    {
+        parent::__construct();
+
+        $this->spotify = $spotify;
+    }
+
     protected $signature = 'play
                             {query : Song, artist, or playlist to play}
                             {--device= : Device name or ID to play on}
@@ -23,8 +32,6 @@ class PlayCommand extends Command
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
 
         $query = $this->argument('query');
         $deviceName = $this->option('device');
@@ -40,7 +47,7 @@ class PlayCommand extends Command
         // Find device by name if specified
         $deviceId = null;
         if ($deviceName) {
-            $devices = $spotify->getDevices();
+            $devices = $this->spotify->getDevices();
             foreach ($devices as $device) {
                 if (stripos($device['name'], $deviceName) !== false || $device['id'] === $deviceName) {
                     $deviceId = $device['id'];
@@ -61,12 +68,12 @@ class PlayCommand extends Command
         }
 
         try {
-            $result = $spotify->search($query);
+            $result = $this->spotify->search($query);
 
             if ($result) {
                 if ($this->option('queue')) {
                     // Add to queue instead of playing
-                    $spotify->addToQueue($result['uri']);
+                    $this->spotify->addToQueue($result['uri']);
 
                     if ($this->option('json')) {
                         $this->line(json_encode([
@@ -106,7 +113,7 @@ class PlayCommand extends Command
                     }
                 } else {
                     // Play immediately
-                    $spotify->play($result['uri'], $deviceId);
+                    $this->spotify->play($result['uri'], $deviceId);
 
                     if ($this->option('json')) {
                         $this->line(json_encode([
@@ -166,7 +173,7 @@ class PlayCommand extends Command
             } else {
                 $this->error('Failed to play: '.$e->getMessage());
 
-                // Emit error event
+                // Emit error  event
                 $this->call('event:emit', [
                     'event' => 'error.playback_failed',
                     'data' => json_encode([
