@@ -2,8 +2,6 @@
 
 namespace App\Commands\Concerns;
 
-use App\Services\SpotifyService;
-
 trait RequiresSpotifyConfig
 {
     /**
@@ -12,9 +10,7 @@ trait RequiresSpotifyConfig
      */
     protected function ensureConfigured(): bool
     {
-        $spotify = app(SpotifyService::class);
-
-        if ($spotify->isConfigured()) {
+        if ($this->spotify->isConfigured()) {
             return true;
         }
 

@@ -1,239 +1,10 @@
-<?php
-
-namespace App\Commands;
-
-use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
-use Illuminate\Support\Facades\Process;
-use LaravelZero\Framework\Commands\Command;
-
-use function Laravel\Prompts\info;
-use function Laravel\Prompts\spin;
-use function Laravel\Prompts\warning;
-
-class VibesCommand extends Command
-{
-    use RequiresSpotifyConfig;
-
-    protected $signature = 'vibes
-                            {--output= : Output file path (default: docs/vibes.html)}
-                            {--no-open : Don\'t open in browser}
-                            {--playlist : Create/update a Spotify playlist of the soundtrack}
-                            {--json : Output as JSON}';
-
-    protected $description = 'Generate a page showing commits grouped by the song playing when they were written';
-
-    public function handle(SpotifyService $spotify): int
-    {
-        $commits = spin(
-            fn () => $this->parseGitLog(),
-            'Parsing git history...'
-        );
-
-        if (empty($commits)) {
-            info('No commits with Spotify track URLs found.');
-
-            return self::SUCCESS;
-        }
-
-        $grouped = $this->groupByTrack($commits);
-
-        // Fetch track metadata from Spotify API (album art, names)
-        $trackIds = array_column($grouped, 'track_id');
-        $trackMeta = [];
-        if ($this->ensureConfigured()) {
-            $trackMeta = spin(
-                fn () => $spotify->getTracks($trackIds),
-                'Fetching track metadata...'
-            );
-        }
-
-        // Fall back to oEmbed for any tracks missing metadata (no auth needed)
-        $missingIds = array_diff($trackIds, array_keys($trackMeta));
-        if (! empty($missingIds)) {
-            $oembedMeta = spin(
-                fn () => $spotify->getTracksViaOEmbed($missingIds),
-                'Fetching track info via oEmbed...'
-            );
-            $trackMeta = array_merge($trackMeta, $oembedMeta);
-        }
-
-        // Enrich groups with metadata
-        foreach ($grouped as &$group) {
-            $group['meta'] = $trackMeta[$group['track_id']] ?? null;
-        }
-        unset($group);
-
-        if ($this->option('json')) {
-            $this->line(json_encode([
-                'total_commits' => count($commits),
-                'total_tracks' => count($grouped),
-                'tracks' => $grouped,
-            ], JSON_PRETTY_PRINT));
-
-            return self::SUCCESS;
-        }
-
-        // Generate playlist if requested
-        $playlistUrl = null;
-        if ($this->option('playlist')) {
-            $playlistUrl = spin(
-                fn () => $this->syncPlaylist($spotify, $grouped),
-                'Syncing Spotify playlist...'
-            );
-            if ($playlistUrl) {
-                info("Playlist synced: {$playlistUrl}");
-            }
-        }
-
-        // Generate HTML
-        $outputPath = $this->option('output') ?? base_path('docs/vibes.html');
-        $outputDir = dirname($outputPath);
-        if (! is_dir($outputDir)) {
-            mkdir($outputDir, 0755, true);
-        }
-
-        $html = $this->generateHtml($grouped, count($commits), $playlistUrl);
-        file_put_contents($outputPath, $html);
-
-        info('Generated vibes page: '.count($grouped).' tracks, '.count($commits).' commits');
-        info("  {$outputPath}");
-
-        if (! $this->option('no-open')) {
-            Process::run("open '{$outputPath}'");
-        }
-
-        return self::SUCCESS;
-    }
-
-    private function parseGitLog(): array
-    {
-        $result = Process::run('git log --all --no-merges --format="COMMIT_START%n%H%n%an%n%ai%n%s%n%B%nCOMMIT_END"');
-
-        if (! $result->successful()) {
-            return [];
-        }
-
-        $output = $result->output();
-        $commits = [];
-
-        preg_match_all('/COMMIT_START\n(.+?)\nCOMMIT_END/s', $output, $matches);
-
-        foreach ($matches[1] as $block) {
-            $lines = explode("\n", $block, 5);
-            if (count($lines) < 5) {
-                continue;
-            }
-
-            [$hash, $author, $date, $subject, $body] = $lines;
-
-            $fullMessage = $subject."\n".$body;
-            if (preg_match('#https://open\.spotify\.com/track/([A-Za-z0-9]+)#', $fullMessage, $urlMatch)) {
-                $commits[] = [
-                    'hash' => trim($hash),
-                    'short' => substr(trim($hash), 0, 7),
-                    'author' => trim($author),
-                    'date' => trim($date),
-                    'subject' => trim($subject),
-                    'track_url' => $urlMatch[0],
-                    'track_id' => $urlMatch[1],
-                ];
-            }
-        }
-
-        return $commits;
-    }
-
-    private function groupByTrack(array $commits): array
-    {
-        $groups = [];
-
-        foreach ($commits as $commit) {
-            $trackId = $commit['track_id'];
-            if (! isset($groups[$trackId])) {
-                $groups[$trackId] = [
-                    'track_id' => $trackId,
-                    'track_url' => $commit['track_url'],
-                    'commits' => [],
-                ];
-            }
-            $groups[$trackId]['commits'][] = $commit;
-        }
-
-        usort($groups, fn ($a, $b) => count($b['commits']) <=> count($a['commits']));
-
-        return $groups;
-    }
-
-    private function syncPlaylist(SpotifyService $spotify, array $groups): ?string
-    {
-        $playlistName = 'Commit Soundtrack';
-        $description = 'Every track that was playing when code was committed. Auto-generated by spotify vibes.';
-
-        // Find or create the playlist
-        $playlist = $spotify->findPlaylistByName($playlistName);
-
-        if (! $playlist) {
-            $playlist = $spotify->createPlaylist($playlistName, $description);
-            if (! $playlist) {
-                warning('Could not create playlist');
-
-                return null;
-            }
-        } else {
-            $spotify->updatePlaylistDetails($playlist['id'], [
-                'description' => $description.' Updated '.date('M j, Y'),
-            ]);
-        }
-
-        // Collect unique track URIs in order (most-committed first)
-        $uris = [];
-        foreach ($groups as $group) {
-            $meta = $group['meta'] ?? null;
-            if ($meta) {
-                $uris[] = $meta['uri'];
-            } else {
-                $uris[] = 'spotify:track:'.$group['track_id'];
-            }
-        }
-
-        if (! empty($uris)) {
-            $spotify->replacePlaylistTracks($playlist['id'], $uris);
-        }
-
-        return $playlist['external_urls']['spotify'] ?? "https://open.spotify.com/playlist/{$playlist['id']}";
-    }
-
-    private function generateHtml(array $groups, int $totalCommits, ?string $playlistUrl): string
-    {
-        $totalTracks = count($groups);
-        $topCommits = ! empty($groups) ? count($groups[0]['commits']) : 0;
-        $topTrack = ! empty($groups) ? htmlspecialchars($groups[0]['meta']['name'] ?? 'Unknown') : 'Unknown';
-        $generatedAt = date('F j, Y \a\t g:i A');
-        $playlistButton = $playlistUrl
-            ? &quot;&lt;a href=\&quot;{$playlistUrl}\&quot; class=\&quot;playlist-link\&quot; target=\&quot;_blank\&quot;&gt;Listen to the full playlist&lt;/a&gt;&quot;
-            : ' ';
-
-        return View::make('vibes', compact('groups', 'totalCommits', 'totalTracks', 'topCommits', 'topTrack', 'generatedAt', 'playlistButton'))->render();
-    }
-}
-
-        $totalTracks = count($groups);
-        $topCommits = ! empty($groups) ? count($groups[0]['commits']) : 0;
-        $topTrack = ! empty($groups) ? htmlspecialchars($groups[0]['meta']['name'] ?? 'Unknown') : 'Unknown';
-        $generatedAt = date('F j, Y \a\t g:i A');
-        $playlistButton = $playlistUrl
-            ? "<a href=\"{$playlistUrl}\" class=\"playlist-link\" target=\"_blank\">Listen to the full playlist</a>"
-            : '';
-
-        return <<<HTML
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vibes — Commit Soundtrack</title>
-    <meta name="description" content="Every commit has a vibe. {$totalCommits} commits, {$totalTracks} tracks.">
+    <meta name="description" content="Every commit has a vibe. {{ $totalCommits }} commits, {{ $totalTracks }} tracks.">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -419,7 +190,7 @@ class VibesCommand extends Command
 
         .track-album {
             font-size: 0.8rem;
-            color: rgba(255,255,255,0.4);
+            color: rgba Processed(255,255,255,0.4);
             margin-top: 2px;
         }
 
@@ -602,7 +373,7 @@ class VibesCommand extends Command
         }
 
         .nav-links a {
-            color: var(--text-dim);
+            color: var(--textЗна-dim);
             font-size: 0.9rem;
             font-weight: 500;
             text-decoration: none;
@@ -650,132 +421,34 @@ class VibesCommand extends Command
     </nav>
 
     <div class="hero">
-        <h1>every commit has a <span>vibe</span></h1>
+        <h1>every commit has-task a <span>vibe</span></h1>
         <p class="subtitle">A Spotify CLI where CI rejects your code if you weren't listening to music when you wrote it.</p>
         <div class="stats">
             <div class="stat">
-                <div class="stat-value">{$totalCommits}</div>
+                <div class="stat-value">{{ $totalCommits }}</div>
                 <div class="stat-label">Commits</div>
             </div>
             <div class="stat">
-                <div class="stat-value">{$totalTracks}</div>
+                <div class="stat-value">{{ $totalTracks }}</div>
                 <div class="stat-label">Tracks</div>
             </div>
         </div>
-        <p class="top-vibe">Top track: <strong>{$topTrack}</strong> ({$topCommits} commits)</p>
-        {$playlistButton}
+        <p class="top-vibe">Top track: <strong>{{ $topTrack }}</strong> ({{ $topCommits }} commits)</p>
+        {!! $playlistButton !!}
     </div>
 
     <div class="container">
         <h2 class="section-title">The Soundtrack</h2>
 
-        {$trackCards}
+        @foreach($groups as $group)
+            @include('vibes.track-card', ['group' => $group])
+        @endforeach
     </div>
 
     <div class="footer">
         <strong>S.H.I.T.</strong> &mdash; Scaling Humans Into Tomorrow<br>
-        Generated {$generatedAt} &middot;
+        Generated {{ $generatedAt }} &middot;
         Every commit is a <a href="https://github.com/the-shit/music">vibe check</a>
     </div>
 </body>
 </html>
-HTML;
-    }
-
-    private function renderTrackCard(array $group): string
-    {
-        $trackId = $group['track_id'];
-        $meta = $group['meta'] ?? null;
-        $commitCount = count($group['commits']);
-        $s = $commitCount === 1 ? '' : 's';
-
-        $dominantType = 'feat';
-        foreach ($group['commits'] as $commit) {
-            if (preg_match('/^(feat|fix|test|ci|refactor|docs|chore)[\(:]/', $commit['subject'], $m)) {
-                $dominantType = $m[1];
-                break;
-            }
-        }
-
-        // Track hero with album art
-        $trackName = htmlspecialchars($meta['name'] ?? 'Unknown Track');
-        $trackArtist = htmlspecialchars($meta['artist'] ?? 'Unknown Artist');
-        $trackAlbum = htmlspecialchars($meta['album'] ?? '');
-        $imageUrl = $meta['image_large'] ?? '';
-        $imageMedium = $meta['image_medium'] ?? $imageUrl;
-
-        $artHtml = $imageUrl
-            ? "<div class=\"track-hero-bg\" style=\"background-image: url('{$imageUrl}')\"></div><img class=\"track-art\" src=\"{$imageMedium}\" alt=\"{$trackAlbum}\" loading=\"lazy\">"
-            : '';
-
-        $commitRows = '';
-        foreach ($group['commits'] as $commit) {
-            $commitRows .= $this->renderCommit($commit);
-        }
-
-        return <<<HTML
-
-        <div class="track-card" data-type="{$dominantType}">
-            <div class="track-hero">
-                {$artHtml}
-                <div class="track-info">
-                    <div class="track-name">{$trackName}</div>
-                    <div class="track-artist">{$trackArtist}</div>
-                    <div class="track-album">{$trackAlbum}</div>
-                </div>
-                <div class="track-badge">{$commitCount} commit{$s}</div>
-            </div>
-            <div class="spotify-embed">
-                <iframe
-                    src="https://open.spotify.com/embed/track/{$trackId}?utm_source=generator&theme=0"
-                    width="100%" height="80"
-                    frameBorder="0"
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                    loading="lazy">
-                </iframe>
-            </div>
-            <div class="commits">
-                <div class="commits-head">Commit History</div>
-                <div class="commits-list">
-                {$commitRows}
-                </div>
-            </div>
-        </div>
-HTML;
-    }
-
-    private function renderCommit(array $commit): string
-    {
-        $hash = htmlspecialchars($commit['short']);
-        $subject = htmlspecialchars($commit['subject']);
-        $date = date('M j, Y', strtotime($commit['date']));
-        $author = htmlspecialchars($commit['author']);
-
-        $typeHtml = '';
-        if (preg_match('/^(feat|fix|test|ci|refactor|docs|chore|style|perf)[\(:]/', $subject, $typeMatch)) {
-            $type = $typeMatch[1];
-            $cssClass = match ($type) {
-                'feat' => 'type-feat',
-                'fix' => 'type-fix',
-                'test' => 'type-test',
-                'ci' => 'type-ci',
-                'refactor' => 'type-refactor',
-                'docs' => 'type-docs',
-                'chore' => 'type-chore',
-                default => 'type-feat',
-            };
-            $typeHtml = "<span class=\"commit-type {$cssClass}\">{$type}</span>";
-        }
-
-        return <<<HTML
-
-                <div class="commit">
-                    <code class="commit-hash">{$hash}</code>
-                    <div class="commit-info">
-                        <div class="commit-subject">{$typeHtml}{$subject}</div>
-                        <div class="commit-meta">{$author} · {$date}</div>
-                    </div>
-                </div>
-HTML;
-    }
-}
