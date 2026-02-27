@@ -13,6 +13,7 @@
     --text-muted: #404040;
     --green: #1DB954;
     --green-dim: #1a7a3a;
+    --glow: rgba(29, 185, 84, 0.28);
 }
 
 body {
@@ -39,6 +40,7 @@ a:hover { text-decoration: underline; }
     background: rgba(10, 10, 10, 0.85);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
 }
 
 .nav-logo {
@@ -72,7 +74,10 @@ a:hover { text-decoration: underline; }
 .hero {
     text-align: center;
     padding: 80px 20px 60px;
-    background: linear-gradient(180deg, #1DB95415 0%, transparent 100%);
+    background:
+        radial-gradient(circle at 20% 0%, rgba(29, 185, 84, 0.14), transparent 38%),
+        radial-gradient(circle at 80% 0%, rgba(29, 185, 84, 0.08), transparent 34%),
+        linear-gradient(180deg, #1DB95415 0%, transparent 100%);
 }
 
 .hero h1 {
@@ -111,10 +116,15 @@ a:hover { text-decoration: underline; }
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 24px;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
-.feature-card:hover { border-color: var(--green-dim); }
+.feature-card:hover {
+    border-color: var(--green-dim);
+    background: var(--surface-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.36), 0 0 0 1px var(--glow) inset;
+}
 
 .feature-card h3 {
     font-size: 1rem;
@@ -137,6 +147,7 @@ a:hover { text-decoration: underline; }
     padding: 24px;
     overflow-x: auto;
     margin: 32px 0;
+    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.32);
 }
 
 .code-block pre {
@@ -234,6 +245,14 @@ a:hover { text-decoration: underline; }
     font-size: 0.9rem;
 }
 
+.cmd-table tbody tr {
+    transition: background 0.15s;
+}
+
+.cmd-table tbody tr:hover {
+    background: rgba(29, 185, 84, 0.06);
+}
+
 .cmd-table tr:last-child td { border-bottom: none; }
 
 .cmd-table code {
@@ -282,4 +301,11 @@ a:hover { text-decoration: underline; }
     .manifesto-features { grid-template-columns: 1fr; }
     .hero h1 { font-size: 2.2rem; }
     .nav-links { gap: 16px; }
+    .nav {
+        height: auto;
+        padding-top: 12px;
+        padding-bottom: 12px;
+        flex-wrap: wrap;
+        row-gap: 8px;
+    }
 }
