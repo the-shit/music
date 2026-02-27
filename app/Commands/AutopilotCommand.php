@@ -16,7 +16,7 @@ class AutopilotCommand extends Command
 
     protected $signature = 'autopilot
         {--threshold=3 : Refill when queue has fewer than N tracks}
-        {--mood=flow : Mood for recommendations (chill/flow/hype)}
+        {--mood=flow : Mood preset for recommendations}
         {--interval=3 : Watch polling interval in seconds}
         {--install : Install autopilot as a background LaunchAgent}
         {--uninstall : Remove the autopilot LaunchAgent}
@@ -33,6 +33,74 @@ class AutopilotCommand extends Command
 
     /** Tracks older than this many seconds can be re-queued */
     private const DEDUP_WINDOW_SECONDS = 1800; // 30 minutes
+
+    private const MOOD_PRESETS = [
+        'chill' => [
+            'target_energy' => 0.3,
+            'target_valence' => 0.5,
+            'target_tempo' => 90,
+            'target_danceability' => 0.5,
+            'target_acousticness' => 0.6,
+        ],
+        'flow' => [
+            'target_energy' => 0.6,
+            'target_valence' => 0.6,
+            'target_tempo' => 120,
+            'target_danceability' => 0.6,
+            'target_instrumentalness' => 0.2,
+        ],
+        'hype' => [
+            'target_energy' => 0.9,
+            'target_valence' => 0.8,
+            'target_tempo' => 140,
+            'target_danceability' => 0.85,
+        ],
+        'focus' => [
+            'target_energy' => 0.45,
+            'target_valence' => 0.4,
+            'target_tempo' => 105,
+            'target_instrumentalness' => 0.7,
+            'target_speechiness' => 0.08,
+        ],
+        'party' => [
+            'target_energy' => 0.92,
+            'target_valence' => 0.85,
+            'target_tempo' => 128,
+            'target_danceability' => 0.9,
+        ],
+        'upbeat' => [
+            'target_energy' => 0.78,
+            'target_valence' => 0.82,
+            'target_tempo' => 124,
+            'target_danceability' => 0.78,
+        ],
+        'melancholy' => [
+            'target_energy' => 0.4,
+            'target_valence' => 0.2,
+            'target_tempo' => 95,
+            'target_acousticness' => 0.45,
+        ],
+        'ambient' => [
+            'target_energy' => 0.2,
+            'target_valence' => 0.4,
+            'target_tempo' => 78,
+            'target_acousticness' => 0.7,
+            'target_instrumentalness' => 0.85,
+        ],
+        'workout' => [
+            'target_energy' => 0.95,
+            'target_valence' => 0.7,
+            'target_tempo' => 150,
+            'target_danceability' => 0.82,
+        ],
+        'sleep' => [
+            'target_energy' => 0.12,
+            'target_valence' => 0.28,
+            'target_tempo' => 65,
+            'target_acousticness' => 0.82,
+            'target_instrumentalness' => 0.9,
+        ],
+    ];
 
     public function handle(): int
     {
@@ -62,8 +130,9 @@ class AutopilotCommand extends Command
         $mood = $this->option('mood');
         $interval = max(1, (int) $this->option('interval'));
 
-        if (! in_array($mood, ['chill', 'flow', 'hype'])) {
-            warning("Unknown mood '{$mood}' — using 'flow'");
+        if (! array_key_exists($mood, self::MOOD_PRESETS)) {
+            $allowed = implode(', ', array_keys(self::MOOD_PRESETS));
+            warning("Unknown mood '{$mood}' — using 'flow' ({$allowed})");
             $mood = 'flow';
         }
 
@@ -378,12 +447,7 @@ XML;
             $seedTrackIds[] = $m[1];
         }
 
-        // Add mood-specific audio feature targets if the recommendations API supports it
-        $moodParams = match ($mood) {
-            'chill' => ['target_energy' => 0.3, 'target_valence' => 0.5, 'target_tempo' => 90],
-            'hype' => ['target_energy' => 0.9, 'target_valence' => 0.8, 'target_tempo' => 140],
-            default => ['target_energy' => 0.6, 'target_valence' => 0.6, 'target_tempo' => 120], // flow
-        };
+        $moodParams = self::MOOD_PRESETS[$mood] ?? self::MOOD_PRESETS['flow'];
 
         // Seed from recent history for variety
         $recentlyPlayed = $spotify->getRecentlyPlayed(5);
