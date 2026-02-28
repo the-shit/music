@@ -10,7 +10,9 @@ class HypeCommand extends Command
 {
     use RequiresSpotifyConfig;
 
-    protected $signature = 'hype {--json : Output as JSON}';
+    protected $signature = 'hype
+        {--limit=10 : Number of tracks to queue}
+        {--json : Output as JSON}';
 
     protected $description = 'Queue high-energy hype tracks';
 
@@ -29,7 +31,7 @@ class HypeCommand extends Command
                 'electronic dance energy bass',
             ];
 
-            $tracks = $this->gatherTracks($spotify, $queries, 10);
+            $tracks = $this->gatherTracks($spotify, $queries, (int) $this->option('limit'));
 
             if (empty($tracks)) {
                 $this->warn('No hype tracks found.');
