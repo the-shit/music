@@ -376,7 +376,7 @@ if ($uri && ! isset($seen[$uri])) {
 
         if ($energy >= 0.8) {
             $terms[] = 'energetic';
-        } elseif ($energy > 0 && $energy &lower <= 0.3) {
+        } elseif ($energy > 0 && $energy <= 0.3) {
             $terms[] = 'calm';
         }
 
