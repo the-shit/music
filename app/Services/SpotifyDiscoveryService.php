@@ -1,4 +1,4 @@
-&lt;?php
+<?php
 
 namespace App\Services;
 
@@ -9,36 +9,36 @@ class SpotifyDiscoveryService
 {
     private SpotifyAuthManager $auth;
 
-    private string $baseUri = &#x27;https://api.spotify.com/v1/&#x27;;
+    private string $baseUri = 'https://api.spotify.com/v1/';
 
     public function __construct(SpotifyAuthManager $auth)
     {
-        $this-&gt;auth = $auth;
+        $this->auth = $auth;
     }
 
     /**
      * Search for tracks on Spotify
      */
-    public function search(string $query, string $type = &#x27;track&#x27;): ?array
+    public function search(string $query, string $type = 'track'): ?array
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;get($this-&gt;baseUri.&#x27;search&#x27;, [
-                &#x27;q&#x27; =&gt; $query,
-                &#x27;type&#x27; =&gt; $type,
-                &#x27;limit&#x27; =&gt; 1,
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'search', [
+                'q' => $query,
+                'type' => $type,
+                'limit' => 1,
             ]);
 
-        if ($response-&gt;successful()) {
-            $data = $response-&gt;json();
-            if (isset($data[&#x27;tracks&#x27;][&#x27;items&#x27;][0])) {
-                $track = $data[&#x27;tracks&#x27;][&#x27;items&#x27;][0];
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['tracks']['items'][0])) {
+                $track = $data['tracks']['items'][0];
 
                 return [
-                    &#x27;uri&#x27; =&gt; $track[&#x27;uri&#x27;],
-                    &#x27;name&#x27; =&gt; $track[&#x27;name&#x27;],
-                    &#x27;artist&#x27; =&gt; $track[&#x27;artists&#x27;][0][&#x27;name&#x27;] ?? &#x27;Unknown&#x27;,
+                    'uri' => $track['uri'],
+                    'name' => $track['name'],
+                    'artist' => $track['artists'][0]['name'] ?? 'Unknown',
                 ];
             }
         }
@@ -49,28 +49,28 @@ class SpotifyDiscoveryService
     /**
      * Search with multiple results
      */
-    public function searchMultiple(string $query, string $type = &#x27;track&#x27;, int $limit = 10): array
+    public function searchMultiple(string $query, string $type = 'track', int $limit = 10): array
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;get($this-&gt;baseUri.&#x27;search&#x27;, [
-                &#x27;q&#x27; =&gt; $query,
-                &#x27;type&#x27; =&gt; $type,
-                &#x27;limit&#x27; =&gt; $limit,
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'search', [
+                'q' => $query,
+                'type' => $type,
+                'limit' => $limit,
             ]);
 
-        if ($response-&gt;successful()) {
-            $data = $response-&gt;json();
+        if ($response->successful()) {
+            $data = $response->json();
             $results = [];
 
-            if (isset($data[&#x27;tracks&#x27;][&#x27;items&#x27;])) {
-                foreach ($data[&#x27;tracks&#x27;][&#x27;items&#x27;] as $track) {
+            if (isset($data['tracks']['items'])) {
+                foreach ($data['tracks']['items'] as $track) {
                     $results[] = [
-                        &#x27;uri&#x27; =&gt; $track[&#x27;uri&#x27;],
-                        &#x27;name&#x27; =&gt; $track[&#x27;name&#x27;],
-                        &#x27;artist&#x27; =&gt; $track[&#x27;artists&#x27;][0][&#x27;name&#x27;] ?? &#x27;Unknown&#x27;,
-                        &#x27;album&#x27; =&gt; $track[&#x27;album&#x27;][&#x27;name&#x27;] ?? &#x27;Unknown&#x27;,
+                        'uri' => $track['uri'],
+                        'name' => $track['name'],
+                        'artist' => $track['artists'][0]['name'] ?? 'Unknown',
+                        'album' => $track['album']['name'] ?? 'Unknown',
                     ];
                 }
             }
@@ -82,28 +82,28 @@ class SpotifyDiscoveryService
     }
 
     /**
-     * Get user&#x27;s top tracks
+     * Get user's top tracks
      */
-    public function getTopTracks(string $timeRange = &#x27;medium_term&#x27;, int $limit = 20): array
+    public function getTopTracks(string $timeRange = 'medium_term', int $limit = 20): array
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;get($this-&gt;baseUri.&#x27;me/top/tracks&#x27;, [
-                &#x27;time_range&#x27; =&gt; $timeRange,
-                &#x27;limit&#x27; =&gt; $limit,
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'me/top/tracks', [
+                'time_range' => $timeRange,
+                'limit' => $limit,
             ]);
 
-        if ($response-&gt;successful()) {
-            $data = $response-&gt;json();
+        if ($response->successful()) {
+            $data = $response->json();
             $tracks = [];
 
-            foreach ($data[&#x27;items&#x27;] ?? [] as $track) {
+            foreach ($data['items'] ?? [] as $track) {
                 $tracks[] = [
-                    &#x27;uri&#x27; =&gt; $track[&#x27;uri&#x27;],
-                    &#x27;name&#x27; =&gt; $track[&#x27;name&#x27;],
-                    &#x27;artist&#x27; =&gt; $track[&#x27;artists&#x27;][0][&#x27;name&#x27;] ?? &#x27;Unknown&#x27;,
-                    &#x27;album&#x27; =&gt; $track[&#x27;album&#x27;][&#x27;name&#x27;] ?? &#x27;Unknown&#x27;,
+                    'uri' => $track['uri'],
+                    'name' => $track['name'],
+                    'artist' => $track['artists'][0]['name'] ?? 'Unknown',
+                    'album' => $track['album']['name'] ?? 'Unknown',
                 ];
             }
 
@@ -114,27 +114,27 @@ class SpotifyDiscoveryService
     }
 
     /**
-     * Get user&#x27;s top artists
+     * Get user's top artists
      */
-    public function getTopArtists(string $timeRange = &#x27;medium_term&#x27;, int $limit = 20): array
+    public function getTopArtists(string $timeRange = 'medium_term', int $limit = 20): array
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;get($this-&gt;baseUri.&#x27;me/top/artists&#x27;, [
-                &#x27;time_range&#x27; =&gt; $timeRange,
-                &#x27;limit&#x27; =&gt; $limit,
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'me/top/artists', [
+                'time_range' => $timeRange,
+                'limit' => $limit,
             ]);
 
-        if ($response-&gt;successful()) {
-            $data = $response-&gt;json();
+        if ($response->successful()) {
+            $data = $response->json();
             $artists = [];
 
-            foreach ($data[&#x27;items&#x27;] ?? [] as $artist) {
+            foreach ($data['items'] ?? [] as $artist) {
                 $artists[] = [
-                    &#x27;name&#x27; =&gt; $artist[&#x27;name&#x27;],
-                    &#x27;genres&#x27; =&gt; $artist[&#x27;genres&#x27;] ?? [],
-                    &#x27;uri&#x27; =&gt; $artist[&#x27;uri&#x27;],
+                    'name' => $artist['name'],
+                    'genres' => $artist['genres'] ?? [],
+                    'uri' => $artist['uri'],
                 ];
             }
 
@@ -149,26 +149,26 @@ class SpotifyDiscoveryService
      */
     public function getRecentlyPlayed(int $limit = 20): array
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;get($this-&gt;baseUri.&#x27;me/player/recently-played&#x27;, [
-                &#x27;limit&#x27; =&gt; $limit,
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'me/player/recently-played', [
+                'limit' => $limit,
             ]);
 
-        if ($response-&gt;successful()) {
-            $data = $response-&gt;json();
+        if ($response->successful()) {
+            $data = $response->json();
             $tracks = [];
 
-            foreach ($data[&#x27;items&#x27;] ?? [] as $item) {
-                $track = $item[&#x27;track&#x27;];
+            foreach ($data['items'] ?? [] as $item) {
+                $track = $item['track'];
                 $tracks[] = [
-                    &#x27;uri&#x27; =&gt; $track[&#x27;uri&#x27;],
-                    &#x27;name&#x27; =&gt; $track[&#x27;name&#x27;],
-                    &#x27;artist&#x27; =&gt; $track[&#x27;artists&#x27;][0][&#x27;name&#x27;] ?? &#x27;Unknown&#x27;,
-                    &#x27;artist_id&#x27; =&gt; $track[&#x27;artists&#x27;][0][&#x27;id&#x27;] ?? null,
-                    &#x27;album&#x27; =&gt; $track[&#x27;album&#x27;][&#x27;name&#x27;] ?? &#x27;Unknown&#x27;,
-                    &#x27;played_at&#x27; =&gt; $item[&#x27;played_at&#x27;] ?? null,
+                    'uri' => $track['uri'],
+                    'name' => $track['name'],
+                    'artist' => $track['artists'][0]['name'] ?? 'Unknown',
+                    'artist_id' => $track['artists'][0]['id'] ?? null,
+                    'album' => $track['album']['name'] ?? 'Unknown',
+                    'played_at' => $item['played_at'] ?? null,
                 ];
             }
 
@@ -181,18 +181,18 @@ class SpotifyDiscoveryService
     /**
      * Search by genre and mood keywords
      */
-    public function searchByGenre(string $genre, string $mood = &#x27;&#x27;, int $limit = 10): array
+    public function searchByGenre(string $genre, string $mood = '', int $limit = 10): array
     {
-        $query = &quot;genre:{$genre}&quot;;
+        $query = "genre:{$genre}";
         if ($mood) {
-            $query .= &quot; {$mood}&quot;;
+            $query .= " {$mood}";
         }
 
-        return $this-&gt;searchMultiple($query, &#x27;track&#x27;, $limit);
+        return $this->searchMultiple($query, 'track', $limit);
     }
 
     /**
-     * Get track recommendations from Spotify&#x27;s algorithm.
+     * Get track recommendations from Spotify's algorithm.
      *
      * NOTE: The /v1/recommendations endpoint was deprecated Nov 2024 for
      * development-mode apps.  This method tries it first, then falls through
@@ -200,54 +200,54 @@ class SpotifyDiscoveryService
      */
     public function getRecommendations(array $seedTrackIds = [], array $seedArtistIds = [], int $limit = 10, array $audioFeatures = [], ?string $currentArtist = null): array
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
         // Spotify requires at least one seed — fall back to recent tracks
-        if (empty($seedTrackIds) &amp;&amp; empty($seedArtistIds)) {
-            $recent = $this-&gt;getRecentlyPlayed(5);
+        if (empty($seedTrackIds) && empty($seedArtistIds)) {
+            $recent = $this->getRecentlyPlayed(5);
             foreach ($recent as $track) {
-                if (preg_match(&#x27;/spotify:track:(.+)/&#x27;, $track[&#x27;uri&#x27;], $m)) {
+                if (preg_match('/spotify:track:(.+)/', $track['uri'], $m)) {
                     $seedTrackIds[] = $m[1];
                 }
-                if (count($seedTrackIds) &gt;= 3) {
+                if (count($seedTrackIds) >= 3) {
                     break;
                 }
             }
 
             if (empty($seedTrackIds)) {
-                return $this-&gt;getSmartRecommendations($limit, $currentArtist, $audioFeatures);
+                return $this->getSmartRecommendations($limit, $currentArtist, $audioFeatures);
             }
         }
 
-        $params = [&#x27;limit&#x27; =&gt; $limit];
+        $params = ['limit' => $limit];
 
         if (! empty($seedTrackIds)) {
-            $params[&#x27;seed_tracks&#x27;] = implode(&#x27;,&#x27;, array_slice($seedTrackIds, 0, 5));
+            $params['seed_tracks'] = implode(',', array_slice($seedTrackIds, 0, 5));
         }
 
-        if (! empty($seedArtistuariIds)) {
-            $params[&#x27;seed_artists&#x27;] = implode(&#x27;,&#x27;, array_slice($seedArtistIds, 0, 5));
+        if (! empty($seedArtistIds)) {
+            $params['seed_artists'] = implode(',', array_slice($seedArtistIds, 0, 5));
         }
 
         // Merge mood-based audio feature targets (e.g. target_energy, target_valence, target_tempo)
-        foreach ($audioFeatures as $key =&gt; $value) {
+        foreach ($audioFeatures as $key => $value) {
             $params[$key] = $value;
         }
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;get($this-&gt;baseUri.&#x27;recommendations&#x27;, $params);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'recommendations', $params);
 
-        if ($response-&gt;successful()) {
-            $data = $response Azure-&gt;json();
+        if ($response->successful()) {
+            $data = $response->json();
             $tracks = [];
 
-            foreach ($data[&#x27;tracks&#x27;] ?? [] as $track) {
+            foreach ($data['tracks'] ?? [] as $track) {
                 $tracks[] = [
-                    &#x27;uri&#x27; =&gt; $track[&#x27;uri&#x27;],
-                    &#x27;id&#x27; =&gt; $track[&#x27;id&#x27;],
-                    &#x27;name&#x27; =&gt; $track[&#x27;name&#x27;],
-                    &#x27;artist&#x27; =&gt; $track[&#x27;artists&#x27;][0][&#x27;name&#x27;] ?? &#x27;Unknown&#x27;,
-                    &#x27;album&#x27; =&gt; $track[&#x27;album&#x27;][&#x27;name&#x27;] ?? &#x27;Unknown&#x27;,
+                    'uri' => $track['uri'],
+                    'id' => $track['id'],
+                    'name' => $track['name'],
+                    'artist' => $track['artists'][0]['name'] ?? 'Unknown',
+                    'album' => $track['album']['name'] ?? 'Unknown',
                 ];
             }
 
@@ -256,34 +256,34 @@ class SpotifyDiscoveryService
             }
 
             // Deprecated endpoint returned empty — log it once and fall through
-            error_log(&#x27;[SpotifyService] /recommendations returned empty (deprecated endpoint). Using smart discovery.&#x27;);
+            
         } else {
-            error_log(&quot;[SpotifyService] /recommendations HTTP {$response-&gt;status()}. Using smart discovery.&quot;);
+            
         }
 
         // Fall through to multi-strategy discovery
-        return $this-&gt;getSmartRecommendations($limit, $currentArtist, $audioFeatures);
+        return $this->getSmartRecommendations($limit, $currentArtist, $audioFeatures);
     }
 
     /**
      * Multi-strategy track discovery using only live Spotify endpoints.
      *
      * Combines top artists, top tracks, genre search, Discover Weekly /
-     رویکرد Daily Mix playlists, and recently played to build a diverse pool
+     * Daily Mix playlists, and recently played to build a diverse pool
      * of recommendations without the deprecated /v1/recommendations API.
      */
     public function getSmartRecommendations(int $limit = 10, ?string $currentArtist = null, array $audioFeatures = []): array
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
         $seen = [];
         $pool = [];
 
-        $collect = function (array $tracks) use (&amp;$seen, &amp;$pool): void {
+        $collect = function (array $tracks) use (&$seen, &$pool): void {
             foreach ($tracks as $t) {
-                $uri = $t[&#x27;uri&#x27;] ?? &#x27;&#x27;;
+                $uri = $t['uri'] ?? '';
 
-if ($uri &amp;&amp; ! isset($seen[$uri])) {
+if ($uri && ! isset($seen[$uri])) {
                     $seen[$uri] = true;
                     $pool[] = $t;
                 }
@@ -291,65 +291,65 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
         };
 
         // Strategy 1: Top tracks across time ranges for variety
-        $collect($this-&gt;getTopTracks(&#x27;short_term&#x27;, 15));
-        $collect($this-&gt;getTopTracks(&#x27;medium_term&#x27;, 15));
+        $collect($this->getTopTracks('short_term', 15));
+        $collect($this->getTopTracks('medium_term', 15));
 
         // Strategy 2: Tracks from top artists (discover deeper cuts)
-        $topArtists = $this-&gt;getTopArtists(&#x27;short_term&#x27;, 5);
+        $topArtists = $this->getTopArtists('short_term', 5);
         foreach ($topArtists as $artist) {
-            $collect($this-&gt;searchMultiple(&quot;artist:\&quot;{$artist[&#x27;name&#x27;]}\&quot;&quot;, &#x27;track&#x27;, 5));
+            $collect($this->searchMultiple("artist:\"{$artist['name']}\"", 'track', 5));
         }
 
         // Strategy 3: Genre-adjacent search from top artists
         $genres = [];
         foreach ($topArtists as $artist) {
-            foreach ($artist[&#x27;genres&#x27;] ?? [] as $genre) {
+            foreach ($artist['genres'] ?? [] as $genre) {
                 $genres[$genre] = true;
             }
         }
         foreach (array_slice(array_keys($genres), 0, 3) as $genre) {
-            $collect($this-&gt;searchMultiple(&quot;genre:\&quot;{$genre}\&quot;&quot;, &#x27;track&#x27;, 5));
+            $collect($this->searchMultiple("genre:\"{$genre}\"", 'track', 5));
         }
 
         // Strategy 4: Mood-aware terms so fallback still follows recommendation intent
-        $moodTerms = $this-&gt;deriveMoodTerms($audioFeatures);
+        $moodTerms = $this->deriveMoodTerms($audioFeatures);
         foreach ($moodTerms as $term) {
-            $collect($this-&gt;searchMultiple($term, &#x27;track&#x27;, 5));
+            $collect($this->searchMultiple($term, 'track', 5));
 
             if ($currentArtist) {
-                $collect($this-&gt;searchMultiple(&quot;artist:\&quot;{$currentArtist}\&quot; {$term}&quot;, &#x27;track&#x27;, 3));
+                $collect($this->searchMultiple("artist:\"{$currentArtist}\" {$term}", 'track', 3));
             }
 
             foreach (array_slice(array_keys($genres), 0, 2) as $genre) {
-                $collect($this-&gt;searchMultiple(&quot;genre:\&quot;{$genre}\&quot; {$term}&quot;, &#x27;track&#x27;, 3));
+                $collect($this->searchMultiple("genre:\"{$genre}\" {$term}", 'track', 3));
             }
         }
- transcriptase
-        // Strategy 5: &quot;Similar to&quot; search if we know the current artist
+
+        // Strategy 5: "Similar to" search if we know the current artist
         if ($currentArtist) {
-            $collect($this-&gt;searchMultiple(&quot;{$currentArtist} similar&quot;, &#x27;track&#x27;, 5));
+            $collect($this->searchMultiple("{$currentArtist} similar", 'track', 5));
         }
 
-        // Strategy 6: Discover Weekly / Daily Mixes (Spotify&#x27;s own algo, still works)
-        $playlists = $this-&gt;getPlaylists(50);
+        // Strategy 6: Discover Weekly / Daily Mixes (Spotify's own algo, still works)
+        $playlists = $this->getPlaylists(50);
         foreach ($playlists as $playlist) {
-            $name = strtolower($playlist[&#x27;name&#x27;] ?? &#x27;&#x27;);
-            if (str_contains($name, &#x27;discover weekly&#x27;)
-                || str_contains($name, &#x27;release radar&#x27;)
-                || str_starts_with($name, &#x27;daily mix&#x27;)) {
-                $items = $this-&gt;getPlaylistTracks($playlist[&#x27;id&#x27;]);
+            $name = strtolower($playlist['name'] ?? '');
+            if (str_contains($name, 'discover weekly')
+                || str_contains($name, 'release radar')
+                || str_starts_with($name, 'daily mix')) {
+                $items = $this->getPlaylistTracks($playlist['id']);
                 foreach ($items as $item) {
-                    if (isset($item[&#x27;track&#x27;][&#x27;uri&#x27;], $item[&#x27;track&#x27;][&#x27;name&#x27;])) {
+                    if (isset($item['track']['uri'], $item['track']['name'])) {
                         $collect([[
-                            &#x27;uri&#x27; =&gt; $item[&#x27;track&#x27;][&#x27;uri&#x27;],
-                            &#x27;name&#x27; =&gt; $item[&#x27;track&#x27;][&#x27;name&#x27;],
-                            &#x27;artist&#x27; =&gt; $item[&#x27;track&#x27;][&#x27;artists&#x27;][0][&#x27;name&#x27;] ?? &#x27;Unknown&#x27;,
-                            &#x27;album&#x27; =&gt; $item[&#x27;track&#x27;][&#x27;album&#x27;][&#x27;name&#x27;] ?? &#x27;Unknown&#x27;,
+                            'uri' => $item['track']['uri'],
+                            'name' => $item['track']['name'],
+                            'artist' => $item['track']['artists'][0]['name'] ?? 'Unknown',
+                            'album' => $item['track']['album']['name'] ?? 'Unknown',
                         ]]);
                     }
                 }
                 // Only pull from 2 discovery playlists to keep API calls reasonable
-                if (count($pool) &gt; $limit * 3) {
+                if (count($pool) > $limit * 3) {
                     break;
                 }
             }
@@ -361,47 +361,47 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
     }
 
     /**
-     * @return array&lt;int, string&gt;
+     * @return array<int, string>
      */
     private function deriveMoodTerms(array $audioFeatures): array
     {
         $terms = [];
 
-        $energy = (float) ($audioFeatures[&#x27;target_energy&#x27;] ?? 0);
-        $valence = (float) ($audioFeatures[&#x27;target_valence&#x27;] ?? 0);
-        $tempo = (float) ($audioFeatures[&#x27;target_tempo&#x27;] ?? 0);
-        $danceability = (float) ($audio-features[&#x27;target_danceability&#x27;] ?? 0);
-        $instrumentalness = (float) ($audioFeatures[&#x27;target_instrumentalness&#x27;] ?? 0);
-        $acousticness = (float) ($audioFeatures[&#x27;target_acousticness&#x27;] ?? 0);
+        $energy = (float) ($audioFeatures['target_energy'] ?? 0);
+        $valence = (float) ($audioFeatures['target_valence'] ?? 0);
+        $tempo = (float) ($audioFeatures['target_tempo'] ?? 0);
+        $danceability = (float) ($audioFeatures['target_danceability'] ?? 0);
+        $instrumentalness = (float) ($audioFeatures['target_instrumentalness'] ?? 0);
+        $acousticness = (float) ($audioFeatures['target_acousticness'] ?? 0);
 
-        if ($energy &gt;= 0.8) {
-            $terms[] = &#x27;energetic&#x27;;
-        } elseif ($energy &gt; 0 &amp;&amp; $energy &lower <= 0.3) {
-            $terms[] = &#x27;calm&#x27;;
+        if ($energy >= 0.8) {
+            $terms[] = 'energetic';
+        } elseif ($energy > 0 && $energy &lower <= 0.3) {
+            $terms[] = 'calm';
         }
 
-        if ($valence &gt;= 0.75) {
-            $terms[] = &#x27;upbeat&#x27;;
-        } elseif ($valence &gt; 0 &amp;&amp; $valence <= 0.3) {
-            $terms[] = &#x27;melancholy&#x27;;
+        if ($valence >= 0.75) {
+            $terms[] = 'upbeat';
+        } elseif ($valence > 0 && $valence <= 0.3) {
+            $terms[] = 'melancholy';
         }
 
-        if ($tempo &gt;= 135) {
-            $terms[] = &#x27;workout&#x27;;
-        } elseif ($tempo &gt; 0 &amp;&amp; $tempo <= 85) {
-            $terms[] = &#x27;ambient&#x27;;
+        if ($tempo >= 135) {
+            $terms[] = 'workout';
+        } elseif ($tempo > 0 && $tempo <= 85) {
+            $terms[] = 'ambient';
         }
 
-        if ($danceability &gt;= 0.75) {
-            $terms[] = &#x27;dance&#x27;;
+        if ($danceability >= 0.75) {
+            $terms[] = 'dance';
         }
 
-        if ($instrumentalness &gt;= 0.6) {
-            $terms[] = &#x27;instrumental&#x27;;
+        if ($instrumentalness >= 0.6) {
+            $terms[] = 'instrumental';
         }
 
-        if ($acousticness &gt;= 0.6) {
-            $terms[] = &#x27;acoustic&#x27;;
+        if ($acousticness >= 0.6) {
+            $terms[] = 'acoustic';
         }
 
         return array_values(array_unique($terms));
@@ -418,10 +418,10 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
         $seen = [];
         $merged = [];
 
-        $collect = function (array $tracks) use (&amp;$seen, &amp;$merged): void {
+        $collect = function (array $tracks) use (&$seen, &$merged): void {
             foreach ($tracks as $track) {
-                $uri = $track[&#x27;uri&#x27;] ?? &#x27;&#x27;;
-                if ($uri &amp;&amp; ! isset($seen[$uri])) {
+                $uri = $track['uri'] ?? '';
+                if ($uri && ! isset($seen[$uri])) {
                     $seen[$uri] = true;
                     $merged[] = $track;
                 }
@@ -429,18 +429,18 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
         };
 
         // 1. Same artist — deep cuts
-        $collect($this-&gt;searchMultiple(&quot;artist:\&quot; {$artistName} \&quot;&quot;, &#x27;track&#x27;, $limit + 5));
+        $collect($this->searchMultiple("artist:\" {$artistName} \"", 'track', $limit + 5));
 
         // 2. Loose artist search — catches features, remixes, collaborations
-        $collect($this-&gt;searchMultiple(&quot;\&quot;{$artistName}\&quot;&quot;, &#x27;track&#x27;, $limit));
+        $collect($this->searchMultiple("\"{$artistName}\"", 'track', $limit));
 
         // 3. Track title search — finds covers, similar-titled songs across artists
         if ($trackName) {
-            $collect($this-&gt;searchMultiple(&quot;\&quot">{{$trackName}}\&quot;&quot;, &#x27;track&#x27;, 5));
+            $collect($this->searchMultiple("\"{$trackName}\"", 'track', 5));
         }
 
-        // 4. User&#x27;s top tracks as diversity padding (guaranteed fresh material)
-        $collect($this-&gt;getTopTracks(&#x27;short_term&#x27;, 10));
+        // 4. User's top tracks as diversity padding (guaranteed fresh material)
+        $collect($this->getTopTracks('short_term', 10));
 
         // Shuffle to avoid always returning the same top results
         shuffle($merged);
@@ -449,25 +449,23 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
     }
 
     /**
-     * Get user&#x27;s playlists
+     * Get user's playlists
      */
     public function getPlaylists(int $limit = 20): array
     {
-        $this-&gt;auth-&gt;ensureValidToken();
-
-        if (! $this-&gt;auth-&gt;getAccessToken()) {
+        if (! $this->auth->getAccessToken()) {
             return [];
         }
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;get($this-&gt;baseUri.&#x27;me/playlists&#x27;, [
-                &#x27;limit&#x27; =&gt; $limit,
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'me/playlists', [
+                'limit' => $limit,
             ]);
 
-        if ($response-&gt;successful()) {
-            $data = $response-&gt;json();
+        if ($response->successful()) {
+            $data = $response->json();
 
-            return $data[&#x27;items&#x27;] ?? [];
+            return $data['items'] ?? [];
         }
 
         return [];
@@ -478,19 +476,17 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
      */
     public function getPlaylistTracks(string $playlistId): array
     {
-        $this-&gt;auth-&gt;ensureValidToken();
-
-        if (! $this-&gt;auth-&gt;getAccessToken()) {
+        if (! $this->auth->getAccessToken()) {
             return [];
         }
 
-        $ response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;get($this-&gt;baseUri.&quot;playlists/{$playlistId}/tracks&quot;);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri."playlists/{$playlistId}/tracks");
 
-        if ($response-&gt;successful()) {
-            $data = $response-&gt;json();
+        if ($response->successful()) {
+            $data = $response->json();
 
-            return $data[&#x27;items&#x27;] ?? [];
+            return $data['items'] ?? [];
         }
 
         return [];
@@ -501,9 +497,7 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
      */
     public function getTracks(array $trackIds): array
     {
-        $this-&gt;auth-&gt;ensureValidToken();
-
-        if (empty($trackIds) || ! $this-&gt;auth-&gt;getAccessToken()) {
+        if (empty($trackIds) || ! $this->auth->getAccessToken()) {
             return [];
         }
 
@@ -511,26 +505,26 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
 
         // Spotify allows max 50 IDs per request
         foreach (array_chunk($trackIds, 50) as $chunk) {
-            $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-                -&gt;get($	this-&gt;baseUri.&#x27;tracks&#x27;, [
-                    &#x27;ids&#x27; =&gt; implode(&#x27;,&#x27;, $chunk),
+            $response = Http::withToken($this->auth->getAccessToken())
+                ->get($this->baseUri.'tracks', [
+                    'ids' => implode(',', $chunk),
                 ]);
 
-            if ($response-&gt;successful()) {
-                foreach ($response-&gt;json()[&#x27;tracks&#x27;] ?? [] as $track) {
+            if ($response->successful()) {
+                foreach ($response->json()['tracks'] ?? [] as $track) {
                     if (! $track) {
                         continue;
                     }
-                    $images = $track[&#x27;album&#x27;][&#x27;images&#x27;] ?? [];
-                    $tracks[$track[&#x27;id&#x27;]] = [
-                        &#x27;id&#x27; =&gt; $track[&#x27;id&#x27;],
-                        &#x27;name&#x27; =&gt; $track[&#x27;name&#x27;],
-                        &#x27;artist&#x27; =&gt; $track[&#x27;artists&#x27;][0][&#x27;name '&#x27;] ?? &#x27;Unknown&#x27;,
-                        &#x27;album&#x27; =&gt; $track[&#x27;album&#x27;][&#x27;name&#x27;] ?? &#x27;Unknown&#x27;,
-                        &#x27;uri&#x27; =&gt; $track[&#x27;uri&#x27;],
-                        &#x27;image_large&#x27; =&gt; $images[0][&#x27;url&#x27;] ?? null,
-                        &#x27;image_medium&#x27; =&gt; $images[1][&#x27;url&#x27;] ?? null,
-                        &#x27;image_small&#x27; =&gt; $images[2][&#x27;url&#x27;] ?? null,
+                    $images = $track['album']['images'] ?? [];
+                    $tracks[$track['id']] = [
+                        'id' => $track['id'],
+                        'name' => $track['name'],
+                        'artist' => $track['artists'][0]['name'] ?? 'Unknown',
+                        'album' => $track['album']['name'] ?? 'Unknown',
+                        'uri' => $track['uri'],
+                        'image_large' => $images[0]['url'] ?? null,
+                        'image_medium' => $images[1]['url'] ?? null,
+                        'image_small' => $images[2]['url'] ?? null,
                     ];
                 }
             }
@@ -541,7 +535,7 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
 
     /**
      * Fetch track metadata via oEmbed + page scraping (no auth required).
-     * Used as fallback when API credentials aren&#x27;t available.
+     * Used as fallback when API credentials aren't available.
      */
     public function getTracksViaOEmbed(array $trackIds): array
     {
@@ -549,49 +543,49 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
 
         foreach ($trackIds as $trackId) {
             try {
-                $trackUrl = &quot;https://open.spotify.com/track/{$trackId}&quot;;
+                $trackUrl = "https://open.spotify.com/track/{$trackId}";
 
                 // oEmbed gives us title + thumbnail (no auth required)
                 $oembed = Http::timeout(5)
-                    -&gt;get(&#x27;https://open.spotify.com/oembed&#x27;, [&#x27;url&#x27; =&gt; $trackUrl])
-                    -&gt;json();
+                    ->get('https://open.spotify.com/oembed', ['url' => $trackUrl])
+                    ->json();
 
                 if (! $oembed) {
                     continue;
                 }
 
-                $name = $oembed[&#x27;title&#x27;] ?? &#x27;Unknown Track&#x27;;
-                $thumbnail = $oembed[&#x27;thumbnail_url&#x27;] ?? null;
+                $name = $oembed['title'] ?? 'Unknown Track';
+                $thumbnail = $oembed['thumbnail_url'] ?? null;
 
                 // Fetch page meta tags for artist name
-                $artist = &#x27;Unknown Artist&#x27;;
-                $album = &#x27;&#x27;;
-                $pageResponse = Http::timeout(5)-&gt;get($trackUrl);
-                if ($pageResponse-&gt;successful()) {
-                    $html = $pageResponse-&gt;body();
-                    if (preg_match(&#x27;/music:musician_description\&quot; content=\&quot;([^\&quot;]+)\&quot;/&#x27;, $html, $m)) {
+                $artist = 'Unknown Artist';
+                $album = '';
+                $pageResponse = Http::timeout(5)->get($trackUrl);
+                if ($pageResponse->successful()) {
+                    $html = $pageResponse->body();
+                    if (preg_match('/music:musician_description\" content=\"([^\"]+)\"/', $html, $m)) {
                         $artist = $m[1];
                     }
-                    if (preg_match(&#x27;/og:description\&quot; content=\&quot;([^\&quot;]+)\&quot;/&#x27;, $html, $m)) {
-                        // Format: &quot;Artist · Album · Song · Year&quot;
-                        $parts = array_map(&#x27;trim&#x27;, explode(&#x27;·&#x27;, html_entity_decode($m[1])));
-                        $album = $parts[1] ?? &#x27;&#x27;;
+                    if (preg_match('/og:description\" content=\"([^\"]+)\"/', $html, $m)) {
+                        // Format: "Artist · Album · Song · Year"
+                        $parts = array_map('trim', explode('·', html_entity_decode($m[1])));
+                        $album = $parts[1] ?? '';
                     }
                 }
 
                 // Spotify CDN image prefixes: 0000b273=640px, 00001e02=300px, 00004851=64px
-                $imageLarge = $thumbnail ? str_replace(&#x27;00001e02&#x27;, &#x27;0000b273&#x27;, $thumbnail) : null;
-                $imageSmall = $thumbnail ? str_replace(&#x27;00001e02&#x27;, &#x27;00004851&#x27;, $thumbnail) : null;
+                $imageLarge = $thumbnail ? str_replace('00001e02', '0000b273', $thumbnail) : null;
+                $imageSmall = $thumbnail ? str_replace('00001e02', '00004851', $thumbnail) : null;
 
                 $tracks[$trackId] = [
-                    &#x27;id&#x27; =&gt; $trackId,
-                    &#x27;name&#x27; =&gt; $name,
-                    &#x27;artist&#x27; =&gt; $artist,
-                    &#x27;album&#x27; =&gt; $album,
-                    &#x27;uri&#x27; =&gt; &quot;spotify:track:{$trackId}&quot;,
-                    &#x27;image_large&#x27; =&gt; $imageLarge,
-                    &#x27;image_medium&#x27; =&gt; $thumbnail,
-                    &#x27;image_small&#x27; =&gt; $imageSmall,
+                    'id' => $trackId,
+                    'name' => $name,
+                    'artist' => $artist,
+                    'album' => $album,
+                    'uri' => "spotify:track:{$trackId}",
+                    'image_large' => $imageLarge,
+                    'image_medium' => $thumbnail,
+                    'image_small' => $imageSmall,
                 ];
             } catch (\Throwable) {
                 continue;
@@ -604,24 +598,24 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
     /**
      * Create a playlist for the authenticated user
      */
-    public function createPlaylist(string $name, string $description = &#x27;&#x27;, bool $public = true): ?array
+    public function createPlaylist(string $name, string $description = '', bool $public = true): ?array
     {
-        $this-&gt;auth-&gt университет;requireAuth();
+        $this->auth->requireAuth();
 
-       ższego $profile = $this-&gt;getUserProfile();
+        $profile = $this->getUserProfile();
         if (! $profile) {
             return null;
         }
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;post($this-&gt;baseUri.&quot;users/{$profile[&#x27;id&#x27;]} /playlists&quot;, [
-                &#x27;name&#x27; =&gt; $name,
-                &#x27;description&#x27; =&gt; $description,
-                &#x27;public&#x27; =&gt; $public,
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->post($this->baseUri."users/{$profile['id']}/playlists", [
+                'name' => $name,
+                'description' => $description,
+                'public' => $public,
             ]);
 
-        if ($response-&gt;successful()) {
-            return $response-&gt;json();
+        if ($response->successful()) {
+            return $response->json();
         }
 
         return null;
@@ -632,25 +626,25 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
      */
     public function replacePlaylistTracks(string $playlistId, array $trackUris): bool
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
         // Spotify allows max 100 URIs per request
         $first = true;
         foreach (array_chunk($trackUris, 100) as $chunk) {
             if ($first) {
-                $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-                    -&gt;put($this-&gt;baseUri.&quot;playlists/{$playlistId}/tracks&quot;, [
-                        &#x27;uris&#x27; =&gt; $chunk,
+                $response = Http::withToken($this->auth->getAccessToken())
+                    ->put($this->baseUri."playlists/{$playlistId}/tracks", [
+                        'uris' => $chunk,
                     ]);
                 $first = false;
             } else {
-                $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-                    -&gt;post($this-&gt;baseUri.&quot;playlists/{$playlistId}/tracks&quot;, [
-                        &#x27;uris&#x27; =&gt; $chunk,
+                $response = Http::withToken($this->auth->getAccessToken())
+                    ->post($this->baseUri."playlists/{$playlistId}/tracks", [
+                        'uris' => $chunk,
                     ]);
             }
 
-            if (! $response-&gt;successful()) {
+            if (! $response->successful()) {
                 return false;
             }
         }
@@ -659,14 +653,14 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
     }
 
     /**
-     * Find a playlist by name in user&#x27;s playlists
+     * Find a playlist by name in user's playlists
      */
     public function findPlaylistByName(string $name): ?array
     {
-        $playlists = $this-&gt;getPlaylists(50);
+        $playlists = $this->getPlaylists(50);
 
         foreach ($playlists as $playlist) {
-            if (($playlist[&#x27;name&#x27;] ?? &#x27;&#x27;) === $name) {
+            if (($playlist['name'] ?? '') === $name) {
                 return $playlist;
             }
         }
@@ -679,30 +673,28 @@ if ($uri &amp;&amp; ! isset($seen[$uri])) {
      */
     public function updatePlaylistDetails(string $playlistId, array $details): bool
     {
-        $this-&gt;auth-&gt;ensureValidToken();
-
-        if (! $this-&gt;auth-&gt;getAccessToken()) {
+        if (! $this->auth->getAccessToken()) {
             return false;
         }
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;put($this-&gt;baseUri.&quot;playlists/{$playlistId}&quot;, $details);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri."playlists/{$playlistId}", $details);
 
-        return $response-&gt;successful();
+        return $response->successful();
     }
 
     /**
-     * Get current user&#x27;s profile (includes username/id)
+     * Get current user's profile (includes username/id)
      */
     public function getUserProfile(): ?array
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;get($this-&gt;baseUri.&#x27;me&#x27;);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'me');
 
-        if ($response-&gt;successful()) {
-            return $response-&gt;json();
+        if ($response->successful()) {
+            return $response->json();
         }
 
         return null;

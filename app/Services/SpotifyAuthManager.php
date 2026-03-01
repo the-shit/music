@@ -1,4 +1,4 @@
-&lt;?php
+<?php
 
 namespace App\Services;
 
@@ -21,13 +21,13 @@ class SpotifyAuthManager
 
     public function __construct()
     {
-        $this-&gt;clientId = config(&#x27;spotify.client_id&#x27;, &#x27;&#x27;);
-        $this-&gt;clientSecret = config(&#x27;spotify.client_secret&#x27;, &#x27;&#x27;);
+        $this->clientId = config('spotify.client_id', '');
+        $this->clientSecret = config('spotify.client_secret', '');
 
-        // Use config path for PHAR compatibility (base_path() doesn&#x27;t work in PHAR)
-        $this-&gt;tokenFile = config(&#x27;spotify.token_path&#x27;);
+        // Use config path for PHAR compatibility (base_path() doesn't work in PHAR)
+        $this->tokenFile = config('spotify.token_path');
 
-        $this-&gt;loadTokenData();
+        $this->loadTokenData();
     }
 
     /**
@@ -35,8 +35,8 @@ class SpotifyAuthManager
      */
     public function isConfigured(): bool
     {
-        return ! empty($this-&gt;clientId) &amp;&amp; ! empty($this-&gt;clientSecret)
-            &amp;&amp; (! empty($this-&gt;accessToken) || ! empty($this-&gt;refreshToken));
+        return ! empty($this->clientId) && ! empty($this->clientSecret)
+            && (! empty($this->accessToken) || ! empty($this->refreshToken));
     }
 
     /**
@@ -44,12 +44,12 @@ class SpotifyAuthManager
      */
     private function loadTokenData(): void
     {
-        if (file_exists($this-&gt;tokenFile)) {
-            $data = json_decode(file_get_contents($this-&gt;tokenFile), true);
+        if (file_exists($this->tokenFile)) {
+            $data = json_decode(file_get_contents($this->tokenFile), true);
             if ($data) {
-                $this-&gt;accessToken = $data[&#x27;access_token&#x27;] ?? null;
-                $this-&gt;refreshToken = $data[&#x27;refresh_token&#x27;] ?? null;
-                $this-&gt;expiresAt = $data[&#x27;expires_at&#x27;] ?? null;
+                $this->accessToken = $data['access_token'] ?? null;
+                $this->refreshToken = $data['refresh_token'] ?? null;
+                $this->expiresAt = $data['expires_at'] ?? null;
             }
         }
     }
@@ -60,18 +60,18 @@ class SpotifyAuthManager
      */
     private function reloadFromDisk(): void
     {
-        $configDir = dirname($this-&gt;tokenFile);
-        $credentialsFile = $configDir.&#x27;/credentials.json&#x27;;
+        $configDir = dirname($this->tokenFile);
+        $credentialsFile = $configDir.'/credentials.json';
 
         if (file_exists($credentialsFile)) {
             $creds = json_decode(file_get_contents($credentialsFile), true);
             if ($creds) {
-                $this-&gt;clientId = $creds[&#x27;client_id&#x27;] ?? $this-&gt;clientId;
-                $this-&gt;clientSecret = $creds[&#x27;client_secret&#x27;] ?? $this-&gt;clientSecret;
+                $this->clientId = $creds['client_id'] ?? $this->clientId;
+                $this->clientSecret = $creds['client_secret'] ?? $this->clientSecret;
             }
         }
 
-        $this-&gt;loadTokenData();
+        $this->loadTokenData();
     }
 
     /**
@@ -80,17 +80,17 @@ class SpotifyAuthManager
     private function ensureValidToken(): void
     {
         // If we have a refresh token and the access token is expired (or about to expire in 60 seconds)
-        if ($this-&gt;refreshToken &amp;&amp; (! $this-&gt;expiresAt || $this-&gt;expiresAt &lt; (time() + 60))) {
+        if ($this->refreshToken && (! $this->expiresAt || $this->expiresAt < (time() + 60))) {
             // Re-read from disk first — an external `spotify login` may have saved fresh tokens
-            $this-&gt;reloadFromDisk();
+            $this->reloadFromDisk();
 
             // After reload, check if we still need to refresh
-            if (! $this-&gt;expiresAt || $this-&gt;expiresAt &lt; (time() + 60)) {
-                $this-&gt;refreshAccessToken();
+            if (! $this->expiresAt || $this->expiresAt < (time() + 60)) {
+                $this->refreshAccessToken();
             }
 
-            if (! $this-&gt;accessToken) {
-                throw new \Exception(&#x27;Session expired. Run &quot;spotify login&quot; to re-authenticate.&#x27;);
+            if (! $this->accessToken) {
+                throw new \Exception('Session expired. Run "spotify login" to re-authenticate.');
             }
         }
     }
@@ -101,14 +101,14 @@ class SpotifyAuthManager
      */
     public function requireAuth(): void
     {
-        if (! $this-&gt;accessToken &amp;&amp; ! $this-&gt;refreshToken) {
-            throw new \Exception(&#x27;Not authenticated. Run &quot;spotify login&quot; first.&#x27;);
+        if (! $this->accessToken && ! $this->refreshToken) {
+            throw new \Exception('Not authenticated. Run "spotify login" first.');
         }
 
-        $this-&gt;ensureValidToken();
+        $this->ensureValidToken();
 
-        if (! $this-&gt;accessToken) {
-            throw new \Exception(&#x27;Not authenticated. Run &quot;spotify login&quot; first.&#x27;);
+        if (! $this->accessToken) {
+            throw new \Exception('Not authenticated. Run "spotify login" first.');
         }
     }
 
@@ -117,41 +117,41 @@ class SpotifyAuthManager
      */
     private function refreshAccessToken(): void
     {
-        // Retry refresh up to 3 times — transient failures shouldn&#x27;t nuke the session
-        for ($attempt = 1; $attempt &lt;= 3; $attempt++) {
+        // Retry refresh up to 3 times — transient failures shouldn't nuke the session
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
             $response = Http::withHeaders([
-                &#x27;Authorization&#x27; =&gt; &#x27;Basic &#x27;.base64_encode($this-&gt;clientId.&#x27;:&#x27;.$this-&gt;clientSecret),
-            ])-&gt;asForm()-&gt;post(&#x27;https://accounts.spotify.com/api/token&#x27;, [
-                &#x27;grant_type&#x27; =&gt; &#x27;refresh_token&#x27;,
-                &#x27;refresh_token&#x27; =&gt; $this-&gt;refreshToken,
+                'Authorization' => 'Basic '.base64_encode($this->clientId.':'.$this->clientSecret),
+            ])->asForm()->post('https://accounts.spotify.com/api/token', [
+                'grant_type' => 'refresh_token',
+                'refresh_token' => $this->refreshToken,
             ]);
 
-            if ($response-&gt;successful()) {
-                $data = $response-&gt;json();
-                $this-&gt;accessToken = $data[&#x27;access_token&#x27;];
-                $this-&gt;expiresAt = time() + ($data[&#x27;expires_in&#x27;] ?? 3600);
+            if ($response->successful()) {
+                $data = $response->json();
+                $this->accessToken = $data['access_token'];
+                $this->expiresAt = time() + ($data['expires_in'] ?? 3600);
 
                 // Spotify may rotate refresh tokens — always capture the new one
-                if (! empty($data[&#x27;refresh_token&#x27;])) {
-                    $this-&gt;refreshToken = $data[&#x27;refresh_token&#x27;];
+                if (! empty($data['refresh_token'])) {
+                    $this->refreshToken = $data['refresh_token'];
                 }
 
                 // Save updated token data
-                $this-&gt;saveTokenData();
+                $this->saveTokenData();
 
                 return;
             }
 
             // Only clear token on 4xx (truly revoked), not on network/5xx errors
-            if ($response-&gt;status() &gt;= 400 &amp;&amp; $response-&gt;status() &lt; 500) {
-                $this-&gt;accessToken = null;
-                $this-&gt;expiresAt = null;
-                $this-&gt;saveTokenData();
+            if ($response->status() >= 400 && $response->status() < 500) {
+                $this->accessToken = null;
+                $this->expiresAt = null;
+                $this->saveTokenData();
 
                 return;
             }
 
-            if ($attempt &lt; 3) {
+            if ($attempt < 3) {
                 usleep(500000 * $attempt);
             }
         }
@@ -163,25 +163,25 @@ class SpotifyAuthManager
     private function saveTokenData(): void
     {
         $tokenData = [
-            &#x27;access_token&#x27; =&gt; $this-&gt;accessToken,
-            &#x27;refresh_token&#x27; =&gt; $this-&gt;refreshToken,
-            &#x27;expires_at&#x27; =&gt; $this-&gt;expiresAt,
+            'access_token' => $this->accessToken,
+            'refresh_token' => $this->refreshToken,
+            'expires_at' => $this->expiresAt,
         ];
 
         // Ensure config directory exists (PHAR compatible path)
-        $configDir = dirname($this-&gt;tokenFile);
+        $configDir = dirname($this->tokenFile);
         if (! is_dir($configDir)) {
             mkdir($configDir, 0755, true);
         }
 
         // Save with restricted permissions
-        file_put_contents($this-&gt;tokenFile, json_encode($tokenData, JSON_PRETTY_PRINT));
-        chmod($this-&gt;tokenFile, 0600); // Only owner can read/write
+        file_put_contents($this->tokenFile, json_encode($tokenData, JSON_PRETTY_PRINT));
+        chmod($this->tokenFile, 0600); // Only owner can read/write
     }
 
     public function getAccessToken(): ?string
     {
-        $this-&gt;ensureValidToken();
-        return $this-&gt;accessToken;
+        $this->ensureValidToken();
+        return $this->accessToken;
     }
 }

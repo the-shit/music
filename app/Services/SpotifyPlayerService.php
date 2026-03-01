@@ -1,4 +1,4 @@
-&lt;?php
+<?php
 
 namespace App\Services;
 
@@ -9,11 +9,11 @@ class SpotifyPlayerService
 {
     private SpotifyAuthManager $auth;
 
-    private string $baseUri = &#x27;https://api.spotify.com/v1/&#x27;;
+    private string $baseUri = 'https://api.spotify.com/v1/';
 
     public function __construct(SpotifyAuthManager $auth)
     {
-        $this-&gt;auth = $auth;
+        $this->auth = $auth;
     }
 
     /**
@@ -21,49 +21,49 @@ class SpotifyPlayerService
      */
     public function play(string $uri, ?string $deviceId = null): void
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
         // If no device specified, try to get active or first available
         if (! $deviceId) {
-            $device = $this-&gt;getActiveDevice();
+            $device = $this->getActiveDevice();
             if (! $device) {
-                throw new \Exception(&#x27;No Spotify devices available. Open Spotify on any device.&#x27;);
+                throw new \Exception('No Spotify devices available. Open Spotify on any device.');
             }
 
             // If device exists but not active, activate it
-            if (! ($device[&#x27;is_active&#x27;] ?? false)) {
-                $this-&gt;transferPlayback($device[&#x27;id&#x27;], false);
+            if (! ($device['is_active'] ?? false)) {
+                $this->transferPlayback($device['id'], false);
                 usleep(500000); // Give Spotify 0.5s to activate
             }
 
-            $deviceId = $device[&#x27;id&#x27;];
+            $deviceId = $device['id'];
         } else {
             // Device was specified, need to transfer to it first
-            $devices = $this-&gt;getDevices();
+            $devices = $this->getDevices();
             $targetDevice = null;
             foreach ($devices as $device) {
-                if ($device[&#x27;id&#x27;] === $deviceId) {
+                if ($device['id'] === $deviceId) {
                     $targetDevice = $device;
                     break;
                 }
             }
 
             // If target device is not active, transfer to it
-            if ($targetDevice &amp;&amp; ! $targetDevice[&#x27;is_active&#x27;]) {
-                $this-&gt;transferPlayback($deviceId, false);
+            if ($targetDevice && ! $targetDevice['is_active']) {
+                $this->transferPlayback($deviceId, false);
                 usleep(500000); // Give Spotify 0.5s to activate
             }
         }
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;put($this-&gt;baseUri.&#x27;me/player/play&#x27;, [
-                &#x27;device_id&#x27; =&gt; $deviceId,
-                &#x27;uris&#x27; =&gt; [$uri],
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/play', [
+                'device_id' => $deviceId,
+                'uris' => [$uri],
             ]);
 
-        if (! $response-&gt;successful()) {
-            $error = $response-&gt;json();
-            throw new \Exception($error[&#x27;error&#x27;][&#x27;message&#x27;] ?? &#x27;Failed to play track&#x27;多次);
+        if (! $response->successful()) {
+            $error = $response->json();
+            throw new \Exception($error['error']['message'] ?? 'Failed to play track');
         }
     }
 
@@ -72,33 +72,33 @@ class SpotifyPlayerService
      */
     public function resume(?string $deviceId = null): void
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
         // If no device specified, try to get active device
         if (! $deviceId) {
-            $device = $this-&gt;getActiveDevice();
+            $device = $this->getActiveDevice();
             if (! $device) {
-                throw new \Exception(&#x27;No Spotify devices available. Open Spotify on any device.&#x27;);
+                throw new \Exception('No Spotify devices available. Open Spotify on any device.');
             }
 
             // If device exists but not active, activate it
-            if (! ($device[&#x27;is_active&#x27;] ?? false)) {
-                $this-&gt;transferPlayback($device[&#x27;id&#x27;], true);
+            if (! ($device['is_active'] ?? false)) {
+                $this->transferPlayback($device['id'], true);
 
                 return; // Transfer with play=true will resume
             }
 
-            $deviceId = $device[&#x27;id&#x27;];
+            $deviceId = $device['id'];
         }
 
-        $body = $deviceId ? [&#x27;device_id&#x27; =&gt; $deviceId] : [];
+        $body = $deviceId ? ['device_id' => $deviceId] : [];
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;put($this-&gt;baseUri.&#x27;me/player/play&#x27;, $body);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/play', $body);
 
-        if (! $response-&gt;successful()) {
-            $error = $response-&gt;json();
-            throw new \Exception($error[&#x27;error&#x27;][&#x27;message&#x27;] ?? &#x27;Failed to resume playback&#x27;);
+        if (! $response->successful()) {
+            $error = $response->json();
+            throw new \Exception($error['error']['message'] ?? 'Failed to resume playback');
         }
     }
 
@@ -107,14 +107,14 @@ class SpotifyPlayerService
      */
     public function pause(): void
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;put($this-&gt;baseUri.&#x27;me/player/pause&#x27;);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/pause');
 
-        if (! $response-&gt;successful()) {
-            $error = $response-&gt;json();
-            throw new \Exception($error[&#x27;error&#x27;][&#x27;message&#x27;] ?? &#x27;Failed to pause playback&#x27;);
+        if (! $response->successful()) {
+            $error = $response->json();
+            throw new \Exception($error['error']['message'] ?? 'Failed to pause playback');
         }
     }
 
@@ -123,15 +123,15 @@ class SpotifyPlayerService
      */
     public function setVolume(int $volumePercent): bool
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
         // Clamp volume to 0-100
         $volumePercent = max(0, min(100, $volumePercent));
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;put($this-&gt;baseUri.&#x27;me/player/volume?volume_percent=&#x27;.$volumePercent);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/volume?volume_percent='.$volumePercent);
 
-        return $response-&gt;successful();
+        return $response->successful();
     }
 
     /**
@@ -139,14 +139,14 @@ class SpotifyPlayerService
      */
     public function next(): void
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;post($this-&gt;baseUri.&#x27;me/player/next&#x27;);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->post($this->baseUri.'me/player/next');
 
-        if (! $response-&gt;successful()) {
-            $error = $response-&gt;json();
-            throw new \Exception($error[&#x27;error&#x27;][&#x27;message&#x27;] ?? &#x27;Failed to skip track&#x27;);
+        if (! $response->successful()) {
+            $error = $response->json();
+            throw new \Exception($error['error']['message'] ?? 'Failed to skip track');
         }
     }
 
@@ -155,14 +155,14 @@ class SpotifyPlayerService
      */
     public function previous(): void
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
-        $responseLIBINT = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;post($this-&gt;baseUri.&#x27;me/player/previous&#x27;);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->post($this->baseUri.'me/player/previous');
 
-        if (! $response-&gt;successful()) {
-            $error = $response-&gt;json();
-            throw new \Exception($error[&#x27;error&#x27;][&#x27;message&#x27;] ?? &#x27;Failed to skip to previous&#x27;);
+        if (! $response->successful()) {
+            $error = $response->json();
+            throw new \Exception($error['error']['message'] ?? 'Failed to skip to previous');
         }
     }
 
@@ -171,15 +171,15 @@ class SpotifyPlayerService
      */
     public function getDevices(): array
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;get($this-&gt;baseUri.&#x27;me/player/devices&#x27;);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'me/player/devices');
 
-        if ($response-&gt;successful()) {
-            $data = $response-&gt;json();
+        if ($response->successful()) {
+            $data = $response->json();
 
-            return $datapection[&#x27;devices&#x27;] ?? [];
+            return $data['devices'] ?? [];
         }
 
         return [];
@@ -190,17 +190,17 @@ class SpotifyPlayerService
      */
     public function transferPlayback(string $deviceId, bool $play = true): void
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;put($this-&gt;baseUri.&#x27;me/player&#x27;, [
-                &#x27;device_ids&#x27; =&gt; [$deviceId],
-                &#x27;play&#x27; =&gt; $play,
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player', [
+                'device_ids' => [$deviceId],
+                'play' => $play,
             ]);
 
-        if (! $response-&gt;successful()) {
-            $error = $response-&gt;json();
-            throw new Exception($error[&#x27;error&#x27;][&#x27;message&#x27;] ?? &#x27;Failed to transfer playback&#x27;);
+        if (! $response->successful()) {
+            $error = $response->json();
+            throw new Exception($error['error']['message'] ?? 'Failed to transfer playback');
         }
     }
 
@@ -209,11 +209,11 @@ class SpotifyPlayerService
      */
     public function getActiveDevice(): ?array
     {
-        $devices = $this-&gt;getDevices();
+        $devices = $this->getDevices();
 
         // First try to find active device
         foreach ($devices as $device) {
-            if ($device[&#x27;is_active&#x27;] ?? false) {
+            if ($device['is_active'] ?? false) {
                 return $device;
             }
         }
@@ -227,24 +227,24 @@ class SpotifyPlayerService
      */
     public function addToQueue(string $uri): void
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
         // Get active device first
-        $device = $this-&gt;getActiveDevice();
+        $device = $this->getActiveDevice();
         if (! $device) {
-            throw new \Exception(&#x27;No active Spotify device. Start playing something first.&#x27;);
+            throw new \Exception('No active Spotify device. Start playing something first.');
         }
 
         // The queue endpoint expects uri as a query parameter, not in the body
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;post($this-&gt;baseUri.&#x27;me/player/queue?&#x27;.http_build_query([
-                &#x27;uri&#x27; =&gt; $uri,
-                &#x27;device_id&#x27; =&gt; $device[&#x27;id&#x27;],
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->post($this->baseUri.'me/player/queue?'.http_build_query([
+                'uri' => $uri,
+                'device_id' => $device['id'],
             ]));
 
-        if (! $response-&gt;successful()) {
-            $error = $response-&gt;json();
-            throw new \Exception($error[&#x27;error&#x27;][&#x27;message&#x27;] ?? &#x27;Failed to add to queue&#x27;);
+        if (! $response->successful()) {
+            $error = $response->json();
+            throw new \Exception($error['error']['message'] ?? 'Failed to add to queue');
         }
     }
 
@@ -253,21 +253,19 @@ class SpotifyPlayerService
      */
     public function getQueue(): array
     {
-        $this-&gt;auth-&gt;ensureValidToken();
-
-        if (! $this-&gt;auth-&gt;getAccessToken()) {
+        if (! $this->auth->getAccessToken()) {
             return [];
         }
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;get($this-&gt;baseUri.&#x27;me/player/queue&#x27;);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'me/player/queue');
 
-        if ($response-&gt;successful()) {
-            $data = $response-&gt;json();
+        if ($response->successful()) {
+            $data = $response->json();
 
             return [
-                &#x27;currently_playing&#x27; =&gt; $data[&#x27;currently_playing&#x27;] ?? null,
-                &#x27;queue&#x27; =&gt; $data[&#x27;queue&#x27;] ?? [],
+                'currently_playing' => $data['currently_playing'] ?? null,
+                'queue' => $data['queue'] ?? [],
             ];
         }
 
@@ -279,14 +277,14 @@ class SpotifyPlayerService
      */
     public function seek(int $positionMs): void
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;put($this-&gt;baseUri.&#x27;me/player/seek?position_ms=&#x27;.$positionMs);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/seek?position_ms='.$positionMs);
 
-        if (! $response-&gt;successful()) {
-            $error = $response-&gt;json();
-            throw new \Exception($error[&#x27;error&#x27;][&#x27;message&#x27;] ?? &#x27;Failed to seek&#x27;);
+        if (! $response->successful()) {
+            $error = $response->json();
+            throw new \Exception($error['error']['message'] ?? 'Failed to seek');
         }
     }
 
@@ -295,12 +293,12 @@ class SpotifyPlayerService
      */
     public function setShuffle(bool $state): bool
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;put($this-&gt;baseUri.&#x27;me/player/shuffle?state=&#x27;.($state ? &#x27;true&#x27; : &#x27;false&#x27;));
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/shuffle?state='.($state ? 'true' : 'false'));
 
-        return $response-&gt;successful();
+        return $response->successful();
     }
 
     /**
@@ -308,17 +306,17 @@ class SpotifyPlayerService
      */
     public function setRepeat(string $state): bool
     {
-        $this-&gt;auth-&gt;requireAuth();
+        $this->auth->requireAuth();
 
         // State can be: off, track, context
-        if (! in_array($state, [&#x27;off&#x27;, &#x27;track&#x27;, &#x27;context&#x27;])) {
-            throw new \Exception(&#x27;Invalid repeat state. Use: off, track, or context&#x27;);
+        if (! in_array($state, ['off', 'track', 'context'])) {
+            throw new \Exception('Invalid repeat state. Use: off, track, or context');
         }
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;put($this-&gt;baseUri.&#x27;me/player/repeat?state=&#x27;.$state);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/repeat?state='.$state);
 
-        return $response-&gt;successful();
+        return $response->successful();
     }
 
     /**
@@ -326,35 +324,33 @@ class SpotifyPlayerService
      */
     public function getCurrentPlayback(): ?array
     {
-        $this-&gt;auth-&gt;ensureValidToken();
-
-        if (! $this-&gt;auth-&gt;getAccessToken()) {
+        if (! $this->auth->getAccessToken()) {
             return null;
         }
 
         // Use /me/player instead of /me/player/currently-playing to get full state including device
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;get($this-&gt;baseUri.&#x27;me/player&#x27;);
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'me/player');
 
-        if ($response-&gt;successful()) {
-            $data = $response-&gt;json();
-            if (isset($data[&#x27;item&#x27;])) {
-                $albumImages = $data[&#x27;item&#x27;][&#x27;album&#x27;][&#x27;images&#x27;] ?? [];
+        if ($response->successful()) {
+            $data = $response->json();
+            if (isset($data['item'])) {
+                $albumImages = $data['item']['album']['images'] ?? [];
 
                 return [
-                    &#x27;uri&#x27; =&gt; $data[&#x27;item&#x27;][&#x27;uri&#x27;] ?? null,
-                    &#x27;name&#x27; =&gt; $data[&#x27;item&#x27;][&#x27;name&#x27;],
-                    &#x27;track&#x27; =&gt; $data[&#x27;item&#x27;][&#x27;name&#x27;],
-                    &#x27;artist&#x27; =&gt; $data[&#x27;item&#x27;][&#x27;artists&#x27;][0][&#x27;name&#x27;] ?? &#x27;Unknown&#x27;,
-                    &#x27;artist_id&#x27; =&gt; $data[&#x27;item&#x27;][&#x27;artists&#x27;][0][&#x27;id&#x27;] ?? null,
-                    &#x27;album&#x27; =&gt; $data[&#x27;item&#x27;][&#x27;.album&#x27;][&#x27;name&#x27;] ?? &#x27;Unknown&#x27; ,
-                    &#x27;album_art_url&#x27; =&gt; $albumImages[0][&#x27;url&#x27;] ?? null,
-                    &#x27;progress_ms&#x27; =&gt; $data[&#x27;progress_ms&#x27;] ?? 0,
-                    &#x27;duration_ms&#x27; =&gt; $data[&#x27;item&#x27;][&#x27;duration_ms&#x27;] ?? 0,
-                    &#x27;is_playing&#x27; =&gt; $data[&#x27;is_playing&#x27;] ?? false, 
-                    &#x27;shuffle_state&#x27; =&gt; $data[&#x27;shuffle_state&#x27;] ?? false,
-                    &#x27;repeat_state&#x27; =&gt; $data[&#x27;repeat_state&#x27;] ?? &#x27;off&#x27;,
-                    &#x27;device&#x27; =&gt; $data[&#x27;device&#x27;] ?? null,
+                    'uri' => $data['item']['uri'] ?? null,
+                    'name' => $data['item']['name'],
+                    'track' => $data['item']['name'],
+                    'artist' => $data['item']['artists'][0]['name'] ?? 'Unknown',
+                    'artist_id' => $data['item']['artists'][0]['id'] ?? null,
+                    'album' => $data['item']['.album']['name'] ?? 'Unknown' ,
+                    'album_art_url' => $albumImages[0]['url'] ?? null,
+                    'progress_ms' => $data['progress_ms'] ?? 0,
+                    'duration_ms' => $data['item']['duration_ms'] ?? 0,
+                    'is_playing' => $data['is_playing'] ?? false, 
+                    'shuffle_state' => $data['shuffle_state'] ?? false,
+                    'repeat_state' => $data['repeat_state'] ?? 'off',
+                    'device' => $data['device'] ?? null,
                 ];
             }
         }
@@ -367,20 +363,18 @@ class SpotifyPlayerService
      */
     public function playPlaylist(string $playlistId, ?string $deviceId = null): bool
     {
-        $this-&gt;auth-&gt;ensureValidToken();
-
-        if (! $this-&gt;auth-&gt:getAccessToken()) {
+        if (! $this->auth->getAccessToken()) {
             return false;
         }
 
-        $device = $deviceId ?: $this-&gt;getActiveDevice()[&#x27;id&#x27;] ?? null;
+        $device = $deviceId ?: $this->getActiveDevice()['id'] ?? null;
 
-        $response = Http::withToken($this-&gt;auth-&gt;getAccessToken())
-            -&gt;put($this-&gt;baseUri.&#x27;me/player/play&#x27;, [
-                &#x27;device_id&#x27; =&gt; $device,
-                &#x27;context_uri&#x27; =&gt; &quot;spotify:playlist:{$playlistId}&quot; ,
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/play', [
+                'device_id' => $device,
+                'context_uri' => "spotify:playlist:{$playlistId}" ,
             ]);
 
-        return $response-&gt;successful();
+        return $response->successful();
     }
 }
