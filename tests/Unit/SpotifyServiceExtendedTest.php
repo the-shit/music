@@ -1,24 +1,45 @@
 <?php
 
+use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyService;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
+use Mockery;
 use Tests\TestCase;
 
 uses(TestCase::class);
 
-// Helper to make a service with a given token file
-function makeService(string $tokenFile): SpotifyService
+// Helper to make a service with optional authentication
+function makeService(bool $authenticated = true): SpotifyService
 {
     $service = new SpotifyService;
-    $reflection = new ReflectionClass($service);
-    $property = $reflection->getProperty('tokenFile');
-    $property->setAccessible(true);
-    $property->setValue($service, $tokenFile);
 
-    $method = $reflection->getMethod('loadTokenData');
-    $method->setAccessible(true);
-    $method->invoke($service);
+    $mockAuth = Mockery::mock(SpotifyAuthManager::class)->makePartial();
+
+    if ($authenticated) {
+        $mockAuth->shouldReceive('getAccessToken')->andReturn('valid_token');
+        $mockAuth->shouldReceive('requireAuth')->andReturn(null);
+        $mockAuth->shouldReceive('isConfigured')->andReturn(true);
+    } else {
+        $mockAuth->shouldReceive('requireAuth')->andThrow(new \Exception('Not authenticated. Run "spotify login" first.'));
+        $mockAuth->shouldReceive('getAccessToken')->andReturn(null);
+        $mockAuth->shouldReceive('isConfigured')->andReturn(false);
+    }
+
+    $reflection = new ReflectionClass($service);
+    foreach (['auth', 'player', 'discovery'] as $prop) {
+        $r = $reflection->getProperty($prop);
+        $r->setAccessible(true);
+        $obj = $r->getValue($service);
+        if ($prop === 'auth') {
+            $r->setValue($service, $mockAuth);
+        } else {
+            $sub = new ReflectionClass($obj);
+            $subAuth = $sub->getProperty('auth');
+            $subAuth->setAccessible(true);
+            $subAuth->setValue($obj, $mockAuth);
+        }
+    }
 
     return $service;
 }
@@ -27,140 +48,15 @@ beforeEach(function () {
     Config::set('spotify.client_id', 'test_client_id');
     Config::set('spotify.client_secret', 'test_client_secret');
 
-    $this->tokenFile = sys_get_temp_dir().'/spotify_ext_test_'.uniqid().'.json';
-
-    // Write a valid, non-expired token by default
-    file_put_contents($this->tokenFile, json_encode([
-        'access_token' => 'valid_token',
-        'refresh_token' => 'refresh_token',
-        'expires_at' => time() + 3600,
-    ]));
-
-    $this->service = makeService($this->tokenFile);
-});
-
-afterEach(function () {
-    if (file_exists($this->tokenFile)) {
-        unlink($this->tokenFile);
-    }
+    $this->service = makeService();
 });
 
 describe('SpotifyService Extended', function () {
 
-    // ─── Legacy token migration ────────────────────────────────────────────
-
-    describe('Legacy token migration', function () {
-
-        it('reads token from JSON file at primary token path', function () {
-            // Verify that a JSON token file at the primary path is loaded correctly
-            $tmpFile = sys_get_temp_dir().'/legacy_test_primary_'.uniqid().'.json';
-            file_put_contents($tmpFile, json_encode([
-                'access_token' => 'primary_token',
-                'refresh_token' => 'primary_refresh',
-                'expires_at' => time() + 3600,
-            ]));
-
-            $service = new SpotifyService;
-            $reflection = new ReflectionClass($service);
-
-            $prop = $reflection->getProperty('tokenFile');
-            $prop->setAccessible(true);
-            $prop->setValue($service, $tmpFile);
-
-            $accessProp = $reflection->getProperty('accessToken');
-            $accessProp->setAccessible(true);
-            $accessProp->setValue($service, null);
-
-            $method = $reflection->getMethod('loadTokenData');
-            $method->setAccessible(true);
-            $method->invoke($service);
-
-            expect($accessProp->getValue($service))->toBe('primary_token');
-
-            @unlink($tmpFile);
-        });
-
-        it('returns without setting token when tokenFile contains invalid JSON', function () {
-            // If tokenFile exists but contains garbage data, should not crash
-            $tmpFile = sys_get_temp_dir().'/legacy_test_bad_'.uniqid().'.json';
-            file_put_contents($tmpFile, 'not-json-and-not-a-legacy-location');
-
-            $service = new SpotifyService;
-            $reflection = new ReflectionClass($service);
-
-            $prop = $reflection->getProperty('tokenFile');
-            $prop->setAccessible(true);
-            $prop->setValue($service, $tmpFile);
-
-            $accessProp = $reflection->getProperty('accessToken');
-            $accessProp->setAccessible(true);
-            $accessProp->setValue($service, null);
-
-            // Should not throw — just won't load any token
-            $method = $reflection->getMethod('loadTokenData');
-            $method->setAccessible(true);
-            $method->invoke($service);
-
-            // Token remains null (bad JSON = falsy decode)
-            expect($accessProp->getValue($service))->toBeNull();
-
-            @unlink($tmpFile);
-        });
-
-    });
-
-    // ─── saveTokenData directory creation ─────────────────────────────────
-
-    describe('Token persistence', function () {
-
-        it('creates config directory if it does not exist when saving token', function () {
-            $dir = sys_get_temp_dir().'/spotify_new_dir_'.uniqid();
-            $newFile = $dir.'/token.json';
-
-            expect(is_dir($dir))->toBeFalse();
-
-            // Re-build service with new tokenFile path
-            $service = new SpotifyService;
-            $reflection = new ReflectionClass($service);
-
-            $tokenFileProp = $reflection->getProperty('tokenFile');
-            $tokenFileProp->setAccessible(true);
-            $tokenFileProp->setValue($service, $newFile);
-
-            $accessProp = $reflection->getProperty('accessToken');
-            $accessProp->setAccessible(true);
-            $accessProp->setValue($service, 'some_token');
-
-            $method = $reflection->getMethod('saveTokenData');
-            $method->setAccessible(true);
-            $method->invoke($service);
-
-            expect(is_dir($dir))->toBeTrue();
-            expect(file_exists($newFile))->toBeTrue();
-
-            // Cleanup
-            unlink($newFile);
-            rmdir($dir);
-        });
-
-    });
-
-    // ─── unauthenticated throws ────────────────────────────────────────────
-
     describe('Unauthenticated method throws', function () {
 
         beforeEach(function () {
-            // Build a service with NO token
-            $noTokenFile = sys_get_temp_dir().'/no_token_'.uniqid().'.json';
-            $this->unauthService = new SpotifyService;
-            $reflection = new ReflectionClass($this->unauthService);
-            $prop = $reflection->getProperty('tokenFile');
-            $prop->setAccessible(true);
-            $prop->setValue($this->unauthService, $noTokenFile);
-
-            $accessProp = $reflection->getProperty('accessToken');
-            $accessProp->setAccessible(true);
-            $accessProp->setValue($this->unauthService, null);
+            $this->unauthService = makeService(false);
         });
 
         it('search() throws when not authenticated', function () {
@@ -274,8 +170,6 @@ describe('SpotifyService Extended', function () {
         });
 
     });
-
-    // ─── API failure branches ──────────────────────────────────────────────
 
     describe('API failure handling', function () {
 
@@ -454,8 +348,6 @@ describe('SpotifyService Extended', function () {
 
     });
 
-    // ─── getPlaylistTracks ─────────────────────────────────────────────────
-
     describe('Playlist tracks', function () {
 
         it('gets playlist tracks', function () {
@@ -485,8 +377,6 @@ describe('SpotifyService Extended', function () {
 
     });
 
-    // ─── getUserProfile ────────────────────────────────────────────────────
-
     describe('User profile', function () {
 
         it('gets user profile', function () {
@@ -514,8 +404,6 @@ describe('SpotifyService Extended', function () {
         });
 
     });
-
-    // ─── setShuffle and setRepeat ──────────────────────────────────────────
 
     describe('Playback state control', function () {
 
@@ -574,8 +462,6 @@ describe('SpotifyService Extended', function () {
 
     });
 
-    // ─── search returns null on failure ───────────────────────────────────
-
     describe('Search edge cases', function () {
 
         it('returns null when search returns no results', function () {
@@ -608,8 +494,6 @@ describe('SpotifyService Extended', function () {
         });
 
     });
-
-    // ─── getDevices returns empty array on failure ─────────────────────────
 
     describe('Device edge cases', function () {
 
@@ -649,8 +533,6 @@ describe('SpotifyService Extended', function () {
 
     });
 
-    // ─── getPlaylists and getQueue failure ─────────────────────────────────
-
     describe('Playlist and queue edge cases', function () {
 
         it('returns empty array when playlists API fails', function () {
@@ -672,8 +554,6 @@ describe('SpotifyService Extended', function () {
         });
 
     });
-
-    // ─── getCurrentPlayback edge cases ─────────────────────────────────────
 
     describe('getCurrentPlayback edge cases', function () {
 
