@@ -20,7 +20,7 @@ return [
     | Session Configuration
     |--------------------------------------------------------------------------
     |
-    | Configuration for AI-powered listening session agents.
+    | Configuration for AI-powered session agents.
     |
     */
 
