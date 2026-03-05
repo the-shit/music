@@ -18,7 +18,12 @@ class AdaptAgent implements Agent, HasStructuredOutput
 
     public function model(): string
     {
-        return config('ai.session.adapt_model', 'claude-haiku-4-5-20251001');
+        return config('ai.session.adapt_model', 'anthropic/claude-haiku-4.5');
+    }
+
+    public function provider(): string
+    {
+        return 'openrouter';
     }
 
     public function schema(JsonSchema $schema): array
