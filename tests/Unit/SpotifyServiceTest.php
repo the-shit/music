@@ -1,9 +1,11 @@
 <?php
 
+use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
+use Mockery;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -12,202 +14,31 @@ beforeEach(function () {
     Config::set('spotify.client_id', 'test_client_id');
     Config::set('spotify.client_secret', 'test_client_secret');
 
-    $this->tokenFile = sys_get_temp_dir().'/spotify_test_token.json';
     $this->service = new SpotifyService;
 
-    $reflection = new ReflectionClass($this->service);
-    $property = $reflection->getProperty('tokenFile');
-    $property->setAccessible(true);
-    $property->setValue($this->service, $this->tokenFile);
-});
+    $mockAuth = Mockery::mock(SpotifyAuthManager::class)->makePartial();
+    $mockAuth->shouldReceive('getAccessToken')->andReturn('valid_token');
+    $mockAuth->shouldReceive('requireAuth')->andReturn(null);
 
-afterEach(function () {
-    if (file_exists($this->tokenFile)) {
-        unlink($this->tokenFile);
+    $reflection = new ReflectionClass($this->service);
+    foreach (['auth', 'player', 'discovery'] as $prop) {
+        $r = $reflection->getProperty($prop);
+        $r->setAccessible(true);
+        $obj = $r->getValue($this->service);
+        if ($prop === 'auth') {
+            $r->setValue($this->service, $mockAuth);
+        } else {
+            $sub = new ReflectionClass($obj);
+            $subAuth = $sub->getProperty('auth');
+            $subAuth->setAccessible(true);
+            $subAuth->setValue($obj, $mockAuth);
+        }
     }
 });
 
 describe('SpotifyService', function () {
 
-    describe('Authentication', function () {
-
-        it('checks if configured correctly', function () {
-            if (file_exists($this->tokenFile)) {
-                unlink($this->tokenFile);
-            }
-
-            $service = new SpotifyService;
-            $reflection = new ReflectionClass($service);
-
-            $property = $reflection->getProperty('tokenFile');
-            $property->setAccessible(true);
-            $property->setValue($service, $this->tokenFile);
-
-            $tokenProp = $reflection->getProperty('accessToken');
-            $tokenProp->setAccessible(true);
-            $tokenProp->setValue($service, null);
-
-            expect($service->isConfigured())->toBeFalse();
-
-            file_put_contents($this->tokenFile, json_encode([
-                'access_token' => 'test_token',
-                'refresh_token' => 'refresh_token',
-                'expires_at' => time() + 3600,
-            ]));
-
-            $service = new SpotifyService;
-            $reflection = new ReflectionClass($service);
-            $property = $reflection->getProperty('tokenFile');
-            $property->setAccessible(true);
-            $property->setValue($service, $this->tokenFile);
-
-            $method = $reflection->getMethod('loadTokenData');
-            $method->setAccessible(true);
-            $method->invoke($service);
-
-            expect($service->isConfigured())->toBeTrue();
-        });
-
-        it('reports configured when only refresh_token is available', function () {
-            file_put_contents($this->tokenFile, json_encode([
-                'access_token' => null,
-                'refresh_token' => 'refresh_token',
-                'expires_at' => null,
-            ]));
-
-            $service = new SpotifyService;
-            $reflection = new ReflectionClass($service);
-            $property = $reflection->getProperty('tokenFile');
-            $property->setAccessible(true);
-            $property->setValue($service, $this->tokenFile);
-
-            $method = $reflection->getMethod('loadTokenData');
-            $method->setAccessible(true);
-            $method->invoke($service);
-
-            expect($service->isConfigured())->toBeTrue();
-        });
-
-        it('saves cleared state to disk on 4xx refresh failure', function () {
-            file_put_contents($this->tokenFile, json_encode([
-                'access_token' => 'old_token',
-                'refresh_token' => 'revoked_token',
-                'expires_at' => time() - 100,
-            ]));
-
-            Http::fake([
-                'accounts.spotify.com/api/token' => Http::response([
-                    'error' => 'invalid_grant',
-                    'error_description' => 'Refresh token revoked',
-                ], 400),
-            ]);
-
-            $service = new SpotifyService;
-            $reflection = new ReflectionClass($service);
-            $property = $reflection->getProperty('tokenFile');
-            $property->setAccessible(true);
-            $property->setValue($service, $this->tokenFile);
-
-            $method = $reflection->getMethod('loadTokenData');
-            $method->setAccessible(true);
-            $method->invoke($service);
-
-            $refresh = $reflection->getMethod('refreshAccessToken');
-            $refresh->setAccessible(true);
-            $refresh->invoke($service);
-
-            // Verify the cleared state was persisted to disk
-            $tokenData = json_decode(file_get_contents($this->tokenFile), true);
-            expect($tokenData['access_token'])->toBeNull();
-            expect($tokenData['expires_at'])->toBeNull();
-        });
-
-        it('reloads token data from disk', function () {
-            // Start with expired token
-            file_put_contents($this->tokenFile, json_encode([
-                'access_token' => 'old_token',
-                'refresh_token' => 'refresh_token',
-                'expires_at' => time() - 100,
-            ]));
-
-            $service = new SpotifyService;
-            $reflection = new ReflectionClass($service);
-            $property = $reflection->getProperty('tokenFile');
-            $property->setAccessible(true);
-            $property->setValue($service, $this->tokenFile);
-
-            $method = $reflection->getMethod('loadTokenData');
-            $method->setAccessible(true);
-            $method->invoke($service);
-
-            // Simulate external login writing fresh tokens
-            file_put_contents($this->tokenFile, json_encode([
-                'access_token' => 'fresh_external_token',
-                'refresh_token' => 'fresh_refresh_token',
-                'expires_at' => time() + 3600,
-            ]));
-
-            $reload = $reflection->getMethod('reloadFromDisk');
-            $reload->setAccessible(true);
-            $reload->invoke($service);
-
-            $tokenProp = $reflection->getProperty('accessToken');
-            $tokenProp->setAccessible(true);
-            expect($tokenProp->getValue($service))->toBe('fresh_external_token');
-        });
-
-        it('refreshes expired token', function () {
-            file_put_contents($this->tokenFile, json_encode([
-                'access_token' => 'old_token',
-                'refresh_token' => 'refresh_token',
-                'expires_at' => time() - 100,
-            ]));
-
-            Http::fake([
-                'accounts.spotify.com/api/token' => Http::response([
-                    'access_token' => 'new_token',
-                    'expires_in' => 3600,
-                ]),
-            ]);
-
-            $service = new SpotifyService;
-            $reflection = new ReflectionClass($service);
-            $property = $reflection->getProperty('tokenFile');
-            $property->setAccessible(true);
-            $property->setValue($service, $this->tokenFile);
-
-            $method = $reflection->getMethod('loadTokenData');
-            $method->setAccessible(true);
-            $method->invoke($service);
-
-            $method = $reflection->getMethod('ensureValidToken');
-            $method->setAccessible(true);
-            $method->invoke($service);
-
-            $tokenData = json_decode(file_get_contents($this->tokenFile), true);
-            expect($tokenData['access_token'])->toBe('new_token');
-        });
-    });
-
     describe('Playback Control', function () {
-
-        beforeEach(function () {
-            file_put_contents($this->tokenFile, json_encode([
-                'access_token' => 'valid_token',
-                'refresh_token' => 'refresh_token',
-                'expires_at' => time() + 3600,
-            ]));
-
-            $this->service = new SpotifyService;
-            $reflection = new ReflectionClass($this->service);
-            $property = $reflection->getProperty('tokenFile');
-            $property->setAccessible(true);
-            $property->setValue($this->service, $this->tokenFile);
-
-            $method = $reflection->getMethod('loadTokenData');
-            $method->setAccessible(true);
-            $method->invoke($this->service);
-        });
 
         it('searches for tracks', function () {
             Http::fake([
@@ -318,24 +149,6 @@ describe('SpotifyService', function () {
 
     describe('Device Management', function () {
 
-        beforeEach(function () {
-            file_put_contents($this->tokenFile, json_encode([
-                'access_token' => 'valid_token',
-                'refresh_token' => 'refresh_token',
-                'expires_at' => time() + 3600,
-            ]));
-
-            $this->service = new SpotifyService;
-            $reflection = new ReflectionClass($this->service);
-            $property = $reflection->getProperty('tokenFile');
-            $property->setAccessible(true);
-            $property->setValue($this->service, $this->tokenFile);
-
-            $method = $reflection->getMethod('loadTokenData');
-            $method->setAccessible(true);
-            $method->invoke($this->service);
-        });
-
         it('gets available devices', function () {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
@@ -391,24 +204,6 @@ describe('SpotifyService', function () {
 
     describe('Queue Management', function () {
 
-        beforeEach(function () {
-            file_put_contents($this->tokenFile, json_encode([
-                'access_token' => 'valid_token',
-                'refresh_token' => 'refresh_token',
-                'expires_at' => time() + 3600,
-            ]));
-
-            $this->service = new SpotifyService;
-            $reflection = new ReflectionClass($this->service);
-            $property = $reflection->getProperty('tokenFile');
-            $property->setAccessible(true);
-            $property->setValue($this->service, $this->tokenFile);
-
-            $method = $reflection->getMethod('loadTokenData');
-            $method->setAccessible(true);
-            $method->invoke($this->service);
-        });
-
         it('gets queue', function () {
             Http::fake([
                 'api.spotify.com/v1/me/player/queue' => Http::response([
@@ -446,24 +241,6 @@ describe('SpotifyService', function () {
     });
 
     describe('Playlist Management', function () {
-
-        beforeEach(function () {
-            file_put_contents($this->tokenFile, json_encode([
-                'access_token' => 'valid_token',
-                'refresh_token' => 'refresh_token',
-                'expires_at' => time() + 3600,
-            ]));
-
-            $this->service = new SpotifyService;
-            $reflection = new ReflectionClass($this->service);
-            $property = $reflection->getProperty('tokenFile');
-            $property->setAccessible(true);
-            $property->setValue($this->service, $this->tokenFile);
-
-            $method = $reflection->getMethod('loadTokenData');
-            $method->setAccessible(true);
-            $method->invoke($this->service);
-        });
 
         it('gets user playlists', function () {
             Http::fake([
