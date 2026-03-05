@@ -137,14 +137,14 @@ describe('DaemonCommand', function () {
         });
 
         it('uses posix_kill with signal 0 to check process existence', function () {
-            $cmd = 'sleep 60 > /dev/null 2>&1 & echo $!';
-            $pid = (int) shell_exec($cmd);
-            usleep(100000);
+            $proc = proc_open('sleep 60', [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);
+            $status = proc_get_status($proc);
+            $pid = $status['pid'];
 
             expect(posix_kill($pid, 0))->toBeTrue();
 
-            posix_kill($pid, SIGTERM);
-            usleep(100000);
+            proc_terminate($proc, SIGTERM);
+            proc_close($proc);
 
             expect(@posix_kill($pid, 0))->toBeFalse();
         });
@@ -204,14 +204,14 @@ describe('DaemonCommand', function () {
     describe('graceful shutdown', function () {
 
         it('SIGTERM stops processes gracefully', function () {
-            $cmd = 'sleep 60 > /dev/null 2>&1 & echo $!';
-            $pid = (int) shell_exec($cmd);
-            usleep(100000);
+            $proc = proc_open('sleep 60', [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);
+            $status = proc_get_status($proc);
+            $pid = $status['pid'];
 
             expect(posix_kill($pid, 0))->toBeTrue();
 
-            posix_kill($pid, SIGTERM);
-            usleep(100000);
+            proc_terminate($proc, SIGTERM);
+            proc_close($proc);
 
             expect(@posix_kill($pid, 0))->toBeFalse();
         });
