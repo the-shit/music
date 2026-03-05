@@ -1,9 +1,11 @@
 <?php
 
+use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
+use Mockery;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -12,28 +14,25 @@ beforeEach(function () {
     Config::set('spotify.client_id', 'test_client_id');
     Config::set('spotify.client_secret', 'test_client_secret');
 
-    $this->tokenFile = sys_get_temp_dir().'/spotify_discovery_test_token.json';
-
-    file_put_contents($this->tokenFile, json_encode([
-        'access_token' => 'valid_token',
-        'refresh_token' => 'refresh_token',
-        'expires_at' => time() + 3600,
-    ]));
-
     $this->service = new SpotifyService;
+
+    $mockAuth = Mockery::mock(SpotifyAuthManager::class)->makePartial();
+    $mockAuth->shouldReceive('getAccessToken')->andReturn('valid_token');
+    $mockAuth->shouldReceive('requireAuth')->andReturn(null);
+
     $reflection = new ReflectionClass($this->service);
-    $property = $reflection->getProperty('tokenFile');
-    $property->setAccessible(true);
-    $property->setValue($this->service, $this->tokenFile);
-
-    $method = $reflection->getMethod('loadTokenData');
-    $method->setAccessible(true);
-    $method->invoke($this->service);
-});
-
-afterEach(function () {
-    if (file_exists($this->tokenFile)) {
-        unlink($this->tokenFile);
+    foreach (['auth', 'player', 'discovery'] as $prop) {
+        $r = $reflection->getProperty($prop);
+        $r->setAccessible(true);
+        $obj = $r->getValue($this->service);
+        if ($prop === 'auth') {
+            $r->setValue($this->service, $mockAuth);
+        } else {
+            $sub = new ReflectionClass($obj);
+            $subAuth = $sub->getProperty('auth');
+            $subAuth->setAccessible(true);
+            $subAuth->setValue($obj, $mockAuth);
+        }
     }
 });
 
