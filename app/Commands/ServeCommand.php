@@ -36,9 +36,15 @@ class ServeCommand extends Command
         $this->info('Ctrl+C to stop');
         $this->newLine();
 
+        // Clean up handler script on exit
+        register_shutdown_function(function () use ($handlerScript) {
+            @unlink($handlerScript);
+        });
+
         // Start the PHP built-in server
-        $command = "php -S {$host}:{$port} {$handlerScript}";
-        passthru($command);
+        $listen = escapeshellarg("{$host}:{$port}");
+        $router = escapeshellarg($handlerScript);
+        passthru("php -S {$listen} {$router}");
 
         return self::SUCCESS;
     }
@@ -46,11 +52,9 @@ class ServeCommand extends Command
     private function createHandler(): string
     {
         $scriptPath = sys_get_temp_dir().'/spotify_server.php';
-        $bootstrapPath = base_path();
         $configDir = config('spotify.config_dir');
         $tokenPath = config('spotify.token_path');
-        $clientId = config('spotify.client_id');
-        $clientSecret = config('spotify.client_secret');
+        $credentialsPath = $configDir.'/credentials.json';
 
         $script = <<<'PHP'
 <?php
@@ -69,6 +73,17 @@ if ($uri === '/' || $uri === '/health') {
 
 // Slack slash command handler
 if (str_starts_with($uri, '/slack/queue') && $method === 'POST') {
+    // Verify Slack signing token if configured
+    $slackToken = getSlackVerificationToken();
+    if ($slackToken !== null) {
+        $requestToken = $_POST['token'] ?? '';
+        if (!hash_equals($slackToken, $requestToken)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Invalid verification token']);
+            exit;
+        }
+    }
+
     $text = $_POST['text'] ?? '';
     $userName = $_POST['user_name'] ?? 'someone';
     $responseUrl = $_POST['response_url'] ?? null;
@@ -148,6 +163,17 @@ exit;
 
 // --- Helper functions ---
 
+function getCredentials(): array {
+    $credentialsPath = 'CREDENTIALS_PATH_PLACEHOLDER';
+    if (!file_exists($credentialsPath)) return [];
+    return json_decode(file_get_contents($credentialsPath), true) ?? [];
+}
+
+function getSlackVerificationToken(): ?string {
+    $creds = getCredentials();
+    return $creds['slack_verification_token'] ?? null;
+}
+
 function getTokenData(): ?array {
     $tokenPath = 'TOKEN_PATH_PLACEHOLDER';
     if (!file_exists($tokenPath)) return null;
@@ -155,8 +181,9 @@ function getTokenData(): ?array {
 }
 
 function refreshToken(array $tokenData): ?array {
-    $clientId = 'CLIENT_ID_PLACEHOLDER';
-    $clientSecret = 'CLIENT_SECRET_PLACEHOLDER';
+    $creds = getCredentials();
+    $clientId = $creds['client_id'] ?? '';
+    $clientSecret = $creds['client_secret'] ?? '';
 
     $ch = curl_init('https://accounts.spotify.com/api/token');
     curl_setopt_array($ch, [
@@ -312,10 +339,9 @@ function getCurrentPlayback(): ?array {
 }
 PHP;
 
-        // Replace placeholders with actual values
+        // Replace placeholders with paths only — no secrets in the temp file
         $script = str_replace('TOKEN_PATH_PLACEHOLDER', $tokenPath, $script);
-        $script = str_replace('CLIENT_ID_PLACEHOLDER', $clientId, $script);
-        $script = str_replace('CLIENT_SECRET_PLACEHOLDER', $clientSecret, $script);
+        $script = str_replace('CREDENTIALS_PATH_PLACEHOLDER', $credentialsPath, $script);
         $script = str_replace('CONFIG_DIR_PLACEHOLDER', $configDir, $script);
 
         file_put_contents($scriptPath, $script);
