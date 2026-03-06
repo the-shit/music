@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Agents\AdaptAgent;
 use App\Agents\CuratorAgent;
 use App\Agents\IntentParserAgent;
 
@@ -32,7 +31,7 @@ class SessionService
         $parser = new IntentParserAgent;
         $response = $parser->prompt($prompt);
         /** @var array{phases: array<array{name: string, mood: string, duration_minutes: int, energy: float, valence: float, tempo: int, description: string}>, total_duration: int, playlist_name: string} $plan */
-        $plan = json_decode($response->text, true);
+        $plan = self::parseJson($response->text);
 
         $this->sessionPlan = $plan;
         $this->phases = $plan['phases'];
@@ -122,7 +121,7 @@ class SessionService
         $response = $curator->prompt($prompt);
 
         /** @var array{playlist_name: string, playlist_description: string, phases: array<array{name: string, track_uris: string[], dj_note: string}>} */
-        return json_decode($response->text, true);
+        return self::parseJson($response->text);
     }
 
     /**
@@ -205,6 +204,22 @@ class SessionService
     public function getSessionPlan(): array
     {
         return $this->sessionPlan;
+    }
+
+    private static function parseJson(string $text): array
+    {
+        // Strip markdown code fences if present
+        $text = preg_replace('/^```(?:json)?\s*/m', '', $text);
+        $text = preg_replace('/\s*```\s*$/m', '', $text);
+        $text = trim($text);
+
+        $decoded = json_decode($text, true);
+
+        if (! is_array($decoded)) {
+            throw new \RuntimeException('AI response was not valid JSON: '.substr($text, 0, 200));
+        }
+
+        return $decoded;
     }
 
     private function phaseToAudioFeatures(array $phase): array

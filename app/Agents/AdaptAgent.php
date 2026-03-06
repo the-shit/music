@@ -2,18 +2,26 @@
 
 namespace App\Agents;
 
-use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Agent;
-use Laravel\Ai\Contracts\HasStructuredOutput;
 use Laravel\Ai\Promptable;
 
-class AdaptAgent implements Agent, HasStructuredOutput
+class AdaptAgent implements Agent
 {
     use Promptable;
 
     public function instructions(): string
     {
-        return 'You analyze music listening behavior. Given the current session plan, playback events (skips, completions), and remaining phases, decide if adjustments are needed. Be concise.';
+        return <<<'INSTRUCTIONS'
+        You analyze music listening behavior. Given the current session plan, playback events (skips, completions), and remaining phases, decide if adjustments are needed. Be concise.
+
+        ## Output Format
+
+        Respond with ONLY valid JSON, no markdown fencing, no explanation. Use this exact structure:
+
+        {"should_adjust":false,"reasoning":"Brief explanation","adjusted_phases":[{"name":"Phase","energy":0.5,"valence":0.5,"tempo":120}]}
+
+        Only populate adjusted_phases when should_adjust is true.
+        INSTRUCTIONS;
     }
 
     public function model(): string
@@ -24,25 +32,5 @@ class AdaptAgent implements Agent, HasStructuredOutput
     public function provider(): string
     {
         return 'openrouter';
-    }
-
-    public function schema(JsonSchema $schema): array
-    {
-        return [
-            'should_adjust' => $schema->boolean()
-                ->description('Whether remaining phases should be adjusted')
-                ->required(),
-            'reasoning' => $schema->string()
-                ->description('Brief explanation for the decision')
-                ->required(),
-            'adjusted_phases' => $schema->array()
-                ->items($schema->object([
-                    'name' => $schema->string()->required(),
-                    'energy' => $schema->number()->required(),
-                    'valence' => $schema->number()->required(),
-                    'tempo' => $schema->integer()->required(),
-                ]))
-                ->description('Replacement phases when adjustment is needed'),
-        ];
     }
 }
