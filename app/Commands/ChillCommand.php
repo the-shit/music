@@ -10,7 +10,9 @@ class ChillCommand extends Command
 {
     use RequiresSpotifyConfig;
 
-    protected $signature = 'chill {--json : Output as JSON}';
+    protected $signature = 'chill
+        {--limit=10 : Number of tracks to queue}
+        {--json : Output as JSON}';
 
     protected $description = 'Queue chill relaxing music';
 
@@ -29,7 +31,7 @@ class ChillCommand extends Command
                 'soft jazz ambient relaxation',
             ];
 
-            $tracks = $this->gatherTracks($spotify, $queries, 10);
+            $tracks = $this->gatherTracks($spotify, $queries, (int) $this->option('limit'));
 
             if (empty($tracks)) {
                 $this->warn('No chill tracks found.');

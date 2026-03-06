@@ -12,6 +12,7 @@ class FlowCommand extends Command
 
     protected $signature = 'flow
         {--duration=60 : Approximate session duration in minutes}
+        {--limit= : Number of tracks to queue (overrides --duration)}
         {--json : Output as JSON}';
 
     protected $description = 'Queue focus/flow state music for deep work';
@@ -24,9 +25,10 @@ class FlowCommand extends Command
 
         $spotify = app(SpotifyService::class);
         $duration = (int) $this->option('duration');
+        $limit = $this->option('limit');
 
-        // ~3.5 min average per track
-        $trackCount = max(5, (int) ceil($duration / 3.5));
+        // Use explicit limit if provided, otherwise calculate from duration (~3.5 min avg per track)
+        $trackCount = $limit !== null ? (int) $limit : max(5, (int) ceil($duration / 3.5));
 
         try {
             $queries = [
