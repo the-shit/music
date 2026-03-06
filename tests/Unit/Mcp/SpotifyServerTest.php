@@ -12,6 +12,9 @@ use App\Mcp\Tools\QueueShowTool;
 use App\Mcp\Tools\RepeatTool;
 use App\Mcp\Tools\ResumeTool;
 use App\Mcp\Tools\SearchTool;
+use App\Mcp\Tools\SessionAdjustTool;
+use App\Mcp\Tools\SessionStartTool;
+use App\Mcp\Tools\SessionStatusTool;
 use App\Mcp\Tools\ShuffleTool;
 use App\Mcp\Tools\SkipTool;
 use App\Mcp\Tools\VolumeTool;
@@ -48,7 +51,10 @@ describe('SpotifyServer', function () {
             ->toContain(SearchTool::class)
             ->toContain(DevicesTool::class)
             ->toContain(ShuffleTool::class)
-            ->toContain(RepeatTool::class);
+            ->toContain(RepeatTool::class)
+            ->toContain(SessionStartTool::class)
+            ->toContain(SessionStatusTool::class)
+            ->toContain(SessionAdjustTool::class);
     });
 
     it('registers all expected resource classes', function () {
@@ -65,7 +71,7 @@ describe('SpotifyServer', function () {
         $property = $reflection->getProperty('tools');
         $tools = $property->getDefaultValue();
 
-        expect($tools)->toHaveCount(12);
+        expect($tools)->toHaveCount(15);
     });
 
     it('registers exactly 2 resources', function () {
@@ -179,6 +185,32 @@ describe('Tool schema definitions', function () {
 
         $required = $array['inputSchema']['required'] ?? [];
         expect($required)->toBeEmpty();
+    });
+
+    it('SessionStartTool schema includes required prompt and optional duration', function () {
+        $tool = app(SessionStartTool::class);
+        $array = $tool->toArray();
+
+        expect($array['inputSchema']['properties'])->toHaveKey('prompt');
+        expect($array['inputSchema']['properties'])->toHaveKey('duration');
+        expect($array['inputSchema']['required'] ?? [])->toContain('prompt');
+        expect($array['inputSchema']['required'] ?? [])->not->toContain('duration');
+    });
+
+    it('SessionStatusTool schema has no required inputs', function () {
+        $tool = app(SessionStatusTool::class);
+        $array = $tool->toArray();
+
+        $required = $array['inputSchema']['required'] ?? [];
+        expect($required)->toBeEmpty();
+    });
+
+    it('SessionAdjustTool schema includes required feedback field', function () {
+        $tool = app(SessionAdjustTool::class);
+        $array = $tool->toArray();
+
+        expect($array['inputSchema']['properties'])->toHaveKey('feedback');
+        expect($array['inputSchema']['required'] ?? [])->toContain('feedback');
     });
 
 });

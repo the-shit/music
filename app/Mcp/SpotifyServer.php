@@ -13,6 +13,9 @@ use App\Mcp\Tools\QueueShowTool;
 use App\Mcp\Tools\RepeatTool;
 use App\Mcp\Tools\ResumeTool;
 use App\Mcp\Tools\SearchTool;
+use App\Mcp\Tools\SessionAdjustTool;
+use App\Mcp\Tools\SessionStartTool;
+use App\Mcp\Tools\SessionStatusTool;
 use App\Mcp\Tools\ShuffleTool;
 use App\Mcp\Tools\SkipTool;
 use App\Mcp\Tools\VolumeTool;
@@ -39,6 +42,9 @@ class SpotifyServer extends Server
         DevicesTool::class,
         ShuffleTool::class,
         RepeatTool::class,
+        SessionStartTool::class,
+        SessionStatusTool::class,
+        SessionAdjustTool::class,
     ];
 
     protected array $resources = [
