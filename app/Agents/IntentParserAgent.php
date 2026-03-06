@@ -2,12 +2,10 @@
 
 namespace App\Agents;
 
-use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Agent;
-use Laravel\Ai\Contracts\HasStructuredOutput;
 use Laravel\Ai\Promptable;
 
-class IntentParserAgent implements Agent, HasStructuredOutput
+class IntentParserAgent implements Agent
 {
     use Promptable;
 
@@ -49,26 +47,13 @@ class IntentParserAgent implements Agent, HasStructuredOutput
         5. Energy, valence, and tempo should reflect the described mood and create smooth transitions between phases
         6. Generate a creative but descriptive playlist name based on the session intent
         7. The total_duration should equal the sum of all phase durations
-        INSTRUCTIONS;
-    }
 
-    public function schema(JsonSchema $schema): array
-    {
-        return [
-            'phases' => $schema->array()->items(
-                $schema->object([
-                    'name' => $schema->string()->description('Phase name, e.g. "Warm Up", "Peak Energy"')->required(),
-                    'mood' => $schema->string()->description('Maps to an autopilot preset name: chill, flow, hype, focus, party, upbeat, melancholy, ambient, workout, sleep')->required(),
-                    'duration_minutes' => $schema->integer()->description('Duration of this phase in minutes')->required(),
-                    'energy' => $schema->number()->description('Target energy level from 0.0 to 1.0')->required(),
-                    'valence' => $schema->number()->description('Target valence (positivity) from 0.0 to 1.0')->required(),
-                    'tempo' => $schema->integer()->description('Target tempo in BPM')->required(),
-                    'description' => $schema->string()->description('Brief vibe description for this phase')->required(),
-                ])
-            )->required(),
-            'total_duration' => $schema->integer()->description('Total session duration in minutes, sum of all phase durations')->required(),
-            'playlist_name' => $schema->string()->description('Creative playlist name based on the session intent')->required(),
-        ];
+        ## Output Format
+
+        Respond with ONLY valid JSON, no markdown fencing, no explanation. Use this exact structure:
+
+        {"phases":[{"name":"Phase Name","mood":"preset_name","duration_minutes":15,"energy":0.5,"valence":0.5,"tempo":120,"description":"Brief vibe"}],"total_duration":60,"playlist_name":"Creative Name"}
+        INSTRUCTIONS;
     }
 
     public function model(): string
