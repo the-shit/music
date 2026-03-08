@@ -63,7 +63,7 @@ if (! function_exists('mb_strimwidth')) {
 |
 */
 
-uses(Tests\TestCase::class)->in('Feature');
+uses(Tests\TestCase::class)->in('Feature', 'Unit/Agents');
 
 /*
 |--------------------------------------------------------------------------
