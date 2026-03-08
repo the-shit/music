@@ -7,5 +7,7 @@ return [
     'providers' => [
         App\Providers\AppServiceProvider::class,
         App\Providers\McpServiceProvider::class,
+        Prism\Prism\PrismServiceProvider::class,
+        Laravel\Ai\AiServiceProvider::class,
     ],
 ];

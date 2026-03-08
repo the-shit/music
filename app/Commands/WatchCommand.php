@@ -84,6 +84,7 @@ class WatchCommand extends Command
         if ($trackName && $currentUri !== $this->lastTrackUri) {
             $event = [
                 'type' => 'track_changed',
+                'uri' => $currentUri,
                 'track' => $trackName,
                 'artist' => $current['artist'] ?? 'Unknown',
                 'album' => $current['album'] ?? 'Unknown',
