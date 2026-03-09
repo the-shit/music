@@ -77,3 +77,54 @@ it('accepts all valid mood presets', function () {
         expect(array_key_exists($mood, config('autopilot.mood_presets')))->toBeTrue();
     }
 });
+
+it('falls back to quick session when no OpenRouter key', function () {
+    config(['ai.providers.openrouter.key' => null]);
+
+    $mock = Mockery::mock(SpotifyService::class);
+    $mock->shouldReceive('isConfigured')->andReturn(true);
+    $mock->shouldReceive('getActiveDevice')->andReturn(['id' => 'device-1', 'name' => 'Test']);
+    $mock->shouldReceive('getSmartRecommendations')->andReturn([
+        ['uri' => 'spotify:track:abc', 'name' => 'Track 1', 'artist' => 'Artist 1'],
+    ]);
+    $mock->shouldReceive('addToQueue')->once();
+    $this->app->instance(SpotifyService::class, $mock);
+
+    $this->artisan('session', ['description' => 'chill vibes for studying'])
+        ->assertSuccessful();
+});
+
+it('extracts mood from description keywords', function () {
+    $command = new \App\Commands\SessionCommand;
+    $method = new ReflectionMethod($command, 'extractMoodFallback');
+    $method->setAccessible(true);
+
+    expect($method->invoke($command, 'chill vibes for the evening'))->toBe('chill');
+    expect($method->invoke($command, 'pump me up for the gym'))->toBe('hype');
+    expect($method->invoke($command, 'deep work concentration'))->toBe('flow');
+    expect($method->invoke($command, 'time for bed and sleep'))->toBe('sleep');
+    expect($method->invoke($command, 'lets dance and party'))->toBe('party');
+    expect($method->invoke($command, 'feeling sad and moody'))->toBe('melancholy');
+    expect($method->invoke($command, 'something random and unknown'))->toBe('flow'); // default
+});
+
+it('shows zero tracks warning on empty results', function () {
+    $mock = Mockery::mock(SpotifyService::class);
+    $mock->shouldReceive('isConfigured')->andReturn(true);
+    $mock->shouldReceive('getActiveDevice')->andReturn(['id' => 'device-1', 'name' => 'Test']);
+    $mock->shouldReceive('getSmartRecommendations')->andReturn([]);
+    $this->app->instance(SpotifyService::class, $mock);
+
+    $this->artisan('session', ['--mood' => 'ambient', '--duration' => '10'])
+        ->assertFailed();
+});
+
+it('renders energy bar correctly', function () {
+    $command = new \App\Commands\SessionCommand;
+    $method = new ReflectionMethod($command, 'energyBar');
+    $method->setAccessible(true);
+
+    expect($method->invoke($command, 1.0))->toContain('100%');
+    expect($method->invoke($command, 0.0))->toContain('0%');
+    expect($method->invoke($command, 0.5))->toContain('50%');
+});
