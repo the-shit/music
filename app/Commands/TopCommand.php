@@ -6,6 +6,10 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class TopCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -18,13 +22,12 @@ class TopCommand extends Command
 
     protected $description = 'Show your top tracks or artists';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
 
-        $spotify = app(SpotifyService::class);
         $type = $this->option('type');
         $range = $this->option('range');
         $limit = (int) $this->option('limit');
@@ -39,13 +42,13 @@ class TopCommand extends Command
                     return self::SUCCESS;
                 }
 
-                $this->info('🎤 Your Top Artists:');
+                info('🎤 Your Top Artists:');
                 $this->newLine();
 
                 foreach ($items as $i => $artist) {
                     $genres = implode(', ', array_slice($artist['genres'], 0, 3));
                     $this->line('  '.($i + 1).". <fg=cyan>{$artist['name']}</>");
-                    if ($genres) {
+                    if ($genres !== '' && $genres !== '0') {
                         $this->line("     Genres: {$genres}");
                     }
                 }
@@ -58,7 +61,7 @@ class TopCommand extends Command
                     return self::SUCCESS;
                 }
 
-                $this->info('🎵 Your Top Tracks:');
+                info('🎵 Your Top Tracks:');
                 $this->newLine();
 
                 foreach ($items as $i => $track) {
@@ -67,13 +70,13 @@ class TopCommand extends Command
             }
 
             if (empty($items)) {
-                $this->warn('No data found for this time range.');
+                warning('No data found for this time range.');
             }
 
             return self::SUCCESS;
 
         } catch (\Exception $e) {
-            $this->error('❌ '.$e->getMessage());
+            error('❌ '.$e->getMessage());
 
             return self::FAILURE;
         }

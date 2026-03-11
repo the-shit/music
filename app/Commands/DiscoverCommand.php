@@ -6,6 +6,10 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class DiscoverCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -18,13 +22,11 @@ class DiscoverCommand extends Command
 
     protected $description = 'AI-friendly search combining keywords with your listening patterns';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
         $query = $this->argument('query');
         $seedFrom = $this->option('seed-from');
         $limit = (int) $this->option('limit');
@@ -44,11 +46,11 @@ class DiscoverCommand extends Command
                 return self::SUCCESS;
             }
 
-            $this->info("🔍 Discover: {$enrichedQuery}");
+            info("🔍 Discover: {$enrichedQuery}");
             $this->newLine();
 
             if (empty($tracks)) {
-                $this->warn('No tracks found. Try different keywords.');
+                warning('No tracks found. Try different keywords.');
 
                 return self::SUCCESS;
             }
@@ -60,7 +62,7 @@ class DiscoverCommand extends Command
             return self::SUCCESS;
 
         } catch (\Exception $e) {
-            $this->error('❌ '.$e->getMessage());
+            error('❌ '.$e->getMessage());
 
             return self::FAILURE;
         }
@@ -79,7 +81,7 @@ class DiscoverCommand extends Command
                 return $query.' '.implode(' ', $artists);
             }
 
-            if (! empty($artists)) {
+            if ($artists !== []) {
                 $artistNames = collect($artists)->pluck('name')->take(2)->toArray();
 
                 return $query.' '.implode(' ', $artistNames);

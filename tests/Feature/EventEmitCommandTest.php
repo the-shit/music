@@ -2,9 +2,9 @@
 
 use Illuminate\Support\Facades\File;
 
-describe('EventEmitCommand', function () {
+describe('EventEmitCommand', function (): void {
 
-    beforeEach(function () {
+    beforeEach(function (): void {
         // Use unique file per test process to avoid parallel test interference
         $this->testId = uniqid('test_', true);
         $this->eventsFile = sys_get_temp_dir().'/spotify-events-'.$this->testId.'.jsonl';
@@ -16,16 +16,16 @@ describe('EventEmitCommand', function () {
         config(['app.events_file' => $this->eventsFile]);
     });
 
-    afterEach(function () {
+    afterEach(function (): void {
         // Clean up events file after each test
         if (file_exists($this->eventsFile)) {
             unlink($this->eventsFile);
         }
     });
 
-    describe('event:emit command', function () {
+    describe('event:emit command', function (): void {
 
-        it('emits an event without data', function () {
+        it('emits an event without data', function (): void {
             $this->artisan('event:emit', ['event' => 'test.event'])
                 ->expectsOutputToContain('Event emitted: spotify.test.event')
                 ->assertExitCode(0);
@@ -48,7 +48,7 @@ describe('EventEmitCommand', function () {
                 ->and($eventData)->toHaveKey('timestamp');
         });
 
-        it('emits an event with JSON data', function () {
+        it('emits an event with JSON data', function (): void {
             $jsonData = json_encode(['key' => 'value', 'number' => 42]);
 
             $this->artisan('event:emit', ['event' => 'data.event', 'data' => $jsonData])
@@ -62,7 +62,7 @@ describe('EventEmitCommand', function () {
             expect($eventData['data'])->toBe(['key' => 'value', 'number' => 42]);
         });
 
-        it('emits an event with complex nested data', function () {
+        it('emits an event with complex nested data', function (): void {
             $complexData = json_encode([
                 'user' => ['name' => 'Test User', 'id' => 123],
                 'tracks' => [['id' => 1], ['id' => 2]],
@@ -83,9 +83,9 @@ describe('EventEmitCommand', function () {
 
     });
 
-    describe('directory creation', function () {
+    describe('directory creation', function (): void {
 
-        it('creates storage directory if it does not exist', function () {
+        it('creates storage directory if it does not exist', function (): void {
             // Use a unique subdirectory within storage for this test
             $testDir = base_path('storage/test-emit-'.uniqid());
             $testEventsFile = $testDir.'/events.jsonl';
@@ -116,7 +116,7 @@ describe('EventEmitCommand', function () {
             }
         });
 
-        it('works when storage directory already exists', function () {
+        it('works when storage directory already exists', function (): void {
             $storageDir = base_path('storage');
 
             // Ensure directory exists
@@ -133,9 +133,9 @@ describe('EventEmitCommand', function () {
 
     });
 
-    describe('file append functionality', function () {
+    describe('file append functionality', function (): void {
 
-        it('appends multiple events to the same file', function () {
+        it('appends multiple events to the same file', function (): void {
             $this->artisan('event:emit', ['event' => 'first'])
                 ->assertExitCode(0);
 
@@ -150,13 +150,13 @@ describe('EventEmitCommand', function () {
 
             expect($lines)->toHaveCount(3);
 
-            $events = array_map(fn ($line) => json_decode($line, true), $lines);
+            $events = array_map(fn ($line): mixed => json_decode($line, true), $lines);
             expect($events[0]['event'])->toBe('spotify.first');
             expect($events[1]['event'])->toBe('spotify.second');
             expect($events[2]['event'])->toBe('spotify.third');
         });
 
-        it('appends to existing file content', function () {
+        it('appends to existing file content', function (): void {
             // Create directory if it doesn't exist
             $storageDir = dirname($this->eventsFile);
             if (! is_dir($storageDir)) {
@@ -189,9 +189,9 @@ describe('EventEmitCommand', function () {
 
     });
 
-    describe('JSON output format', function () {
+    describe('JSON output format', function (): void {
 
-        it('outputs valid JSON Lines format', function () {
+        it('outputs valid JSON Lines format', function (): void {
             $this->artisan('event:emit', ['event' => 'json.test'])
                 ->assertExitCode(0);
 
@@ -205,7 +205,7 @@ describe('EventEmitCommand', function () {
             }
         });
 
-        it('includes component field set to spotify', function () {
+        it('includes component field set to spotify', function (): void {
             $this->artisan('event:emit', ['event' => 'component.test'])
                 ->assertExitCode(0);
 
@@ -216,7 +216,7 @@ describe('EventEmitCommand', function () {
             expect($eventData['component'])->toBe('spotify');
         });
 
-        it('prefixes event name with spotify.', function () {
+        it('prefixes event name with spotify.', function (): void {
             $this->artisan('event:emit', ['event' => 'my.custom.event'])
                 ->assertExitCode(0);
 
@@ -227,7 +227,7 @@ describe('EventEmitCommand', function () {
             expect($eventData['event'])->toBe('spotify.my.custom.event');
         });
 
-        it('includes ISO 8601 timestamp', function () {
+        it('includes ISO 8601 timestamp', function (): void {
             $this->artisan('event:emit', ['event' => 'timestamp.test'])
                 ->assertExitCode(0);
 
@@ -242,7 +242,7 @@ describe('EventEmitCommand', function () {
             expect($timestamp)->not->toBeFalse();
         });
 
-        it('handles empty data as empty array', function () {
+        it('handles empty data as empty array', function (): void {
             $this->artisan('event:emit', ['event' => 'empty.data'])
                 ->assertExitCode(0);
 
@@ -253,7 +253,7 @@ describe('EventEmitCommand', function () {
             expect($eventData['data'])->toBe([]);
         });
 
-        it('preserves data types in JSON', function () {
+        it('preserves data types in JSON', function (): void {
             $jsonData = json_encode([
                 'string' => 'hello',
                 'integer' => 42,

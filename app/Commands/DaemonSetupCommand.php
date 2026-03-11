@@ -15,7 +15,7 @@ class DaemonSetupCommand extends Command
 
     protected $description = 'Set up the Spotify daemon with all dependencies';
 
-    public function handle()
+    public function handle(): int
     {
         $this->banner();
 
@@ -55,7 +55,7 @@ class DaemonSetupCommand extends Command
 
         // Check sox
         $sox = trim((string) shell_exec('which play 2>/dev/null'));
-        if (! $sox) {
+        if ($sox === '' || $sox === '0') {
             warning('❌ sox not found (required for audio playback)');
             $issues[] = 'sox';
         } else {
@@ -64,14 +64,14 @@ class DaemonSetupCommand extends Command
 
         // Check spotifyd
         $spotifyd = trim((string) shell_exec('which spotifyd 2>/dev/null'));
-        if (! $spotifyd) {
+        if ($spotifyd === '' || $spotifyd === '0') {
             warning('❌ spotifyd not found (required for Spotify Connect)');
             $issues[] = 'spotifyd';
         } else {
             info('✅ spotifyd installed');
         }
 
-        if (empty($issues)) {
+        if ($issues === []) {
             return null;
         }
 
@@ -116,7 +116,7 @@ class DaemonSetupCommand extends Command
                 $check = trim((string) shell_exec('which '.$dep.' 2>/dev/null'));
             }
 
-            if (! $check) {
+            if ($check === '' || $check === '0') {
                 error("❌ Failed to install {$dep}");
 
                 return self::FAILURE;

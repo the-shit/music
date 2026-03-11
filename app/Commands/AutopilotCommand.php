@@ -7,6 +7,7 @@ use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\warning;
 
@@ -34,8 +35,12 @@ class AutopilotCommand extends Command
     /** Tracks older than this many seconds can be re-queued */
     private const DEDUP_WINDOW_SECONDS = 1800; // 30 minutes
 
-    public function handle(): int
+    private SpotifyService $spotify;
+
+    public function handle(SpotifyService $spotify): int
     {
+        $this->spotify = $spotify;
+
         if ($this->option('install')) {
             return $this->installDaemon();
         }
@@ -56,8 +61,6 @@ class AutopilotCommand extends Command
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
         $threshold = max(1, (int) $this->option('threshold'));
         $mood = $this->resolveMood((string) $this->option('mood'));
         $interval = max(1, (int) $this->option('interval'));
@@ -75,13 +78,13 @@ class AutopilotCommand extends Command
         $pipe = popen($cmd, 'r');
 
         if (! $pipe) {
-            $this->error('Failed to open watch pipe.');
+            error('Failed to open watch pipe.');
 
             return self::FAILURE;
         }
 
         if (function_exists('pcntl_signal')) {
-            pcntl_signal(SIGINT, function () use ($pipe) {
+            pcntl_signal(SIGINT, function () use ($pipe): void {
                 pclose($pipe);
                 $this->newLine();
                 info('Autopilot disengaged.');
@@ -95,8 +98,10 @@ class AutopilotCommand extends Command
             }
 
             $line = fgets($pipe);
-
-            if ($line === false || trim($line) === '') {
+            if ($line === false) {
+                continue;
+            }
+            if (trim($line) === '') {
                 continue;
             }
 
@@ -114,7 +119,7 @@ class AutopilotCommand extends Command
             $this->line("Track changed: <fg=cyan>{$event['track']}</> by {$event['artist']}");
 
             try {
-                $this->maybeRefill($spotify, $threshold, $mood);
+                $this->maybeRefill($this->spotify, $threshold, $mood);
             } catch (\Exception $e) {
                 warning("Refill error: {$e->getMessage()}");
             }
@@ -130,7 +135,7 @@ class AutopilotCommand extends Command
     private function installDaemon(): int
     {
         if (PHP_OS_FAMILY !== 'Darwin') {
-            $this->error('LaunchAgent is only supported on macOS');
+            error('LaunchAgent is only supported on macOS');
 
             return self::FAILURE;
         }
@@ -330,7 +335,7 @@ XML;
 
         $pid = trim((string) shell_exec("pgrep -f 'autopilot' 2>/dev/null | head -1"));
 
-        if (! $pid) {
+        if ($pid === '' || $pid === '0') {
             return null;
         }
 
@@ -350,7 +355,7 @@ XML;
 
         $output = trim((string) shell_exec('launchctl list '.self::LAUNCH_AGENT_LABEL.' 2>&1'));
 
-        return ! empty($output) && ! str_contains($output, 'Could not find');
+        return $output !== '' && $output !== '0' && ! str_contains($output, 'Could not find');
     }
 
     // ── Queue logic ───────────────────────────────────────────────
@@ -381,7 +386,7 @@ XML;
         $cutoff = time() - self::DEDUP_WINDOW_SECONDS;
         $this->sessionUriTimestamps = array_filter(
             $this->sessionUriTimestamps,
-            fn (int $ts) => $ts > $cutoff
+            fn (int $ts): bool => $ts > $cutoff
         );
 
         // Seed from recent history for variety
@@ -409,7 +414,7 @@ XML;
         $recommendations = $spotify->getRecommendations($seedTrackIds, $seedArtistIds, $needed + 10, $moodParams, $currentArtist);
 
         // If still empty (unlikely now), fall back to improved related tracks
-        if (empty($recommendations) && $currentArtist) {
+        if ($recommendations === [] && $currentArtist) {
             $this->line('  <fg=gray>Smart discovery empty — falling back to related tracks</>');
             $recommendations = $spotify->getRelatedTracks($currentArtist, $current['name'] ?? '', $needed + 10);
         }
@@ -483,10 +488,8 @@ XML;
         }
 
         foreach ($recentlyPlayed as $recent) {
-            if (count($seedTrackIds) < 3 && preg_match('/spotify:track:(.+)/', $recent['uri'] ?? '', $m)) {
-                if (! in_array($m[1], $seedTrackIds, true)) {
-                    $seedTrackIds[] = $m[1];
-                }
+            if (count($seedTrackIds) < 3 && preg_match('/spotify:track:(.+)/', $recent['uri'] ?? '', $m) && ! in_array($m[1], $seedTrackIds, true)) {
+                $seedTrackIds[] = $m[1];
             }
 
             if (count($seedArtistIds) < 5 && ! empty($recent['artist_id'])) {

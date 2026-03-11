@@ -29,8 +29,8 @@ class SessionAdjustTool extends Tool
 
     public function handle(Request $request, SpotifyService $spotify): Response
     {
-        return $this->withAuthHandling(function () use ($request, $spotify) {
-            $state = self::loadSessionState();
+        return $this->withAuthHandling(function () use ($request, $spotify): \Laravel\Mcp\Response {
+            $state = $this->loadSessionState();
 
             if (! $state) {
                 return Response::error('No active session. Use session_start to begin one.');
@@ -45,12 +45,12 @@ class SessionAdjustTool extends Tool
                 ? "{$playback['track']} by {$playback['artist']}"
                 : 'Unknown';
 
-            $prompt = "Current session: " . ($state['plan']['playlist_name'] ?? 'Unknown') . "\n"
-                . "Now playing: {$nowPlaying}\n"
-                . "Elapsed: {$elapsed} min, Remaining: ~{$remaining} min\n"
-                . "Original phases: " . json_encode($state['plan']['phases'] ?? []) . "\n"
-                . "User feedback: {$feedback}\n\n"
-                . "Should we adjust? If yes, provide new phase targets for the remaining {$remaining} minutes.";
+            $prompt = 'Current session: '.($state['plan']['playlist_name'] ?? 'Unknown')."\n"
+                ."Now playing: {$nowPlaying}\n"
+                ."Elapsed: {$elapsed} min, Remaining: ~{$remaining} min\n"
+                .'Original phases: '.json_encode($state['plan']['phases'] ?? [])."\n"
+                ."User feedback: {$feedback}\n\n"
+                ."Should we adjust? If yes, provide new phase targets for the remaining {$remaining} minutes.";
 
             $agent = new AdaptAgent;
             $response = $agent->prompt($prompt);
@@ -95,12 +95,12 @@ class SessionAdjustTool extends Tool
 
             return Response::text(
                 "Adjusted! {$decoded['reasoning']}\n"
-                . "{$queued} new tracks queued based on your feedback."
+                ."{$queued} new tracks queued based on your feedback."
             );
         });
     }
 
-    private static function loadSessionState(): ?array
+    private function loadSessionState(): ?array
     {
         $path = SessionStartTool::sessionStatePath();
 

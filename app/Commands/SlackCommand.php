@@ -7,7 +7,10 @@ use App\Services\SpotifyService;
 use Illuminate\Support\Facades\Http;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
 use function Laravel\Prompts\text;
+use function Laravel\Prompts\warning;
 
 class SlackCommand extends Command
 {
@@ -19,8 +22,11 @@ class SlackCommand extends Command
 
     protected $description = 'Share what\'s playing to Slack';
 
-    public function handle()
+    private SpotifyService $spotify;
+
+    public function handle(SpotifyService $spotify): int
     {
+        $this->spotify = $spotify;
         $action = $this->argument('action');
 
         return match ($action) {
@@ -33,7 +39,7 @@ class SlackCommand extends Command
 
     private function setup(): int
     {
-        $this->info('🔗 Slack Webhook Setup');
+        info('🔗 Slack Webhook Setup');
         $this->newLine();
         $this->line('1. Go to https://api.slack.com/apps');
         $this->line('2. Create app → "From scratch" → name it "Spotify DJ"');
@@ -44,7 +50,7 @@ class SlackCommand extends Command
         $webhookUrl = text(
             label: 'Paste your Slack webhook URL:',
             placeholder: 'https://hooks.slack.com/services/...',
-            validate: fn (string $value) => str_starts_with($value, 'https://hooks.slack.com/')
+            validate: fn (string $value): ?string => str_starts_with($value, 'https://hooks.slack.com/')
                 ? null
                 : 'Must be a valid Slack webhook URL'
         );
@@ -59,10 +65,10 @@ class SlackCommand extends Command
             json_encode(['webhook_url' => $webhookUrl], JSON_PRETTY_PRINT)
         );
 
-        $this->info('✅ Slack webhook saved!');
-        $this->info('Test it: spotify slack test');
-        $this->info('Share now playing: spotify slack now');
-        $this->info('Stream live: spotify watch --slack');
+        info('✅ Slack webhook saved!');
+        info('Test it: spotify slack test');
+        info('Share now playing: spotify slack now');
+        info('Stream live: spotify watch --slack');
 
         return self::SUCCESS;
     }
@@ -75,16 +81,14 @@ class SlackCommand extends Command
 
         $webhook = $this->loadWebhook();
         if (! $webhook) {
-            $this->error('No Slack webhook configured. Run: spotify slack setup');
+            error('No Slack webhook configured. Run: spotify slack setup');
 
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
-        $current = $spotify->getCurrentPlayback();
+        $current = $this->spotify->getCurrentPlayback();
 
         if (! $current) {
-            $this->warn('Nothing is currently playing.');
+            warning('Nothing is currently playing.');
 
             return self::SUCCESS;
         }
@@ -102,9 +106,9 @@ class SlackCommand extends Command
         ]);
 
         if ($response->successful()) {
-            $this->info("📡 Shared to Slack: {$current['name']} by {$current['artist']}");
+            info("📡 Shared to Slack: {$current['name']} by {$current['artist']}");
         } else {
-            $this->error('Failed to post to Slack. Check your webhook URL.');
+            error('Failed to post to Slack. Check your webhook URL.');
 
             return self::FAILURE;
         }
@@ -116,7 +120,7 @@ class SlackCommand extends Command
     {
         $webhook = $this->loadWebhook();
         if (! $webhook) {
-            $this->error('No Slack webhook configured. Run: spotify slack setup');
+            error('No Slack webhook configured. Run: spotify slack setup');
 
             return self::FAILURE;
         }
@@ -134,9 +138,9 @@ class SlackCommand extends Command
         ]);
 
         if ($response->successful()) {
-            $this->info('✅ Slack webhook works! Check your channel.');
+            info('✅ Slack webhook works! Check your channel.');
         } else {
-            $this->error('❌ Webhook test failed. Double-check the URL.');
+            error('❌ Webhook test failed. Double-check the URL.');
 
             return self::FAILURE;
         }
@@ -146,8 +150,8 @@ class SlackCommand extends Command
 
     private function invalidAction(string $action): int
     {
-        $this->error("Invalid action: {$action}");
-        $this->info('Valid actions: setup, now, test');
+        error("Invalid action: {$action}");
+        info('Valid actions: setup, now, test');
 
         return self::FAILURE;
     }

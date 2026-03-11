@@ -22,10 +22,10 @@ class DevicesTool extends Tool
 
     public function handle(Request $request, SpotifyService $spotify): Response
     {
-        return $this->withAuthHandling(function () use ($spotify) {
+        return $this->withAuthHandling(function () use ($spotify): \Laravel\Mcp\Response {
             $devices = $spotify->getDevices();
 
-            if (empty($devices)) {
+            if ($devices === []) {
                 return Response::text('No Spotify devices available. Open Spotify on any device.');
             }
 

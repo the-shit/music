@@ -3,21 +3,21 @@
 use App\Services\SpotifyService;
 use Illuminate\Support\Facades\Artisan;
 
-describe('QueueShowCommand', function () {
+describe('QueueShowCommand', function (): void {
 
-    it('requires Spotify to be configured', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('requires Spotify to be configured', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
         $this->artisan('queue:show')
-            ->expectsOutput('❌ Spotify is not configured')
+            ->expectsOutputToContain('Spotify is not configured')
             ->expectsOutputToContain('Run "spotify setup"')
             ->assertExitCode(1);
     });
 
-    it('shows empty queue message when queue is empty', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('shows empty queue message when queue is empty', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
@@ -30,8 +30,8 @@ describe('QueueShowCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('shows the currently playing track when present', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('shows the currently playing track when present', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
@@ -50,8 +50,8 @@ describe('QueueShowCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('lists queued tracks with numbers', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('lists queued tracks with numbers', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
@@ -70,8 +70,8 @@ describe('QueueShowCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('uses Unknown for tracks with missing artist', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('uses Unknown for tracks with missing artist', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
@@ -86,13 +86,13 @@ describe('QueueShowCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('shows total track count', function () {
+    it('shows total track count', function (): void {
         $queue = [];
         for ($i = 1; $i <= 5; $i++) {
             $queue[] = ['name' => "Track {$i}", 'artists' => [['name' => 'Artist']]];
         }
 
-        $this->mock(SpotifyService::class, function ($mock) use ($queue) {
+        $this->mock(SpotifyService::class, function ($mock) use ($queue): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
@@ -105,13 +105,13 @@ describe('QueueShowCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('indicates when more than 20 tracks exist', function () {
+    it('indicates when more than 20 tracks exist', function (): void {
         $queue = [];
         for ($i = 1; $i <= 25; $i++) {
             $queue[] = ['name' => "Track {$i}", 'artists' => [['name' => 'Artist']]];
         }
 
-        $this->mock(SpotifyService::class, function ($mock) use ($queue) {
+        $this->mock(SpotifyService::class, function ($mock) use ($queue): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
@@ -124,8 +124,8 @@ describe('QueueShowCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('outputs JSON when --json flag is provided', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('outputs JSON when --json flag is provided', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
@@ -146,8 +146,8 @@ describe('QueueShowCommand', function () {
             ->toContain('"total":1');
     });
 
-    it('outputs JSON with null currently_playing when nothing is playing', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('outputs JSON with null currently_playing when nothing is playing', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
@@ -160,8 +160,8 @@ describe('QueueShowCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('handles API errors gracefully', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('handles API errors gracefully', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')
                 ->once()
@@ -173,12 +173,12 @@ describe('QueueShowCommand', function () {
             ->assertExitCode(1);
     });
 
-    it('has the correct command name', function () {
+    it('has the correct command name', function (): void {
         $command = $this->app->make(\App\Commands\QueueShowCommand::class);
         expect($command->getName())->toBe('queue:show');
     });
 
-    it('has a description', function () {
+    it('has a description', function (): void {
         $command = $this->app->make(\App\Commands\QueueShowCommand::class);
         expect($command->getDescription())->not->toBeEmpty();
     });

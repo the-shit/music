@@ -18,7 +18,7 @@ class ResumeTool extends Tool
 
     public function handle(Request $request, SpotifyService $spotify): Response
     {
-        return $this->withAuthHandling(function () use ($spotify) {
+        return $this->withAuthHandling(function () use ($spotify): \Laravel\Mcp\Response {
             $spotify->resume();
 
             return Response::text('Playback resumed.');

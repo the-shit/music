@@ -6,6 +6,9 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+
 class ResumeCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -16,13 +19,11 @@ class ResumeCommand extends Command
 
     protected $description = 'Resume Spotify playback from where it was paused';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
 
         $deviceName = $this->option('device');
 
@@ -33,20 +34,20 @@ class ResumeCommand extends Command
             foreach ($devices as $device) {
                 if (stripos($device['name'], $deviceName) !== false || $device['id'] === $deviceName) {
                     $deviceId = $device['id'];
-                    $this->info("🔊 Using device: {$device['name']}");
+                    info("🔊 Using device: {$device['name']}");
                     break;
                 }
             }
 
             if (! $deviceId) {
-                $this->error("❌ Device '{$deviceName}' not found");
+                error("❌ Device '{$deviceName}' not found");
 
                 return self::FAILURE;
             }
         }
 
         if (! $this->option('json')) {
-            $this->info('▶️  Resuming Spotify playback...');
+            info('▶️  Resuming Spotify playback...');
         }
 
         try {
@@ -92,10 +93,10 @@ class ResumeCommand extends Command
                 ]);
 
                 if ($current) {
-                    $this->info("🎵 Resumed: {$current['name']} by {$current['artist']}");
+                    info("🎵 Resumed: {$current['name']} by {$current['artist']}");
                 }
 
-                $this->info('✅ Playback resumed!');
+                info('✅ Playback resumed!');
             }
 
         } catch (\Exception $e) {
@@ -105,7 +106,7 @@ class ResumeCommand extends Command
                     'error' => $e->getMessage(),
                 ]));
             } else {
-                $this->error('Failed to resume: '.$e->getMessage());
+                error('Failed to resume: '.$e->getMessage());
 
                 // Emit error event
                 $this->call('event:emit', [

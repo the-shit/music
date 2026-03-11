@@ -2,10 +2,10 @@
 
 use App\Services\SpotifyService;
 
-describe('ResumeCommand', function () {
+describe('ResumeCommand', function (): void {
 
-    it('resumes playback without device specified', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('resumes playback without device specified', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('resume')->once();
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
@@ -16,14 +16,14 @@ describe('ResumeCommand', function () {
         });
 
         $this->artisan('resume')
-            ->expectsOutput('▶️  Resuming Spotify playback...')
-            ->expectsOutput('🎵 Resumed: Test Song by Test Artist')
-            ->expectsOutput('✅ Playback resumed!')
+            ->expectsOutputToContain('▶️  Resuming Spotify playback...')
+            ->expectsOutputToContain('🎵 Resumed: Test Song by Test Artist')
+            ->expectsOutputToContain('✅ Playback resumed!')
             ->assertExitCode(0);
     });
 
-    it('resumes playback on specified device by name', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('resumes playback on specified device by name', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-123', 'name' => 'Living Room Speaker'],
@@ -40,15 +40,15 @@ describe('ResumeCommand', function () {
         });
 
         $this->artisan('resume', ['--device' => 'Living Room'])
-            ->expectsOutput('🔊 Using device: Living Room Speaker')
-            ->expectsOutput('▶️  Resuming Spotify playback...')
-            ->expectsOutput('🎵 Resumed: Test Song by Test Artist')
-            ->expectsOutput('✅ Playback resumed!')
+            ->expectsOutputToContain('🔊 Using device: Living Room Speaker')
+            ->expectsOutputToContain('▶️  Resuming Spotify playback...')
+            ->expectsOutputToContain('🎵 Resumed: Test Song by Test Artist')
+            ->expectsOutputToContain('✅ Playback resumed!')
             ->assertExitCode(0);
     });
 
-    it('resumes playback on specified device by ID', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('resumes playback on specified device by ID', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-123', 'name' => 'Living Room Speaker'],
@@ -65,15 +65,15 @@ describe('ResumeCommand', function () {
         });
 
         $this->artisan('resume', ['--device' => 'device-456'])
-            ->expectsOutput('🔊 Using device: Kitchen Speaker')
-            ->expectsOutput('▶️  Resuming Spotify playback...')
-            ->expectsOutput('🎵 Resumed: Test Song by Test Artist')
-            ->expectsOutput('✅ Playback resumed!')
+            ->expectsOutputToContain('🔊 Using device: Kitchen Speaker')
+            ->expectsOutputToContain('▶️  Resuming Spotify playback...')
+            ->expectsOutputToContain('🎵 Resumed: Test Song by Test Artist')
+            ->expectsOutputToContain('✅ Playback resumed!')
             ->assertExitCode(0);
     });
 
-    it('fails when specified device is not found', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('fails when specified device is not found', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-123', 'name' => 'Living Room Speaker'],
@@ -81,12 +81,12 @@ describe('ResumeCommand', function () {
         });
 
         $this->artisan('resume', ['--device' => 'Nonexistent Device'])
-            ->expectsOutput("❌ Device 'Nonexistent Device' not found")
+            ->expectsOutputToContain("❌ Device 'Nonexistent Device' not found")
             ->assertExitCode(1);
     });
 
-    it('requires configuration', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('requires configuration', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
@@ -96,8 +96,8 @@ describe('ResumeCommand', function () {
             ->assertExitCode(1);
     });
 
-    it('handles API errors', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('handles API errors', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('resume')
                 ->once()
@@ -105,13 +105,13 @@ describe('ResumeCommand', function () {
         });
 
         $this->artisan('resume')
-            ->expectsOutput('▶️  Resuming Spotify playback...')
-            ->expectsOutput('Failed to resume: No active device')
+            ->expectsOutputToContain('▶️  Resuming Spotify playback...')
+            ->expectsOutputToContain('Failed to resume: No active device')
             ->assertExitCode(1);
     });
 
-    it('handles transfer playback errors when device specified', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('handles transfer playback errors when device specified', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-123', 'name' => 'Living Room Speaker'],
@@ -122,29 +122,29 @@ describe('ResumeCommand', function () {
         });
 
         $this->artisan('resume', ['--device' => 'Living Room'])
-            ->expectsOutput('🔊 Using device: Living Room Speaker')
-            ->expectsOutput('▶️  Resuming Spotify playback...')
-            ->expectsOutput('Failed to resume: Device not responding')
+            ->expectsOutputToContain('🔊 Using device: Living Room Speaker')
+            ->expectsOutputToContain('▶️  Resuming Spotify playback...')
+            ->expectsOutputToContain('Failed to resume: Device not responding')
             ->assertExitCode(1);
     });
 
-    it('resumes without current track info', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('resumes without current track info', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('resume')->once();
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
         });
 
         $this->artisan('resume')
-            ->expectsOutput('▶️  Resuming Spotify playback...')
-            ->expectsOutput('✅ Playback resumed!')
+            ->expectsOutputToContain('▶️  Resuming Spotify playback...')
+            ->expectsOutputToContain('✅ Playback resumed!')
             ->assertExitCode(0);
     });
 
-    describe('JSON output mode', function () {
+    describe('JSON output mode', function (): void {
 
-        it('outputs JSON on successful resume without device', function () {
-            $this->mock(SpotifyService::class, function ($mock) {
+        it('outputs JSON on successful resume without device', function (): void {
+            $this->mock(SpotifyService::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
                 $mock->shouldReceive('resume')->once();
                 $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
@@ -155,7 +155,7 @@ describe('ResumeCommand', function () {
             });
 
             $this->artisan('resume', ['--json' => true])
-                ->expectsOutput(json_encode([
+                ->expectsOutputToContain(json_encode([
                     'success' => true,
                     'resumed' => true,
                     'device_id' => null,
@@ -168,8 +168,8 @@ describe('ResumeCommand', function () {
                 ->assertExitCode(0);
         });
 
-        it('outputs JSON on successful resume with device', function () {
-            $this->mock(SpotifyService::class, function ($mock) {
+        it('outputs JSON on successful resume with device', function (): void {
+            $this->mock(SpotifyService::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
                 $mock->shouldReceive('getDevices')->once()->andReturn([
                     ['id' => 'device-123', 'name' => 'Living Room Speaker'],
@@ -185,8 +185,8 @@ describe('ResumeCommand', function () {
             });
 
             $this->artisan('resume', ['--device' => 'Living Room', '--json' => true])
-                ->expectsOutput('🔊 Using device: Living Room Speaker')
-                ->expectsOutput(json_encode([
+                ->expectsOutputToContain('🔊 Using device: Living Room Speaker')
+                ->expectsOutputToContain(json_encode([
                     'success' => true,
                     'resumed' => true,
                     'device_id' => 'device-123',
@@ -199,15 +199,15 @@ describe('ResumeCommand', function () {
                 ->assertExitCode(0);
         });
 
-        it('outputs JSON with null track when no current playback', function () {
-            $this->mock(SpotifyService::class, function ($mock) {
+        it('outputs JSON with null track when no current playback', function (): void {
+            $this->mock(SpotifyService::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
                 $mock->shouldReceive('resume')->once();
                 $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
             });
 
             $this->artisan('resume', ['--json' => true])
-                ->expectsOutput(json_encode([
+                ->expectsOutputToContain(json_encode([
                     'success' => true,
                     'resumed' => true,
                     'device_id' => null,
@@ -216,8 +216,8 @@ describe('ResumeCommand', function () {
                 ->assertExitCode(0);
         });
 
-        it('outputs JSON error on failure', function () {
-            $this->mock(SpotifyService::class, function ($mock) {
+        it('outputs JSON error on failure', function (): void {
+            $this->mock(SpotifyService::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
                 $mock->shouldReceive('resume')
                     ->once()
@@ -225,15 +225,15 @@ describe('ResumeCommand', function () {
             });
 
             $this->artisan('resume', ['--json' => true])
-                ->expectsOutput(json_encode([
+                ->expectsOutputToContain(json_encode([
                     'success' => false,
                     'error' => 'Player command failed',
                 ]))
                 ->assertExitCode(1);
         });
 
-        it('does not output resuming message in JSON mode', function () {
-            $this->mock(SpotifyService::class, function ($mock) {
+        it('does not output resuming message in JSON mode', function (): void {
+            $this->mock(SpotifyService::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
                 $mock->shouldReceive('resume')->once();
                 $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
@@ -251,8 +251,8 @@ describe('ResumeCommand', function () {
 
     });
 
-    it('uses case-insensitive device name matching', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('uses case-insensitive device name matching', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-123', 'name' => 'Living Room Speaker'],
@@ -268,12 +268,12 @@ describe('ResumeCommand', function () {
         });
 
         $this->artisan('resume', ['--device' => 'living room'])
-            ->expectsOutput('🔊 Using device: Living Room Speaker')
+            ->expectsOutputToContain('🔊 Using device: Living Room Speaker')
             ->assertExitCode(0);
     });
 
-    it('matches partial device names', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('matches partial device names', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-123', 'name' => 'Living Room Speaker'],
@@ -290,7 +290,7 @@ describe('ResumeCommand', function () {
         });
 
         $this->artisan('resume', ['--device' => 'Kitchen'])
-            ->expectsOutput('🔊 Using device: Kitchen Speaker')
+            ->expectsOutputToContain('🔊 Using device: Kitchen Speaker')
             ->assertExitCode(0);
     });
 

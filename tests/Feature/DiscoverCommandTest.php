@@ -2,7 +2,7 @@
 
 use App\Services\SpotifyService;
 
-it('outputs discovery results as json', function () {
+it('outputs discovery results as json', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getRecentlyPlayed')->andReturn([
@@ -17,7 +17,7 @@ it('outputs discovery results as json', function () {
         ->assertSuccessful();
 });
 
-it('displays discovery results in human format', function () {
+it('displays discovery results in human format', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getRecentlyPlayed')->andReturn([]);
@@ -31,7 +31,7 @@ it('displays discovery results in human format', function () {
         ->assertSuccessful();
 });
 
-it('handles no results', function () {
+it('handles no results', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getRecentlyPlayed')->andReturn([]);
@@ -43,7 +43,7 @@ it('handles no results', function () {
         ->assertSuccessful();
 });
 
-it('seeds from top artists when requested', function () {
+it('seeds from top artists when requested', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getTopArtists')->with('short_term', 3)->andReturn([
@@ -58,7 +58,7 @@ it('seeds from top artists when requested', function () {
         ->assertSuccessful();
 });
 
-it('fails when not configured', function () {
+it('fails when not configured', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(false);
     $this->app->instance(SpotifyService::class, $mock);

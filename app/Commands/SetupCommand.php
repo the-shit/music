@@ -22,7 +22,7 @@ class SetupCommand extends Command
 
     protected $description = 'Set up Spotify API credentials with beautiful guided setup';
 
-    public function handle()
+    public function handle(): int
     {
         if ($this->option('reset')) {
             return $this->handleReset();
@@ -97,14 +97,14 @@ class SetupCommand extends Command
 
         try {
             // Task 1: Determine callback port
-            $this->task('Determining callback port', function () use (&$defaultPort) {
+            $this->task('Determining callback port', function () use (&$defaultPort): true {
                 $defaultPort = $this->findAvailablePort();
 
                 return true;
             });
 
             // Task 2: Open Spotify Developer Dashboard
-            $this->task('Opening Spotify Developer Dashboard', function () use (&$appUrl) {
+            $this->task('Opening Spotify Developer Dashboard', function () use (&$appUrl): true {
                 $appUrl = 'https://developer.spotify.com/dashboard/applications';
                 $this->openBrowser($appUrl);
 
@@ -112,7 +112,7 @@ class SetupCommand extends Command
             });
 
             // Task 3: Display app configuration
-            $this->task('Preparing app configuration', function () use ($defaultPort) {
+            $this->task('Preparing app configuration', function () use ($defaultPort): true {
                 $this->newLine();
                 $this->displayAppConfiguration($defaultPort);
 
@@ -120,7 +120,7 @@ class SetupCommand extends Command
             });
 
             // Task 4: Wait for app creation
-            $this->task('Waiting for app creation', function () use ($defaultPort) {
+            $this->task('Waiting for app creation', function () use ($defaultPort): bool {
                 $redirectUri = "http://127.0.0.1:{$defaultPort}/callback";
 
                 info('📋 Now create your Spotify app in the browser');
@@ -142,19 +142,19 @@ class SetupCommand extends Command
             });
 
             // Task 5: Collect credentials
-            $this->task('Collecting app credentials', function () use (&$credentials) {
+            $this->task('Collecting app credentials', function () use (&$credentials): true {
                 $credentials = $this->collectCredentials();
 
                 return $credentials !== null;
             });
 
             // Task 6: Validate credentials
-            $this->task('Validating credentials', function () use ($credentials) {
+            $this->task('Validating credentials', function () use ($credentials): bool {
                 return $this->validateCredentials($credentials);
             });
 
             // Task 7: Store credentials
-            $this->task('Storing credentials securely', function () use ($credentials, $defaultPort) {
+            $this->task('Storing credentials securely', function () use ($credentials, $defaultPort): bool {
                 $this->storeCredentials($credentials);
                 $stored = $this->hasStoredCredentials();
 
@@ -176,7 +176,7 @@ class SetupCommand extends Command
             // Task 8: Test connection
             $this->task('Testing Spotify connection', function () use ($credentials) {
                 return spin(
-                    fn () => $this->testSpotifyConnection($credentials),
+                    fn (): bool => $this->testSpotifyConnection($credentials),
                     'Validating credentials with Spotify API...'
                 );
             });
@@ -310,7 +310,7 @@ class SetupCommand extends Command
             label: '📋 Client ID',
             placeholder: 'Paste your Spotify app Client ID',
             required: true,
-            validate: fn (string $value) => strlen($value) < 20
+            validate: fn (string $value): ?string => strlen($value) < 20
                 ? 'Client ID appears to be too short'
                 : null
         );
@@ -319,7 +319,7 @@ class SetupCommand extends Command
             label: '🔐 Client Secret',
             placeholder: 'Paste your Spotify app Client Secret',
             required: true,
-            validate: fn (string $value) => strlen($value) < 20
+            validate: fn (string $value): ?string => strlen($value) < 20
                 ? 'Client Secret appears to be too short'
                 : null
         );

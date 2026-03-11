@@ -22,10 +22,10 @@ class QueueShowTool extends Tool
 
     public function handle(Request $request, SpotifyService $spotify): Response
     {
-        return $this->withAuthHandling(function () use ($spotify) {
+        return $this->withAuthHandling(function () use ($spotify): \Laravel\Mcp\Response {
             $queue = $spotify->getQueue();
 
-            if (empty($queue) || empty($queue['queue'])) {
+            if ($queue === [] || empty($queue['queue'])) {
                 return Response::text('Queue is empty.');
             }
 

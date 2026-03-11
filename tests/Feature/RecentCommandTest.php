@@ -2,7 +2,7 @@
 
 use App\Services\SpotifyService;
 
-it('outputs recently played as json', function () {
+it('outputs recently played as json', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getRecentlyPlayed')->with(20)->andReturn([
@@ -20,7 +20,7 @@ it('outputs recently played as json', function () {
         ->assertSuccessful();
 });
 
-it('displays recently played in human format', function () {
+it('displays recently played in human format', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getRecentlyPlayed')->andReturn([
@@ -39,7 +39,7 @@ it('displays recently played in human format', function () {
         ->assertSuccessful();
 });
 
-it('handles empty recently played', function () {
+it('handles empty recently played', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getRecentlyPlayed')->andReturn([]);
@@ -50,7 +50,7 @@ it('handles empty recently played', function () {
         ->assertSuccessful();
 });
 
-it('fails when not configured', function () {
+it('fails when not configured', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(false);
     $this->app->instance(SpotifyService::class, $mock);

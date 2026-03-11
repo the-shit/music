@@ -2,42 +2,42 @@
 
 use App\Services\SpotifyService;
 
-describe('PlayerCommand', function () {
+describe('PlayerCommand', function (): void {
 
-    it('requires configuration', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('requires configuration', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
         $this->artisan('player')
-            ->expectsOutput('❌ Spotify is not configured')
-            ->expectsOutput('💡 Run "spotify setup" first')
+            ->expectsOutputToContain('Spotify is not configured')
+            ->expectsOutputToContain('Run "spotify setup" first')
             ->assertExitCode(1);
     });
 
-    it('requires interactive terminal', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('requires interactive terminal', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
         });
 
         $this->artisan('player', ['--no-interaction' => true])
-            ->expectsOutput('❌ Player requires an interactive terminal')
-            ->expectsOutput('💡 Run without piping or in a proper terminal')
+            ->expectsOutputToContain('❌ Player requires an interactive terminal')
+            ->expectsOutputToContain('💡 Run without piping or in a proper terminal')
             ->assertExitCode(1);
     });
 
-    it('shows nothing playing state', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('shows nothing playing state', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
         });
 
         $this->artisan('player')
-            ->expectsOutput('🎵 Spotify Interactive Player')
-            ->expectsOutput('Loading...');
+            ->expectsOutputToContain('🎵 Spotify Interactive Player')
+            ->expectsOutputToContain('Loading...');
     });
 
-    it('displays current track info', function () {
+    it('displays current track info', function (): void {
         $currentTrack = [
             'name' => 'Test Song',
             'artist' => 'Test Artist',
@@ -50,14 +50,14 @@ describe('PlayerCommand', function () {
             ],
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentTrack) {
+        $this->mock(SpotifyService::class, function ($mock) use ($currentTrack): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentTrack);
         });
 
         $this->artisan('player')
-            ->expectsOutput('🎵 Spotify Interactive Player')
-            ->expectsOutput('Loading...');
+            ->expectsOutputToContain('🎵 Spotify Interactive Player')
+            ->expectsOutputToContain('Loading...');
     });
 
 });

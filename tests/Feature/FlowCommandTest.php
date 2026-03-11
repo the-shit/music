@@ -2,7 +2,7 @@
 
 use App\Services\SpotifyService;
 
-it('queues flow tracks and outputs json', function () {
+it('queues flow tracks and outputs json', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('searchMultiple')->andReturn([
@@ -19,7 +19,7 @@ it('queues flow tracks and outputs json', function () {
         ->assertSuccessful();
 });
 
-it('displays flow tracks in human format', function () {
+it('displays flow tracks in human format', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('searchMultiple')->andReturn([
@@ -35,7 +35,7 @@ it('displays flow tracks in human format', function () {
         ->assertSuccessful();
 });
 
-it('fails when no tracks found', function () {
+it('fails when no tracks found', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('searchMultiple')->andReturn([]);
@@ -45,7 +45,7 @@ it('fails when no tracks found', function () {
         ->assertFailed();
 });
 
-it('respects custom limit option overriding duration', function () {
+it('respects custom limit option overriding duration', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('searchMultiple')->andReturn([
@@ -66,7 +66,7 @@ it('respects custom limit option overriding duration', function () {
         ->assertSuccessful();
 });
 
-it('fails when not configured', function () {
+it('fails when not configured', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(false);
     $this->app->instance(SpotifyService::class, $mock);

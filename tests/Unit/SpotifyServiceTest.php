@@ -10,7 +10,7 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-beforeEach(function () {
+beforeEach(function (): void {
     Config::set('spotify.client_id', 'test_client_id');
     Config::set('spotify.client_secret', 'test_client_secret');
 
@@ -36,11 +36,11 @@ beforeEach(function () {
     }
 });
 
-describe('SpotifyService', function () {
+describe('SpotifyService', function (): void {
 
-    describe('Playback Control', function () {
+    describe('Playback Control', function (): void {
 
-        it('searches for tracks', function () {
+        it('searches for tracks', function (): void {
             Http::fake([
                 'api.spotify.com/v1/search*' => Http::response([
                     'tracks' => [
@@ -61,7 +61,7 @@ describe('SpotifyService', function () {
             expect($result['artist'])->toBe('Test Artist');
         });
 
-        it('searches multiple tracks', function () {
+        it('searches multiple tracks', function (): void {
             Http::fake([
                 'api.spotify.com/v1/search*' => Http::response([
                     'tracks' => [
@@ -90,7 +90,7 @@ describe('SpotifyService', function () {
             expect($results[1]['name'])->toBe('Song 2');
         });
 
-        it('gets current playback state', function () {
+        it('gets current playback state', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player' => Http::response([
                     'item' => [
@@ -116,7 +116,7 @@ describe('SpotifyService', function () {
             expect($current['device']['volume_percent'])->toBe(50);
         });
 
-        it('controls volume', function () {
+        it('controls volume', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/volume*' => Http::response([], 204),
             ]);
@@ -125,31 +125,31 @@ describe('SpotifyService', function () {
 
             expect($result)->toBeTrue();
 
-            Http::assertSent(function (Request $request) {
+            Http::assertSent(function (Request $request): bool {
                 return str_contains($request->url(), 'volume_percent=42');
             });
         });
 
-        it('handles volume boundaries', function () {
+        it('handles volume boundaries', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/volume*' => Http::response([], 204),
             ]);
 
             $this->service->setVolume(150);
-            Http::assertSent(function (Request $request) {
+            Http::assertSent(function (Request $request): bool {
                 return str_contains($request->url(), 'volume_percent=100');
             });
 
             $this->service->setVolume(-10);
-            Http::assertSent(function (Request $request) {
+            Http::assertSent(function (Request $request): bool {
                 return str_contains($request->url(), 'volume_percent=0');
             });
         });
     });
 
-    describe('Device Management', function () {
+    describe('Device Management', function (): void {
 
-        it('gets available devices', function () {
+        it('gets available devices', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [
@@ -178,7 +178,7 @@ describe('SpotifyService', function () {
             expect($devices[0]['is_active'])->toBeTrue();
         });
 
-        it('finds active device', function () {
+        it('finds active device', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [
@@ -202,9 +202,9 @@ describe('SpotifyService', function () {
         });
     });
 
-    describe('Queue Management', function () {
+    describe('Queue Management', function (): void {
 
-        it('gets queue', function () {
+        it('gets queue', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/queue' => Http::response([
                     'currently_playing' => [
@@ -224,7 +224,7 @@ describe('SpotifyService', function () {
             expect($queue['queue'][0]['name'])->toBe('Next Track');
         });
 
-        it('adds to queue', function () {
+        it('adds to queue', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [['id' => 'device1', 'is_active' => true]],
@@ -234,15 +234,15 @@ describe('SpotifyService', function () {
 
             $this->service->addToQueue('spotify:track:123');
 
-            Http::assertSent(function (Request $request) {
+            Http::assertSent(function (Request $request): bool {
                 return str_contains($request->url(), 'uri=spotify%3Atrack%3A123');
             });
         });
     });
 
-    describe('Playlist Management', function () {
+    describe('Playlist Management', function (): void {
 
-        it('gets user playlists', function () {
+        it('gets user playlists', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/playlists*' => Http::response([
                     'items' => [
@@ -262,7 +262,7 @@ describe('SpotifyService', function () {
             expect($playlists[0]['name'])->toBe('My Playlist');
         });
 
-        it('plays playlist', function () {
+        it('plays playlist', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [['id' => 'device1', 'is_active' => true]],
@@ -274,7 +274,7 @@ describe('SpotifyService', function () {
 
             expect($result)->toBeTrue();
 
-            Http::assertSent(function (Request $request) {
+            Http::assertSent(function (Request $request): bool {
                 if ($request->method() !== 'PUT') {
                     return false;
                 }

@@ -39,14 +39,14 @@ class SearchTool extends Tool
 
     public function handle(Request $request, SpotifyService $spotify): Response
     {
-        return $this->withAuthHandling(function () use ($request, $spotify) {
+        return $this->withAuthHandling(function () use ($request, $spotify): \Laravel\Mcp\Response {
             $query = $request->get('query');
             $type = $request->get('type', 'track');
             $limit = min(20, max(1, (int) $request->get('limit', 5)));
 
             $results = $spotify->searchMultiple($query, $type, $limit);
 
-            if (empty($results)) {
+            if ($results === []) {
                 return Response::text("No {$type}s found for \"{$query}\".");
             }
 

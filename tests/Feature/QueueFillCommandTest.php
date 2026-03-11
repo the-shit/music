@@ -2,10 +2,10 @@
 
 use App\Services\SpotifyService;
 
-describe('QueueFillCommand', function () {
+describe('QueueFillCommand', function (): void {
 
-    it('fills queue with recommendations based on current track', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('fills queue with recommendations based on current track', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
@@ -33,8 +33,8 @@ describe('QueueFillCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('skips duplicates already in queue', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('skips duplicates already in queue', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
@@ -62,8 +62,8 @@ describe('QueueFillCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('skips recently played tracks', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('skips recently played tracks', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
@@ -92,8 +92,8 @@ describe('QueueFillCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('does nothing when queue is already at target', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('does nothing when queue is already at target', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
@@ -108,8 +108,8 @@ describe('QueueFillCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('warns when no recommendations available and no current track for fallback', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('warns when no recommendations available and no current track for fallback', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
@@ -126,8 +126,8 @@ describe('QueueFillCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('falls back to search when recommendations API returns empty', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('falls back to search when recommendations API returns empty', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
@@ -160,8 +160,8 @@ describe('QueueFillCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('deduplicates search fallback results against queue and recently played', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('deduplicates search fallback results against queue and recently played', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
@@ -197,8 +197,8 @@ describe('QueueFillCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('warns when both recommendations and search fallback return empty', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('warns when both recommendations and search fallback return empty', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
@@ -224,8 +224,8 @@ describe('QueueFillCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('outputs JSON when --json flag is used', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('outputs JSON when --json flag is used', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
@@ -249,8 +249,8 @@ describe('QueueFillCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('outputs JSON when queue already full', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('outputs JSON when queue already full', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
@@ -266,8 +266,8 @@ describe('QueueFillCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('respects custom target size', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('respects custom target size', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
@@ -294,8 +294,8 @@ describe('QueueFillCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('handles API errors gracefully', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('handles API errors gracefully', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')
                 ->once()
@@ -307,19 +307,19 @@ describe('QueueFillCommand', function () {
             ->assertExitCode(1);
     });
 
-    it('requires configuration', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('requires configuration', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
         $this->artisan('queue:fill')
-            ->expectsOutput('❌ Spotify is not configured')
+            ->expectsOutputToContain('Spotify is not configured')
             ->expectsOutputToContain('Run "spotify setup"')
             ->assertExitCode(1);
     });
 
-    it('continues when individual queue additions fail', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('continues when individual queue additions fail', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [

@@ -2,7 +2,7 @@
 
 use App\Services\SpotifyService;
 
-it('outputs top tracks as json', function () {
+it('outputs top tracks as json', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getTopTracks')->with('medium_term', 20)->andReturn([
@@ -15,7 +15,7 @@ it('outputs top tracks as json', function () {
         ->assertSuccessful();
 });
 
-it('outputs top artists as json', function () {
+it('outputs top artists as json', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getTopArtists')->with('medium_term', 20)->andReturn([
@@ -27,7 +27,7 @@ it('outputs top artists as json', function () {
         ->assertSuccessful();
 });
 
-it('displays top tracks in human format', function () {
+it('displays top tracks in human format', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getTopTracks')->andReturn([
@@ -40,7 +40,7 @@ it('displays top tracks in human format', function () {
         ->assertSuccessful();
 });
 
-it('handles custom range and limit', function () {
+it('handles custom range and limit', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getTopTracks')->with('short_term', 5)->andReturn([]);
@@ -50,7 +50,7 @@ it('handles custom range and limit', function () {
         ->assertSuccessful();
 });
 
-it('fails when not configured', function () {
+it('fails when not configured', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(false);
     $this->app->instance(SpotifyService::class, $mock);

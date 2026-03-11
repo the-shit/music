@@ -6,9 +6,11 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\spin;
+use function Laravel\Prompts\warning;
 
 class PlayerCommand extends Command
 {
@@ -22,30 +24,30 @@ class PlayerCommand extends Command
 
     private bool $running = true;
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
 
-        $this->spotify = app(SpotifyService::class);
+        $this->spotify = $spotify;
 
         // Check if we're in an interactive terminal
         if (! $this->input->isInteractive()) {
-            $this->error('❌ Player requires an interactive terminal');
-            $this->info('💡 Run without piping or in a proper terminal');
+            error('❌ Player requires an interactive terminal');
+            info('💡 Run without piping or in a proper terminal');
 
             return self::FAILURE;
         }
 
-        $this->info('🎵 Spotify Interactive Player');
-        $this->info('Loading...');
+        info('🎵 Spotify Interactive Player');
+        info('Loading...');
 
         while ($this->running) {
             try {
                 $this->showPlayer();
             } catch (\Exception $e) {
-                $this->error('Error: '.$e->getMessage());
+                error('Error: '.$e->getMessage());
                 $this->running = false;
             }
         }
@@ -57,12 +59,12 @@ class PlayerCommand extends Command
     {
         // Get current playback state
         $current = spin(
-            fn () => $this->spotify->getCurrentPlayback(),
+            fn (): ?array => $this->spotify->getCurrentPlayback(),
             'Refreshing...'
         );
 
         if (! $current) {
-            $this->warn('⏸️  Nothing playing');
+            warning('⏸️  Nothing playing');
             $action = select(
                 'What would you like to do?',
                 [
@@ -126,7 +128,7 @@ class PlayerCommand extends Command
             $current['shuffle_state'] ?? false,
             $current['repeat_state'] ?? 'off'
         );
-        if ($modes) {
+        if ($modes !== '' && $modes !== '0') {
             $this->line(sprintf('│ %-47s │', $modes));
         }
 
@@ -140,10 +142,10 @@ class PlayerCommand extends Command
         $durationSec = floor($durationMs / 1000);
 
         $progressMin = floor($progressSec / 60);
-        $progressSec = $progressSec % 60;
+        $progressSec %= 60;
 
         $durationMin = floor($durationSec / 60);
-        $durationSec = $durationSec % 60;
+        $durationSec %= 60;
 
         $percentage = $durationMs > 0 ? ($progressMs / $durationMs) : 0;
         $barLength = 30;
@@ -190,7 +192,7 @@ class PlayerCommand extends Command
             $modes[] = $repeatIcon.' '.$repeatText;
         }
 
-        return $modes ? implode('  ', $modes) : '';
+        return $modes !== [] ? implode('  ', $modes) : '';
     }
 
     private function getControlOptions(bool $isPlaying): array
@@ -282,7 +284,7 @@ class PlayerCommand extends Command
                     break;
             }
         } catch (\Exception $e) {
-            $this->error('Error: '.$e->getMessage());
+            error('Error: '.$e->getMessage());
         }
     }
 
@@ -321,12 +323,12 @@ class PlayerCommand extends Command
         info("Searching for: {$query}");
 
         $results = spin(
-            fn () => $this->spotify->searchMultiple($query, 'track', 10),
+            fn (): array => $this->spotify->searchMultiple($query, 'track', 10),
             'Searching...'
         );
 
         if (empty($results)) {
-            $this->warn('No results found');
+            warning('No results found');
 
             return;
         }
@@ -359,17 +361,17 @@ class PlayerCommand extends Command
     private function showQueue(): void
     {
         $queue = spin(
-            fn () => $this->spotify->getQueue(),
+            fn (): array => $this->spotify->getQueue(),
             'Loading queue...'
         );
 
         if (empty($queue['queue'])) {
-            $this->warn('📋 Queue is empty');
+            warning('📋 Queue is empty');
 
             return;
         }
 
-        $this->info('📋 Upcoming tracks:');
+        info('📋 Upcoming tracks:');
         $this->newLine();
 
         // Show up to 10 tracks in queue
@@ -393,12 +395,12 @@ class PlayerCommand extends Command
     private function browsePlaylists(): void
     {
         $playlists = spin(
-            fn () => $this->spotify->getPlaylists(20),
+            fn (): array => $this->spotify->getPlaylists(20),
             'Loading playlists...'
         );
 
         if (empty($playlists)) {
-            $this->warn('No playlists found');
+            warning('No playlists found');
 
             return;
         }
@@ -431,19 +433,19 @@ class PlayerCommand extends Command
             $selected = collect($playlists)->firstWhere('id', $playlistId);
             info("▶️  Playing playlist: {$selected['name']}");
         } else {
-            $this->error('Failed to play playlist');
+            error('Failed to play playlist');
         }
     }
 
     private function switchDevice(): void
     {
         $devices = spin(
-            fn () => $this->spotify->getDevices(),
+            fn (): array => $this->spotify->getDevices(),
             'Loading devices...'
         );
 
         if (empty($devices)) {
-            $this->warn('No devices found');
+            warning('No devices found');
 
             return;
         }

@@ -6,6 +6,10 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class QueueCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -14,17 +18,15 @@ class QueueCommand extends Command
 
     protected $description = 'Add a song to the Spotify queue (plays after current track)';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
 
-        $spotify = app(SpotifyService::class);
-
         $query = $this->argument('query');
 
-        $this->info("🎵 Searching for: {$query}");
+        info("🎵 Searching for: {$query}");
 
         try {
             $result = $spotify->search($query);
@@ -42,20 +44,20 @@ class QueueCommand extends Command
                     return self::SUCCESS;
                 }
 
-                $this->info("➕ Added to queue: {$result['name']} by {$result['artist']}");
-                $this->info('📋 It will play after the current track');
+                info("➕ Added to queue: {$result['name']} by {$result['artist']}");
+                info('📋 It will play after the current track');
             } else {
-                $this->warn("No results found for: {$query}");
+                warning("No results found for: {$query}");
 
                 return self::FAILURE;
             }
         } catch (\Exception $e) {
-            $this->error('Failed to add to queue: '.$e->getMessage());
+            error('Failed to add to queue: '.$e->getMessage());
 
             return self::FAILURE;
         }
 
-        $this->info('✅ Successfully added to queue!');
+        info('✅ Successfully added to queue!');
 
         return self::SUCCESS;
     }

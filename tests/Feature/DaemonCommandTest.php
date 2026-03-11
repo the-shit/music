@@ -3,9 +3,9 @@
 use App\Commands\DaemonCommand;
 use Illuminate\Support\Facades\Config;
 
-describe('DaemonCommand', function () {
+describe('DaemonCommand', function (): void {
 
-    beforeEach(function () {
+    beforeEach(function (): void {
         $this->tempDir = sys_get_temp_dir().'/spotify-cli-test-'.uniqid();
         mkdir($this->tempDir, 0755, true);
 
@@ -16,7 +16,7 @@ describe('DaemonCommand', function () {
         Config::set('spotify.token_path', $this->tempDir.'/.config/spotify-cli/token.json');
 
         $this->app->forgetInstance(DaemonCommand::class);
-        $this->app->bind(DaemonCommand::class, function () {
+        $this->app->bind(DaemonCommand::class, function (): \App\Commands\DaemonCommand {
             return new DaemonCommand;
         });
 
@@ -24,8 +24,8 @@ describe('DaemonCommand', function () {
         $this->pidFile = $this->configDir.'/daemon.pid';
     });
 
-    afterEach(function () {
-        if (isset($this->tempDir) && is_dir($this->tempDir)) {
+    afterEach(function (): void {
+        if (property_exists($this, 'tempDir') && $this->tempDir !== null && is_dir($this->tempDir)) {
             $files = new RecursiveIteratorIterator(
                 new RecursiveDirectoryIterator($this->tempDir, RecursiveDirectoryIterator::SKIP_DOTS),
                 RecursiveIteratorIterator::CHILD_FIRST
@@ -37,40 +37,40 @@ describe('DaemonCommand', function () {
         }
     });
 
-    describe('action routing', function () {
+    describe('action routing', function (): void {
 
-        it('handles invalid action', function () {
+        it('handles invalid action', function (): void {
             $this->artisan('daemon', ['action' => 'invalid'])
                 ->expectsOutputToContain('Invalid action: invalid')
                 ->expectsOutputToContain('Available actions: start, stop, status, install, uninstall')
                 ->assertExitCode(1);
         });
 
-        it('handles restart as invalid action', function () {
+        it('handles restart as invalid action', function (): void {
             $this->artisan('daemon', ['action' => 'restart'])
                 ->expectsOutputToContain('Invalid action: restart')
                 ->expectsOutputToContain('Available actions: start, stop, status, install, uninstall')
                 ->assertExitCode(1);
         });
 
-        it('routes to start action', function () {
+        it('routes to start action', function (): void {
             $this->artisan('daemon', ['action' => 'start'])
                 ->assertExitCode(1);
         });
 
-        it('routes to stop action', function () {
+        it('routes to stop action', function (): void {
             $this->artisan('daemon', ['action' => 'stop'])
                 ->expectsOutputToContain('Daemon is not running')
                 ->assertExitCode(0);
         });
 
-        it('routes to status action', function () {
+        it('routes to status action', function (): void {
             $this->artisan('daemon', ['action' => 'status'])
                 ->expectsOutputToContain('Daemon is not running')
                 ->assertExitCode(0);
         });
 
-        it('routes to install action', function () {
+        it('routes to install action', function (): void {
             if (PHP_OS_FAMILY !== 'Darwin') {
                 $this->artisan('daemon', ['action' => 'install'])
                     ->assertExitCode(1);
@@ -81,62 +81,62 @@ describe('DaemonCommand', function () {
             }
         });
 
-        it('routes to uninstall action', function () {
+        it('routes to uninstall action', function (): void {
             $this->artisan('daemon', ['action' => 'uninstall'])
                 ->assertExitCode(PHP_OS_FAMILY === 'Darwin' ? 0 : 1);
         });
 
     });
 
-    describe('start action', function () {
+    describe('start action', function (): void {
 
-        it('fails when daemon executable not found', function () {
+        it('fails when daemon executable not found', function (): void {
             $this->artisan('daemon', ['action' => 'start'])
                 ->assertExitCode(1);
         });
 
     });
 
-    describe('stop action', function () {
+    describe('stop action', function (): void {
 
-        it('reports when daemon is not running without PID file', function () {
+        it('reports when daemon is not running without PID file', function (): void {
             $this->artisan('daemon', ['action' => 'stop'])
                 ->expectsOutputToContain('Daemon is not running')
                 ->assertExitCode(0);
         });
 
-        it('returns success when daemon not running', function () {
+        it('returns success when daemon not running', function (): void {
             $this->artisan('daemon', ['action' => 'stop'])
                 ->assertExitCode(0);
         });
 
     });
 
-    describe('status action', function () {
+    describe('status action', function (): void {
 
-        it('reports when daemon is not running', function () {
+        it('reports when daemon is not running', function (): void {
             $this->artisan('daemon', ['action' => 'status'])
                 ->expectsOutputToContain('Daemon is not running')
                 ->expectsOutputToContain('Use: spotify devices to see available playback devices')
                 ->assertExitCode(0);
         });
 
-        it('always returns success exit code', function () {
+        it('always returns success exit code', function (): void {
             $this->artisan('daemon', ['action' => 'status'])
                 ->assertExitCode(0);
         });
 
     });
 
-    describe('isDaemonRunning detection', function () {
+    describe('isDaemonRunning detection', function (): void {
 
-        it('returns false when PID file does not exist', function () {
+        it('returns false when PID file does not exist', function (): void {
             $this->artisan('daemon', ['action' => 'status'])
                 ->expectsOutputToContain('Daemon is not running')
                 ->assertExitCode(0);
         });
 
-        it('uses posix_kill with signal 0 to check process existence', function () {
+        it('uses posix_kill with signal 0 to check process existence', function (): void {
             $proc = proc_open('sleep 60', [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);
             $status = proc_get_status($proc);
             $pid = $status['pid'];
@@ -151,39 +151,39 @@ describe('DaemonCommand', function () {
 
     });
 
-    describe('command signature and metadata', function () {
+    describe('command signature and metadata', function (): void {
 
-        it('has correct command name', function () {
+        it('has correct command name', function (): void {
             $command = $this->app->make(DaemonCommand::class);
             expect($command->getName())->toBe('daemon');
         });
 
-        it('has correct description', function () {
+        it('has correct description', function (): void {
             $command = $this->app->make(DaemonCommand::class);
             expect($command->getDescription())->toBe('Manage the Spotify daemon for terminal playback');
         });
 
-        it('requires action argument', function () {
+        it('requires action argument', function (): void {
             $this->expectException(\Symfony\Component\Console\Exception\RuntimeException::class);
             $this->artisan('daemon');
         });
 
-        it('accepts start as valid action argument', function () {
+        it('accepts start as valid action argument', function (): void {
             $this->artisan('daemon', ['action' => 'start'])
                 ->assertExitCode(1);
         });
 
-        it('accepts stop as valid action argument', function () {
+        it('accepts stop as valid action argument', function (): void {
             $this->artisan('daemon', ['action' => 'stop'])
                 ->assertExitCode(0);
         });
 
-        it('accepts status as valid action argument', function () {
+        it('accepts status as valid action argument', function (): void {
             $this->artisan('daemon', ['action' => 'status'])
                 ->assertExitCode(0);
         });
 
-        it('accepts --name option', function () {
+        it('accepts --name option', function (): void {
             $command = $this->app->make(DaemonCommand::class);
             $definition = $command->getDefinition();
             expect($definition->hasOption('name'))->toBeTrue();
@@ -192,18 +192,18 @@ describe('DaemonCommand', function () {
 
     });
 
-    describe('PID file operations', function () {
+    describe('PID file operations', function (): void {
 
-        it('handles integer PIDs correctly', function () {
+        it('handles integer PIDs correctly', function (): void {
             $pidWithNewline = "12345\n";
             expect((int) $pidWithNewline)->toBe(12345);
         });
 
     });
 
-    describe('graceful shutdown', function () {
+    describe('graceful shutdown', function (): void {
 
-        it('SIGTERM stops processes gracefully', function () {
+        it('SIGTERM stops processes gracefully', function (): void {
             $proc = proc_open('sleep 60', [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);
             $status = proc_get_status($proc);
             $pid = $status['pid'];
@@ -218,9 +218,9 @@ describe('DaemonCommand', function () {
 
     });
 
-    describe('error handling', function () {
+    describe('error handling', function (): void {
 
-        it('handles missing config directory gracefully on stop', function () {
+        it('handles missing config directory gracefully on stop', function (): void {
             expect(is_dir($this->configDir))->toBeFalse();
 
             $this->artisan('daemon', ['action' => 'stop'])
@@ -228,7 +228,7 @@ describe('DaemonCommand', function () {
                 ->assertExitCode(0);
         });
 
-        it('handles missing config directory gracefully on status', function () {
+        it('handles missing config directory gracefully on status', function (): void {
             expect(is_dir($this->configDir))->toBeFalse();
 
             $this->artisan('daemon', ['action' => 'status'])
@@ -238,39 +238,39 @@ describe('DaemonCommand', function () {
 
     });
 
-    describe('exit codes', function () {
+    describe('exit codes', function (): void {
 
-        it('returns FAILURE (1) when daemon not found on start', function () {
+        it('returns FAILURE (1) when daemon not found on start', function (): void {
             $this->artisan('daemon', ['action' => 'start'])
                 ->assertExitCode(1);
         });
 
-        it('returns SUCCESS (0) when daemon not running on stop', function () {
+        it('returns SUCCESS (0) when daemon not running on stop', function (): void {
             $this->artisan('daemon', ['action' => 'stop'])
                 ->assertExitCode(0);
         });
 
-        it('returns SUCCESS (0) on status', function () {
+        it('returns SUCCESS (0) on status', function (): void {
             $this->artisan('daemon', ['action' => 'status'])
                 ->assertExitCode(0);
         });
 
-        it('returns FAILURE (1) for invalid action', function () {
+        it('returns FAILURE (1) for invalid action', function (): void {
             $this->artisan('daemon', ['action' => 'invalid'])
                 ->assertExitCode(1);
         });
 
     });
 
-    describe('install action', function () {
+    describe('install action', function (): void {
 
-        it('creates plist file on macOS when spotifyd available', function () {
+        it('creates plist file on macOS when spotifyd available', function (): void {
             if (PHP_OS_FAMILY !== 'Darwin') {
                 $this->markTestSkipped('LaunchAgent tests require macOS');
             }
 
             $spotifyd = trim((string) shell_exec('which spotifyd 2>/dev/null'));
-            if (! $spotifyd) {
+            if ($spotifyd === '' || $spotifyd === '0') {
                 // No spotifyd — should fail
                 $this->artisan('daemon', ['action' => 'install'])
                     ->expectsOutputToContain('spotifyd not found')
@@ -288,7 +288,7 @@ describe('DaemonCommand', function () {
             expect(file_get_contents($plistPath))->toContain('com.theshit.spotifyd');
         });
 
-        it('reports when already installed', function () {
+        it('reports when already installed', function (): void {
             if (PHP_OS_FAMILY !== 'Darwin') {
                 $this->markTestSkipped('LaunchAgent tests require macOS');
             }
@@ -304,9 +304,9 @@ describe('DaemonCommand', function () {
 
     });
 
-    describe('uninstall action', function () {
+    describe('uninstall action', function (): void {
 
-        it('fails on non-macOS', function () {
+        it('fails on non-macOS', function (): void {
             if (PHP_OS_FAMILY === 'Darwin') {
                 // On macOS with no plist, reports not installed
                 $this->artisan('daemon', ['action' => 'uninstall'])
@@ -319,7 +319,7 @@ describe('DaemonCommand', function () {
             }
         });
 
-        it('reports when not installed', function () {
+        it('reports when not installed', function (): void {
             if (PHP_OS_FAMILY !== 'Darwin') {
                 $this->markTestSkipped('LaunchAgent tests require macOS');
             }
@@ -329,7 +329,7 @@ describe('DaemonCommand', function () {
                 ->assertExitCode(0);
         });
 
-        it('removes plist file when installed', function () {
+        it('removes plist file when installed', function (): void {
             if (PHP_OS_FAMILY !== 'Darwin') {
                 $this->markTestSkipped('LaunchAgent tests require macOS');
             }
@@ -348,9 +348,9 @@ describe('DaemonCommand', function () {
 
     });
 
-    describe('LaunchAgent plist generation', function () {
+    describe('LaunchAgent plist generation', function (): void {
 
-        it('generates valid plist XML', function () {
+        it('generates valid plist XML', function (): void {
             $command = $this->app->make(DaemonCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('generateLaunchAgentPlist');
@@ -368,7 +368,7 @@ describe('DaemonCommand', function () {
             expect($plist)->toContain('spotifyd.log');
         });
 
-        it('includes KeepAlive and ThrottleInterval in plist', function () {
+        it('includes KeepAlive and ThrottleInterval in plist', function (): void {
             $command = $this->app->make(DaemonCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('generateLaunchAgentPlist');
@@ -383,16 +383,16 @@ describe('DaemonCommand', function () {
 
     });
 
-    describe('output messages', function () {
+    describe('output messages', function (): void {
 
-        it('shows device guidance when not running', function () {
+        it('shows device guidance when not running', function (): void {
             $this->artisan('daemon', ['action' => 'status'])
                 ->expectsOutputToContain('Daemon is not running')
                 ->expectsOutputToContain('Use: spotify devices to see available playback devices')
                 ->assertExitCode(0);
         });
 
-        it('lists valid actions when invalid action provided', function () {
+        it('lists valid actions when invalid action provided', function (): void {
             $this->artisan('daemon', ['action' => 'unknown'])
                 ->expectsOutputToContain('Invalid action: unknown')
                 ->expectsOutputToContain('Available actions: start, stop, status, install, uninstall')

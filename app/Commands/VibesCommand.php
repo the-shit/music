@@ -26,7 +26,7 @@ class VibesCommand extends Command
     public function handle(SpotifyService $spotify): int
     {
         $commits = spin(
-            fn () => $this->parseGitLog(),
+            fn (): array => $this->parseGitLog(),
             'Parsing git history...'
         );
 
@@ -43,16 +43,16 @@ class VibesCommand extends Command
         $trackMeta = [];
         if ($this->ensureConfigured()) {
             $trackMeta = spin(
-                fn () => $spotify->getTracks($trackIds),
+                fn (): array => $spotify->getTracks($trackIds),
                 'Fetching track metadata...'
             );
         }
 
         // Fall back to oEmbed for any tracks missing metadata (no auth needed)
         $missingIds = array_diff($trackIds, array_keys($trackMeta));
-        if (! empty($missingIds)) {
+        if ($missingIds !== []) {
             $oembedMeta = spin(
-                fn () => $spotify->getTracksViaOEmbed($missingIds),
+                fn (): array => $spotify->getTracksViaOEmbed($missingIds),
                 'Fetching track info via oEmbed...'
             );
             $trackMeta = array_merge($trackMeta, $oembedMeta);
@@ -78,7 +78,7 @@ class VibesCommand extends Command
         $playlistUrl = null;
         if ($this->option('playlist')) {
             $playlistUrl = spin(
-                fn () => $this->syncPlaylist($spotify, $grouped),
+                fn (): ?string => $this->syncPlaylist($spotify, $grouped),
                 'Syncing Spotify playlist...'
             );
             if ($playlistUrl) {
@@ -160,7 +160,7 @@ class VibesCommand extends Command
             $groups[$trackId]['commits'][] = $commit;
         }
 
-        usort($groups, fn ($a, $b) => count($b['commits']) <=> count($a['commits']));
+        usort($groups, fn (array $a, array $b): int => count($b['commits']) <=> count($a['commits']));
 
         return $groups;
     }
@@ -190,14 +190,10 @@ class VibesCommand extends Command
         $uris = [];
         foreach ($groups as $group) {
             $meta = $group['meta'] ?? null;
-            if ($meta) {
-                $uris[] = $meta['uri'];
-            } else {
-                $uris[] = 'spotify:track:'.$group['track_id'];
-            }
+            $uris[] = $meta ? $meta['uri'] : 'spotify:track:'.$group['track_id'];
         }
 
-        if (! empty($uris)) {
+        if ($uris !== []) {
             $spotify->replacePlaylistTracks($playlist['id'], $uris);
         }
 
@@ -212,8 +208,8 @@ class VibesCommand extends Command
         }
 
         $totalTracks = count($groups);
-        $topCommits = ! empty($groups) ? count($groups[0]['commits']) : 0;
-        $topTrack = ! empty($groups) ? htmlspecialchars($groups[0]['meta']['name'] ?? 'Unknown') : 'Unknown';
+        $topCommits = $groups === [] ? 0 : count($groups[0]['commits']);
+        $topTrack = $groups === [] ? 'Unknown' : htmlspecialchars($groups[0]['meta']['name'] ?? 'Unknown');
         $generatedAt = date('F j, Y \a\t g:i A');
         $playlistButton = $playlistUrl
             ? "<a href=\"{$playlistUrl}\" class=\"playlist-link\" target=\"_blank\">Listen to the full playlist</a>"

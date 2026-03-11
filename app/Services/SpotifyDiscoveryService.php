@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use Exception;
 use Illuminate\Support\Facades\Http;
 
 class SpotifyDiscoveryService
@@ -184,7 +183,7 @@ class SpotifyDiscoveryService
     public function searchByGenre(string $genre, string $mood = '', int $limit = 10): array
     {
         $query = "genre:{$genre}";
-        if ($mood) {
+        if ($mood !== '' && $mood !== '0') {
             $query .= " {$mood}";
         }
 
@@ -203,7 +202,7 @@ class SpotifyDiscoveryService
         $this->auth->requireAuth();
 
         // Spotify requires at least one seed — fall back to recent tracks
-        if (empty($seedTrackIds) && empty($seedArtistIds)) {
+        if ($seedTrackIds === [] && $seedArtistIds === []) {
             $recent = $this->getRecentlyPlayed(5);
             foreach ($recent as $track) {
                 if (preg_match('/spotify:track:(.+)/', $track['uri'], $m)) {
@@ -214,18 +213,18 @@ class SpotifyDiscoveryService
                 }
             }
 
-            if (empty($seedTrackIds)) {
+            if ($seedTrackIds === []) {
                 return $this->getSmartRecommendations($limit, $currentArtist, $audioFeatures);
             }
         }
 
         $params = ['limit' => $limit];
 
-        if (! empty($seedTrackIds)) {
+        if ($seedTrackIds !== []) {
             $params['seed_tracks'] = implode(',', array_slice($seedTrackIds, 0, 5));
         }
 
-        if (! empty($seedArtistIds)) {
+        if ($seedArtistIds !== []) {
             $params['seed_artists'] = implode(',', array_slice($seedArtistIds, 0, 5));
         }
 
@@ -251,14 +250,14 @@ class SpotifyDiscoveryService
                 ];
             }
 
-            if (! empty($tracks)) {
+            if ($tracks !== []) {
                 return $tracks;
             }
 
             // Deprecated endpoint returned empty — log it once and fall through
-            
+
         } else {
-            
+
         }
 
         // Fall through to multi-strategy discovery
@@ -283,7 +282,7 @@ class SpotifyDiscoveryService
             foreach ($tracks as $t) {
                 $uri = $t['uri'] ?? '';
 
-if ($uri && ! isset($seen[$uri])) {
+                if ($uri && ! isset($seen[$uri])) {
                     $seen[$uri] = true;
                     $pool[] = $t;
                 }
@@ -435,7 +434,7 @@ if ($uri && ! isset($seen[$uri])) {
         $collect($this->searchMultiple("\"{$artistName}\"", 'track', $limit));
 
         // 3. Track title search — finds covers, similar-titled songs across artists
-        if ($trackName) {
+        if ($trackName !== '' && $trackName !== '0') {
             $collect($this->searchMultiple("\"{$trackName}\"", 'track', 5));
         }
 
@@ -497,7 +496,7 @@ if ($uri && ! isset($seen[$uri])) {
      */
     public function getTracks(array $trackIds): array
     {
-        if (empty($trackIds) || ! $this->auth->getAccessToken()) {
+        if ($trackIds === [] || ! $this->auth->getAccessToken()) {
             return [];
         }
 

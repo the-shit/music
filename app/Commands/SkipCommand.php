@@ -19,7 +19,7 @@ class SkipCommand extends Command
 
     protected $description = 'Skip to next or previous track';
 
-    public function handle(SpotifyService $spotify)
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;

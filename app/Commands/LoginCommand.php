@@ -19,7 +19,7 @@ class LoginCommand extends Command
 
     protected $description = 'Authenticate with Spotify';
 
-    public function handle()
+    public function handle(): int
     {
         // Always read credentials fresh from file (bypasses config cache)
         $credentials = ConfigHelper::getCredentials();
@@ -87,7 +87,7 @@ class LoginCommand extends Command
 
         // Wait for callback with spinner
         $code = spin(
-            fn () => $this->waitForAuthCode(),
+            fn (): ?string => $this->waitForAuthCode(),
             'Waiting for authorization...'
         );
 
@@ -112,7 +112,7 @@ class LoginCommand extends Command
 
         // Exchange code for token
         $tokenData = spin(
-            fn () => $this->exchangeCodeForToken($clientId, $clientSecret, $code, $redirectUri),
+            fn (): ?array => $this->exchangeCodeForToken($clientId, $clientSecret, $code, $redirectUri),
             'Exchanging code for access token...'
         );
 

@@ -3,9 +3,9 @@
 use Illuminate\Support\Facades\Process;
 use Laravel\Prompts\Prompt;
 
-describe('SetupCommand', function () {
+describe('SetupCommand', function (): void {
 
-    beforeEach(function () {
+    beforeEach(function (): void {
         // Use a temp directory for credentials during tests
         $this->testConfigDir = sys_get_temp_dir().'/spotify-cli-test-'.uniqid();
         mkdir($this->testConfigDir, 0755, true);
@@ -15,7 +15,7 @@ describe('SetupCommand', function () {
         Process::fake();
     });
 
-    afterEach(function () {
+    afterEach(function (): void {
         // Clean up test config directory
         if (is_dir($this->testConfigDir)) {
             array_map('unlink', glob($this->testConfigDir.'/*'));
@@ -26,9 +26,9 @@ describe('SetupCommand', function () {
         Prompt::interactive(true);
     });
 
-    describe('already configured', function () {
+    describe('already configured', function (): void {
 
-        it('shows already configured message when credentials exist', function () {
+        it('shows already configured message when credentials exist', function (): void {
             // Write credentials to the test config directory
             $credentialsFile = $this->testConfigDir.'/credentials.json';
             file_put_contents($credentialsFile, json_encode([
@@ -43,9 +43,9 @@ describe('SetupCommand', function () {
 
     });
 
-    describe('credential validation', function () {
+    describe('credential validation', function (): void {
 
-        it('validates credentials have correct format', function () {
+        it('validates credentials have correct format', function (): void {
             // Spotify credentials should be at least 20 chars
             $clientId = 'abc123def456ghi789jk';
             $clientSecret = 'secret123secret456secret789secret0';
@@ -56,9 +56,9 @@ describe('SetupCommand', function () {
 
     });
 
-    describe('reset flag', function () {
+    describe('reset flag', function (): void {
 
-        it('allows reset even when already configured', function () {
+        it('allows reset even when already configured', function (): void {
             // Write credentials to the test config directory (not .env)
             $credentialsFile = $this->testConfigDir.'/credentials.json';
             file_put_contents($credentialsFile, json_encode([
@@ -75,18 +75,18 @@ describe('SetupCommand', function () {
 
     });
 
-    describe('config dir handling', function () {
+    describe('config dir handling', function (): void {
 
-        it('uses config dir for credential storage', function () {
+        it('uses config dir for credential storage', function (): void {
             $configDir = config('spotify.config_dir');
             expect(is_dir($configDir))->toBeTrue();
         });
 
     });
 
-    describe('validateCredentials method', function () {
+    describe('validateCredentials method', function (): void {
 
-        it('accepts valid credentials', function () {
+        it('accepts valid credentials', function (): void {
             $command = $this->app->make(\App\Commands\SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('validateCredentials');
@@ -100,49 +100,49 @@ describe('SetupCommand', function () {
             expect($result)->toBeTrue();
         });
 
-        it('throws on short client_id', function () {
+        it('throws on short client_id', function (): void {
             $command = $this->app->make(\App\Commands\SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('validateCredentials');
             $method->setAccessible(true);
 
-            expect(fn () => $method->invoke($command, [
+            expect(fn (): mixed => $method->invoke($command, [
                 'client_id' => 'short',
                 'client_secret' => 'secret1234567890secret',
             ]))->toThrow(\Exception::class, 'Client ID appears to be invalid');
         });
 
-        it('throws on short client_secret', function () {
+        it('throws on short client_secret', function (): void {
             $command = $this->app->make(\App\Commands\SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('validateCredentials');
             $method->setAccessible(true);
 
-            expect(fn () => $method->invoke($command, [
+            expect(fn (): mixed => $method->invoke($command, [
                 'client_id' => 'abcdef1234567890abcdef',
                 'client_secret' => 'short',
             ]))->toThrow(\Exception::class, 'Client Secret appears to be invalid');
         });
 
-        it('throws on client_id with invalid characters', function () {
+        it('throws on client_id with invalid characters', function (): void {
             $command = $this->app->make(\App\Commands\SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('validateCredentials');
             $method->setAccessible(true);
 
-            expect(fn () => $method->invoke($command, [
+            expect(fn (): mixed => $method->invoke($command, [
                 'client_id' => 'invalid-chars-here!!!!!!',
                 'client_secret' => 'secret1234567890secret',
             ]))->toThrow(\Exception::class, 'Client ID contains invalid characters');
         });
 
-        it('throws on client_secret with invalid characters', function () {
+        it('throws on client_secret with invalid characters', function (): void {
             $command = $this->app->make(\App\Commands\SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('validateCredentials');
             $method->setAccessible(true);
 
-            expect(fn () => $method->invoke($command, [
+            expect(fn (): mixed => $method->invoke($command, [
                 'client_id' => 'abcdef1234567890abcdef',
                 'client_secret' => 'invalid-chars-here!!!!!!',
             ]))->toThrow(\Exception::class, 'Client Secret contains invalid characters');
@@ -150,9 +150,9 @@ describe('SetupCommand', function () {
 
     });
 
-    describe('storeCredentials method', function () {
+    describe('storeCredentials method', function (): void {
 
-        it('stores credentials to config dir as JSON', function () {
+        it('stores credentials to config dir as JSON', function (): void {
             $command = $this->app->make(\App\Commands\SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('storeCredentials');
@@ -171,7 +171,7 @@ describe('SetupCommand', function () {
             expect($data['client_secret'])->toBe('stored_secret_12345678');
         });
 
-        it('sets credentials file permissions to 0600', function () {
+        it('sets credentials file permissions to 0600', function (): void {
             $command = $this->app->make(\App\Commands\SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('storeCredentials');
@@ -189,9 +189,9 @@ describe('SetupCommand', function () {
 
     });
 
-    describe('clearStoredCredentials method', function () {
+    describe('clearStoredCredentials method', function (): void {
 
-        it('removes credentials and token files', function () {
+        it('removes credentials and token files', function (): void {
             // Create files to delete
             $credFile = $this->testConfigDir.'/credentials.json';
             $tokenFile = $this->testConfigDir.'/token.json';
@@ -210,20 +210,20 @@ describe('SetupCommand', function () {
             expect(file_exists($tokenFile))->toBeFalse();
         });
 
-        it('does not throw when files do not exist', function () {
+        it('does not throw when files do not exist', function (): void {
             $command = $this->app->make(\App\Commands\SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('clearStoredCredentials');
             $method->setAccessible(true);
 
-            expect(fn () => $method->invoke($command))->not->toThrow(\Throwable::class);
+            expect(fn (): mixed => $method->invoke($command))->not->toThrow(\Throwable::class);
         });
 
     });
 
-    describe('findAvailablePort method', function () {
+    describe('findAvailablePort method', function (): void {
 
-        it('returns a port number between 8888 and 8892', function () {
+        it('returns a port number between 8888 and 8892', function (): void {
             $command = $this->app->make(\App\Commands\SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('findAvailablePort');
@@ -236,9 +236,9 @@ describe('SetupCommand', function () {
 
     });
 
-    describe('testSpotifyConnection method', function () {
+    describe('testSpotifyConnection method', function (): void {
 
-        it('returns false when HTTP request fails', function () {
+        it('returns false when HTTP request fails', function (): void {
             \Illuminate\Support\Facades\Http::fake([
                 'accounts.spotify.com/*' => \Illuminate\Support\Facades\Http::response([], 401),
             ]);
@@ -256,7 +256,7 @@ describe('SetupCommand', function () {
             expect($result)->toBeFalse();
         });
 
-        it('returns false when access_token not in response', function () {
+        it('returns false when access_token not in response', function (): void {
             \Illuminate\Support\Facades\Http::fake([
                 'accounts.spotify.com/*' => \Illuminate\Support\Facades\Http::response(['error' => 'invalid'], 200),
             ]);
@@ -274,7 +274,7 @@ describe('SetupCommand', function () {
             expect($result)->toBeFalse();
         });
 
-        it('returns true when access_token is present', function () {
+        it('returns true when access_token is present', function (): void {
             \Illuminate\Support\Facades\Http::fake([
                 'accounts.spotify.com/*' => \Illuminate\Support\Facades\Http::response(['access_token' => 'tok123'], 200),
             ]);

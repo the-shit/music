@@ -6,6 +6,9 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+
 class VolumeCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -16,13 +19,11 @@ class VolumeCommand extends Command
 
     protected $description = 'Control Spotify volume';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
 
         $level = $this->argument('level');
 
@@ -34,8 +35,8 @@ class VolumeCommand extends Command
                 if ($this->option('json')) {
                     $this->line(json_encode(['error' => 'No active device found']));
                 } else {
-                    $this->error('❌ No active device found');
-                    $this->info('💡 Start playing something first');
+                    error('❌ No active device found');
+                    info('💡 Start playing something first');
                 }
 
                 return self::FAILURE;
@@ -46,7 +47,7 @@ class VolumeCommand extends Command
             if ($this->option('json')) {
                 $this->line(json_encode(['volume' => $volume]));
             } else {
-                $this->info("🔊 Current volume: {$volume}%");
+                info("🔊 Current volume: {$volume}%");
                 $this->showVolumeBar($volume);
             }
 
@@ -60,7 +61,7 @@ class VolumeCommand extends Command
             if ($this->option('json')) {
                 $this->line(json_encode(['error' => 'Invalid volume level']));
             } else {
-                $this->error('❌ Invalid volume level. Use 0-100 or +/- for relative change');
+                error('❌ Invalid volume level. Use 0-100 or +/- for relative change');
             }
 
             return self::FAILURE;
@@ -73,7 +74,7 @@ class VolumeCommand extends Command
             if ($this->option('json')) {
                 $this->line(json_encode(['error' => 'Failed to set volume']));
             } else {
-                $this->error('❌ Failed to set volume');
+                error('❌ Failed to set volume');
             }
 
             return self::FAILURE;
@@ -97,7 +98,7 @@ class VolumeCommand extends Command
                 ]),
             ]);
             $icon = $this->getVolumeIcon($newVolume);
-            $this->info("{$icon} Volume set to {$newVolume}%");
+            info("{$icon} Volume set to {$newVolume}%");
             $this->showVolumeBar($newVolume);
         }
 

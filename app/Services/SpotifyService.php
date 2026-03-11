@@ -2,18 +2,17 @@
 
 namespace App\Services;
 
-use Exception;
-use Illuminate\Support\Facades\Http;
-
 class SpotifyService
 {
     private SpotifyAuthManager $auth;
+
     private SpotifyPlayerService $player;
+
     private SpotifyDiscoveryService $discovery;
 
     public function __construct()
     {
-        $this->auth = new SpotifyAuthManager();
+        $this->auth = new SpotifyAuthManager;
         $this->player = new SpotifyPlayerService($this->auth);
         $this->discovery = new SpotifyDiscoveryService($this->auth);
     }

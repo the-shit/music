@@ -6,7 +6,10 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
 use function Laravel\Prompts\select;
+use function Laravel\Prompts\warning;
 
 class DevicesCommand extends Command
 {
@@ -16,20 +19,18 @@ class DevicesCommand extends Command
 
     protected $description = 'List or switch Spotify devices';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
 
-        $spotify = app(SpotifyService::class);
-
         try {
             $devices = $spotify->getDevices();
 
             if (empty($devices)) {
-                $this->warn('📱 No devices found');
-                $this->info('💡 Open Spotify on your phone, computer, or smart speaker');
+                warning('📱 No devices found');
+                info('💡 Open Spotify on your phone, computer, or smart speaker');
 
                 return self::SUCCESS;
             }
@@ -98,16 +99,16 @@ class DevicesCommand extends Command
             );
 
             if ($selected === $activeDevice) {
-                $this->info('✅ Already playing on this device');
+                info('✅ Already playing on this device');
 
                 return self::SUCCESS;
             }
 
             // Transfer playback
-            $this->info('🔄 Switching to device...');
+            info('🔄 Switching to device...');
             $spotify->transferPlayback($selected);
 
-            $this->info('✅ Playback transferred!');
+            info('✅ Playback transferred!');
 
             // Emit event
             $this->call('event:emit', [
@@ -121,7 +122,7 @@ class DevicesCommand extends Command
             return self::SUCCESS;
 
         } catch (\Exception $e) {
-            $this->error('❌ '.$e->getMessage());
+            error('❌ '.$e->getMessage());
 
             return self::FAILURE;
         }
@@ -129,7 +130,7 @@ class DevicesCommand extends Command
 
     private function displayDevices(array $devices): void
     {
-        $this->info('📱 Available Spotify Devices:');
+        info('📱 Available Spotify Devices:');
         $this->newLine();
 
         foreach ($devices as $device) {
@@ -153,8 +154,8 @@ class DevicesCommand extends Command
             $this->newLine();
         }
 
-        if (! array_filter($devices, fn ($d) => $d['is_active'])) {
-            $this->info("💡 No active device. Use 'spotify devices --switch' to activate one");
+        if (! array_filter($devices, fn (array $d) => $d['is_active'])) {
+            info("💡 No active device. Use 'spotify devices --switch' to activate one");
         }
     }
 }

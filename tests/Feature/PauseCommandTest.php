@@ -2,10 +2,10 @@
 
 use App\Services\SpotifyService;
 
-describe('PauseCommand', function () {
+describe('PauseCommand', function (): void {
 
-    it('pauses playback', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('pauses playback', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'name' => 'Test Song',
@@ -16,13 +16,13 @@ describe('PauseCommand', function () {
         });
 
         $this->artisan('pause')
-            ->expectsOutput('⏸️  Pausing Spotify playback...')
-            ->expectsOutput('✅ Playback paused!')
+            ->expectsOutputToContain('⏸️  Pausing Spotify playback...')
+            ->expectsOutputToContain('✅ Playback paused!')
             ->assertExitCode(0);
     });
 
-    it('handles API errors', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('handles API errors', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
             $mock->shouldReceive('pause')
@@ -31,18 +31,18 @@ describe('PauseCommand', function () {
         });
 
         $this->artisan('pause')
-            ->expectsOutput('⏸️  Pausing Spotify playback...')
-            ->expectsOutput('❌ Failed to pause: Already paused')
+            ->expectsOutputToContain('⏸️  Pausing Spotify playback...')
+            ->expectsOutputToContain('❌ Failed to pause: Already paused')
             ->assertExitCode(1);
     });
 
-    it('requires configuration', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('requires configuration', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
         $this->artisan('pause')
-            ->expectsOutput('❌ Spotify is not configured')
+            ->expectsOutputToContain('Spotify is not configured')
             ->expectsOutputToContain('Run "spotify setup" first')
 
             ->assertExitCode(1);

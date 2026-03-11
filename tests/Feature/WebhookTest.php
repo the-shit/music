@@ -4,17 +4,17 @@ use App\Helpers\ConfigHelper;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 
-describe('Webhook', function () {
+describe('Webhook', function (): void {
 
-    beforeEach(function () {
+    beforeEach(function (): void {
         $this->tempDir = sys_get_temp_dir().'/spotify-webhook-test-'.uniqid();
         mkdir($this->tempDir.'/.config/spotify-cli', 0755, true);
         $_SERVER['HOME'] = $this->tempDir;
         Config::set('spotify.config_dir', $this->tempDir.'/.config/spotify-cli');
     });
 
-    afterEach(function () {
-        if (isset($this->tempDir) && is_dir($this->tempDir)) {
+    afterEach(function (): void {
+        if (property_exists($this, 'tempDir') && $this->tempDir !== null && is_dir($this->tempDir)) {
             $files = new RecursiveIteratorIterator(
                 new RecursiveDirectoryIterator($this->tempDir, RecursiveDirectoryIterator::SKIP_DOTS),
                 RecursiveIteratorIterator::CHILD_FIRST
@@ -26,20 +26,20 @@ describe('Webhook', function () {
         }
     });
 
-    describe('ConfigHelper webhook methods', function () {
+    describe('ConfigHelper webhook methods', function (): void {
 
-        it('returns defaults when no webhook.json exists', function () {
+        it('returns defaults when no webhook.json exists', function (): void {
             $config = ConfigHelper::getWebhookConfig();
             expect($config['url'])->toBeNull();
             expect($config['secret'])->toBeNull();
             expect($config['enabled'])->toBeFalse();
         });
 
-        it('returns false for hasWebhook when not configured', function () {
+        it('returns false for hasWebhook when not configured', function (): void {
             expect(ConfigHelper::hasWebhook())->toBeFalse();
         });
 
-        it('saves and reads webhook config', function () {
+        it('saves and reads webhook config', function (): void {
             ConfigHelper::saveWebhookConfig([
                 'url' => 'https://example.com/hook',
                 'secret' => 'test-secret-123',
@@ -52,7 +52,7 @@ describe('Webhook', function () {
             expect($config['enabled'])->toBeTrue();
         });
 
-        it('reports hasWebhook true when configured and enabled', function () {
+        it('reports hasWebhook true when configured and enabled', function (): void {
             ConfigHelper::saveWebhookConfig([
                 'url' => 'https://example.com/hook',
                 'secret' => 'test-secret-123',
@@ -62,7 +62,7 @@ describe('Webhook', function () {
             expect(ConfigHelper::hasWebhook())->toBeTrue();
         });
 
-        it('reports hasWebhook false when disabled', function () {
+        it('reports hasWebhook false when disabled', function (): void {
             ConfigHelper::saveWebhookConfig([
                 'url' => 'https://example.com/hook',
                 'secret' => 'test-secret-123',
@@ -72,7 +72,7 @@ describe('Webhook', function () {
             expect(ConfigHelper::hasWebhook())->toBeFalse();
         });
 
-        it('secures webhook.json with 0600 permissions', function () {
+        it('secures webhook.json with 0600 permissions', function (): void {
             ConfigHelper::saveWebhookConfig([
                 'url' => 'https://example.com/hook',
                 'secret' => 'secret',
@@ -86,9 +86,9 @@ describe('Webhook', function () {
 
     });
 
-    describe('HMAC signature', function () {
+    describe('HMAC signature', function (): void {
 
-        it('produces consistent signatures', function () {
+        it('produces consistent signatures', function (): void {
             $payload = '{"event":"test"}';
             $timestamp = 1234567890;
             $secret = 'my-secret';
@@ -99,7 +99,7 @@ describe('Webhook', function () {
             expect($sig1)->toBe($sig2);
         });
 
-        it('produces different signatures for different secrets', function () {
+        it('produces different signatures for different secrets', function (): void {
             $payload = '{"event":"test"}';
             $timestamp = 1234567890;
 
@@ -111,9 +111,9 @@ describe('Webhook', function () {
 
     });
 
-    describe('EventEmitCommand with webhook', function () {
+    describe('EventEmitCommand with webhook', function (): void {
 
-        it('forwards events to webhook when configured', function () {
+        it('forwards events to webhook when configured', function (): void {
             Http::fake(['*' => Http::response('ok', 200)]);
 
             ConfigHelper::saveWebhookConfig([
@@ -128,7 +128,7 @@ describe('Webhook', function () {
                 ->assertExitCode(0);
 
             Http::assertSentCount(1);
-            Http::assertSent(function ($request) {
+            Http::assertSent(function ($request): bool {
                 return $request->url() === 'https://example.com/hook'
                     && $request->hasHeader('X-Spotify-CLI-Signature')
                     && $request->hasHeader('X-Spotify-CLI-Timestamp')
@@ -136,7 +136,7 @@ describe('Webhook', function () {
             });
         });
 
-        it('does not call webhook when not configured', function () {
+        it('does not call webhook when not configured', function (): void {
             Http::fake();
 
             Config::set('app.events_file', $this->tempDir.'/.config/spotify-cli/events.jsonl');
@@ -147,7 +147,7 @@ describe('Webhook', function () {
             Http::assertNothingSent();
         });
 
-        it('logs errors on webhook failure without blocking', function () {
+        it('logs errors on webhook failure without blocking', function (): void {
             Http::fake(['*' => Http::response('error', 500)]);
 
             ConfigHelper::saveWebhookConfig([
@@ -165,15 +165,15 @@ describe('Webhook', function () {
 
     });
 
-    describe('webhook:configure command', function () {
+    describe('webhook:configure command', function (): void {
 
-        it('shows no config when unconfigured', function () {
+        it('shows no config when unconfigured', function (): void {
             $this->artisan('webhook:configure', ['--show' => true])
                 ->expectsOutputToContain('No webhook configured')
                 ->assertExitCode(0);
         });
 
-        it('shows current config when configured', function () {
+        it('shows current config when configured', function (): void {
             ConfigHelper::saveWebhookConfig([
                 'url' => 'https://example.com/hook',
                 'secret' => 'secret-123',
@@ -186,7 +186,7 @@ describe('Webhook', function () {
                 ->assertExitCode(0);
         });
 
-        it('disables webhook', function () {
+        it('disables webhook', function (): void {
             ConfigHelper::saveWebhookConfig([
                 'url' => 'https://example.com/hook',
                 'secret' => 'secret-123',
@@ -202,15 +202,15 @@ describe('Webhook', function () {
 
     });
 
-    describe('webhook:test command', function () {
+    describe('webhook:test command', function (): void {
 
-        it('fails when no webhook configured', function () {
+        it('fails when no webhook configured', function (): void {
             $this->artisan('webhook:test')
                 ->expectsOutputToContain('No webhook configured')
                 ->assertExitCode(1);
         });
 
-        it('sends test ping and reports success', function () {
+        it('sends test ping and reports success', function (): void {
             Http::fake(['*' => Http::response('ok', 200)]);
 
             ConfigHelper::saveWebhookConfig([
@@ -222,12 +222,12 @@ describe('Webhook', function () {
             $this->artisan('webhook:test')
                 ->assertExitCode(0);
 
-            Http::assertSent(function ($request) {
+            Http::assertSent(function ($request): bool {
                 return $request->header('X-Spotify-CLI-Event')[0] === 'spotify.webhook.test';
             });
         });
 
-        it('reports failure on non-200 response', function () {
+        it('reports failure on non-200 response', function (): void {
             Http::fake(['*' => Http::response('not found', 404)]);
 
             ConfigHelper::saveWebhookConfig([

@@ -29,7 +29,7 @@ class RepeatTool extends Tool
 
     public function handle(Request $request, SpotifyService $spotify): Response
     {
-        return $this->withAuthHandling(function () use ($request, $spotify) {
+        return $this->withAuthHandling(function () use ($request, $spotify): \Laravel\Mcp\Response {
             $mode = $request->get('mode');
             $spotify->setRepeat($mode);
 

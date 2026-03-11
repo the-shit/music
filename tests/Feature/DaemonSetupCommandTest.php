@@ -3,9 +3,9 @@
 use App\Commands\DaemonSetupCommand;
 use Illuminate\Support\Facades\Config;
 
-describe('DaemonSetupCommand', function () {
+describe('DaemonSetupCommand', function (): void {
 
-    beforeEach(function () {
+    beforeEach(function (): void {
         $this->tempDir = sys_get_temp_dir().'/spotify-daemon-setup-test-'.uniqid();
         mkdir($this->tempDir, 0755, true);
         $_SERVER['HOME'] = $this->tempDir;
@@ -14,8 +14,8 @@ describe('DaemonSetupCommand', function () {
         $this->app->forgetInstance(DaemonSetupCommand::class);
     });
 
-    afterEach(function () {
-        if (isset($this->tempDir) && is_dir($this->tempDir)) {
+    afterEach(function (): void {
+        if (property_exists($this, 'tempDir') && $this->tempDir !== null && is_dir($this->tempDir)) {
             $files = new RecursiveIteratorIterator(
                 new RecursiveDirectoryIterator($this->tempDir, RecursiveDirectoryIterator::SKIP_DOTS),
                 RecursiveIteratorIterator::CHILD_FIRST
@@ -27,28 +27,28 @@ describe('DaemonSetupCommand', function () {
         }
     });
 
-    describe('command metadata', function () {
+    describe('command metadata', function (): void {
 
-        it('has correct command name', function () {
+        it('has correct command name', function (): void {
             $command = $this->app->make(DaemonSetupCommand::class);
             expect($command->getName())->toBe('daemon:setup');
         });
 
-        it('has a description', function () {
+        it('has a description', function (): void {
             $command = $this->app->make(DaemonSetupCommand::class);
             expect($command->getDescription())->not->toBeEmpty();
         });
 
-        it('has no positional arguments', function () {
+        it('has no positional arguments', function (): void {
             $command = $this->app->make(DaemonSetupCommand::class);
             expect($command->getDefinition()->getArguments())->toBeEmpty();
         });
 
     });
 
-    describe('banner output', function () {
+    describe('banner output', function (): void {
 
-        it('outputs the setup banner text', function () {
+        it('outputs the setup banner text', function (): void {
             $command = $this->app->make(DaemonSetupCommand::class);
             $input = new \Symfony\Component\Console\Input\ArrayInput([]);
             $output = new \Symfony\Component\Console\Output\BufferedOutput;
@@ -65,9 +65,9 @@ describe('DaemonSetupCommand', function () {
 
     });
 
-    describe('displaySuccess output', function () {
+    describe('displaySuccess output', function (): void {
 
-        it('shows setup complete and usage instructions', function () {
+        it('shows setup complete and usage instructions', function (): void {
             $command = $this->app->make(DaemonSetupCommand::class);
             $input = new \Symfony\Component\Console\Input\ArrayInput([]);
             $output = new \Symfony\Component\Console\Output\BufferedOutput;
@@ -90,9 +90,9 @@ describe('DaemonSetupCommand', function () {
 
     });
 
-    describe('authenticateSpotifyd internals', function () {
+    describe('authenticateSpotifyd internals', function (): void {
 
-        it('returns early and shows already-authenticated when credentials file exists', function () {
+        it('returns early and shows already-authenticated when credentials file exists', function (): void {
             $cachePath = $this->tempDir.'/.config/spotify-cli/cache';
             mkdir($cachePath, 0755, true);
             file_put_contents($cachePath.'/credentials.json', json_encode([
@@ -117,7 +117,7 @@ describe('DaemonSetupCommand', function () {
             expect($output->fetch())->toContain('Already authenticated with Spotify');
         });
 
-        it('creates the cache directory when it does not exist', function () {
+        it('creates the cache directory when it does not exist', function (): void {
             $cachePath = $this->tempDir.'/.config/spotify-cli/cache';
             expect(is_dir($cachePath))->toBeFalse();
 
@@ -141,9 +141,9 @@ describe('DaemonSetupCommand', function () {
 
     });
 
-    describe('installDependencies internals', function () {
+    describe('installDependencies internals', function (): void {
 
-        it('builds correct brew install command on macOS', function () {
+        it('builds correct brew install command on macOS', function (): void {
             if (PHP_OS_FAMILY !== 'Darwin') {
                 expect(true)->toBeTrue(); // Skip on non-macOS
 
@@ -163,7 +163,7 @@ describe('DaemonSetupCommand', function () {
             expect($cmd)->toBe('brew install spotifyd sox');
         });
 
-        it('builds correct apt install command on Linux', function () {
+        it('builds correct apt install command on Linux', function (): void {
             $issues = ['spotifyd', 'sox'];
             $cmd = 'sudo apt install -y '.implode(' ', $issues);
             expect($cmd)->toBe('sudo apt install -y spotifyd sox');

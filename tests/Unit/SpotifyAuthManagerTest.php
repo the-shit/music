@@ -7,7 +7,7 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->tokenFile = sys_get_temp_dir().'/spotify_auth_test_token.json';
 
     // Set config BEFORE constructing — constructor calls loadTokenData()
@@ -23,17 +23,17 @@ beforeEach(function () {
     $this->auth = new SpotifyAuthManager;
 });
 
-afterEach(function () {
+afterEach(function (): void {
     if (file_exists($this->tokenFile)) {
         unlink($this->tokenFile);
     }
 });
 
-describe('SpotifyAuthManager', function () {
+describe('SpotifyAuthManager', function (): void {
 
-    describe('Authentication', function () {
+    describe('Authentication', function (): void {
 
-        it('checks if configured correctly', function () {
+        it('checks if configured correctly', function (): void {
             if (file_exists($this->tokenFile)) {
                 unlink($this->tokenFile);
             }
@@ -53,7 +53,7 @@ describe('SpotifyAuthManager', function () {
             expect($this->auth->isConfigured())->toBeTrue();
         });
 
-        it('reports configured when only refresh_token is available', function () {
+        it('reports configured when only refresh_token is available', function (): void {
             file_put_contents($this->tokenFile, json_encode([
                 'access_token' => null,
                 'refresh_token' => 'refresh_token',
@@ -67,7 +67,7 @@ describe('SpotifyAuthManager', function () {
             expect($this->auth->isConfigured())->toBeTrue();
         });
 
-        it('saves cleared state to disk on 4xx refresh failure', function () {
+        it('saves cleared state to disk on 4xx refresh failure', function (): void {
             file_put_contents($this->tokenFile, json_encode([
                 'access_token' => 'old_token',
                 'refresh_token' => 'revoked_token',
@@ -95,7 +95,7 @@ describe('SpotifyAuthManager', function () {
             expect($tokenData['expires_at'])->toBeNull();
         });
 
-        it('reloads token data from disk', function () {
+        it('reloads token data from disk', function (): void {
             // Start with expired token
             file_put_contents($this->tokenFile, json_encode([
                 'access_token' => 'old_token',
@@ -123,7 +123,7 @@ describe('SpotifyAuthManager', function () {
             expect($tokenProp->getValue($this->auth))->toBe('fresh_external_token');
         });
 
-        it('refreshes expired token', function () {
+        it('refreshes expired token', function (): void {
             file_put_contents($this->tokenFile, json_encode([
                 'access_token' => 'old_token',
                 'refresh_token' => 'refresh_token',
@@ -150,9 +150,9 @@ describe('SpotifyAuthManager', function () {
         });
     });
 
-    describe('Legacy token migration', function () {
+    describe('Legacy token migration', function (): void {
 
-        it('reads token from JSON file at primary token path', function () {
+        it('reads token from JSON file at primary token path', function (): void {
             // Verify that a JSON token file at the primary path is loaded correctly
             $tmpFile = sys_get_temp_dir().'/legacy_test_primary_'.uniqid().'.json';
             file_put_contents($tmpFile, json_encode([
@@ -181,7 +181,7 @@ describe('SpotifyAuthManager', function () {
             @unlink($tmpFile);
         });
 
-        it('returns without setting token when tokenFile contains invalid JSON', function () {
+        it('returns without setting token when tokenFile contains invalid JSON', function (): void {
             // If tokenFile exists but contains garbage data, should not crash
             $tmpFile = sys_get_temp_dir().'/legacy_test_bad_'.uniqid().'.json';
             file_put_contents($tmpFile, 'not-json-and-not-a-legacy-location');
@@ -210,9 +210,9 @@ describe('SpotifyAuthManager', function () {
 
     });
 
-    describe('Token persistence', function () {
+    describe('Token persistence', function (): void {
 
-        it('creates config directory if it does not exist when saving token', function () {
+        it('creates config directory if it does not exist when saving token', function (): void {
             $dir = sys_get_temp_dir().'/spotify_new_dir_'.uniqid();
             $newFile = $dir.'/token.json';
 

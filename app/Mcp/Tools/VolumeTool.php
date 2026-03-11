@@ -27,7 +27,7 @@ class VolumeTool extends Tool
 
     public function handle(Request $request, SpotifyService $spotify): Response
     {
-        return $this->withAuthHandling(function () use ($request, $spotify) {
+        return $this->withAuthHandling(function () use ($request, $spotify): \Laravel\Mcp\Response {
             $level = $request->get('level');
 
             if ($level === null) {

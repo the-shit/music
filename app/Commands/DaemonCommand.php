@@ -34,8 +34,11 @@ class DaemonCommand extends Command
         $this->pidFile = $this->configDir.'/daemon.pid';
     }
 
-    public function handle()
+    private SpotifyService $spotify;
+
+    public function handle(SpotifyService $spotify): int
     {
+        $this->spotify = $spotify;
         $action = $this->argument('action');
 
         return match ($action) {
@@ -84,7 +87,7 @@ class DaemonCommand extends Command
         // Detect orphaned spotifyd processes using our config
         $configFile = $this->configDir.'/spotifyd.conf';
         $orphanPid = trim((string) shell_exec("pgrep -f 'spotifyd.*{$configFile}' 2>/dev/null | head -1"));
-        $orphanComm = $orphanPid ? trim((string) shell_exec("ps -p {$orphanPid} -o comm= 2>/dev/null")) : '';
+        $orphanComm = $orphanPid !== '' && $orphanPid !== '0' ? trim((string) shell_exec("ps -p {$orphanPid} -o comm= 2>/dev/null")) : '';
         if ($orphanPid && $orphanComm === 'spotifyd') {
             warning("Found orphaned spotifyd (PID: {$orphanPid}) — adopting it");
             $this->savePid((int) $orphanPid);
@@ -358,7 +361,7 @@ class DaemonCommand extends Command
 
         if (file_exists($logFile)) {
             $log = trim(file_get_contents($logFile));
-            if ($log) {
+            if ($log !== '' && $log !== '0') {
                 warning('Daemon error:');
                 $this->line($log);
             }
@@ -408,7 +411,7 @@ class DaemonCommand extends Command
         // Check for spotifyd using our config (covers LaunchAgent case)
         $configFile = $this->configDir.'/spotifyd.conf';
         $pid = trim((string) shell_exec("pgrep -f 'spotifyd.*{$configFile}' 2>/dev/null | head -1"));
-        if ($pid) {
+        if ($pid !== '' && $pid !== '0') {
             $comm = trim((string) shell_exec("ps -p {$pid} -o comm= 2>/dev/null"));
             if ($comm === 'spotifyd') {
                 return (int) $pid;
@@ -443,7 +446,7 @@ class DaemonCommand extends Command
 
         $output = trim((string) shell_exec('launchctl list '.self::LAUNCH_AGENT_LABEL.' 2>&1'));
 
-        return ! empty($output) && ! str_contains($output, 'Could not find');
+        return $output !== '' && $output !== '0' && ! str_contains($output, 'Could not find');
     }
 
     private function generateLaunchAgentPlist(string $spotifydPath): string
@@ -495,7 +498,7 @@ XML;
 
         // Unload the old agent if it's loaded
         $output = trim((string) shell_exec('launchctl list '.self::LEGACY_LAUNCH_AGENT_LABEL.' 2>&1'));
-        if (! empty($output) && ! str_contains($output, 'Could not find')) {
+        if ($output !== '' && $output !== '0' && ! str_contains($output, 'Could not find')) {
             shell_exec('launchctl unload '.$legacyPlist.' 2>&1');
         }
 
@@ -516,16 +519,15 @@ XML;
     private function transferPlaybackToDaemon(string $deviceName): void
     {
         try {
-            $spotify = app(SpotifyService::class);
 
-            if (! $spotify->isConfigured()) {
+            if (! $this->spotify->isConfigured()) {
                 return;
             }
 
             // Poll for the daemon device to appear (up to 8 seconds)
             $device = null;
             for ($i = 0; $i < 8; $i++) {
-                $devices = $spotify->getDevices();
+                $devices = $this->spotify->getDevices();
                 foreach ($devices as $d) {
                     if (($d['name'] ?? '') === $deviceName) {
                         $device = $d;
@@ -541,7 +543,7 @@ XML;
                 return;
             }
 
-            $spotify->transferPlayback($device['id'], true);
+            $this->spotify->transferPlayback($device['id'], true);
             info("📱 Playback transferred to \"{$deviceName}\"");
         } catch (\Throwable $e) {
             warning('Could not transfer playback: '.$e->getMessage());
@@ -551,8 +553,8 @@ XML;
 
     private function invalidAction(string $action): int
     {
-        $this->error("Invalid action: {$action}");
-        $this->info('Available actions: start, stop, status, install, uninstall');
+        error("Invalid action: {$action}");
+        info('Available actions: start, stop, status, install, uninstall');
 
         return self::FAILURE;
     }

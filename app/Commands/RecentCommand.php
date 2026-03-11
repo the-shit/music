@@ -6,6 +6,10 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class RecentCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -16,13 +20,12 @@ class RecentCommand extends Command
 
     protected $description = 'Show recently played tracks';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
 
-        $spotify = app(SpotifyService::class);
         $limit = (int) $this->option('limit');
 
         try {
@@ -34,11 +37,11 @@ class RecentCommand extends Command
                 return self::SUCCESS;
             }
 
-            $this->info('🕐 Recently Played:');
+            info('🕐 Recently Played:');
             $this->newLine();
 
             if (empty($tracks)) {
-                $this->warn('No recently played tracks found.');
+                warning('No recently played tracks found.');
 
                 return self::SUCCESS;
             }
@@ -54,7 +57,7 @@ class RecentCommand extends Command
             return self::SUCCESS;
 
         } catch (\Exception $e) {
-            $this->error('❌ '.$e->getMessage());
+            error('❌ '.$e->getMessage());
 
             return self::FAILURE;
         }

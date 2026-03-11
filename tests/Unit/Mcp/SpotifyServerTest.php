@@ -22,20 +22,20 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-describe('SpotifyServer', function () {
+describe('SpotifyServer', function (): void {
 
-    it('has the correct server name', function () {
+    it('has the correct server name', function (): void {
         $reflection = new ReflectionClass(SpotifyServer::class);
         $attribute = $reflection->getAttributes(\Laravel\Mcp\Server\Attributes\Name::class)[0] ?? null;
         expect($attribute)->not->toBeNull();
         expect($attribute->newInstance()->value)->toBe('spotify');
     });
 
-    it('extends Laravel MCP Server', function () {
+    it('extends Laravel MCP Server', function (): void {
         expect(is_subclass_of(SpotifyServer::class, \Laravel\Mcp\Server::class))->toBeTrue();
     });
 
-    it('registers all expected tool classes', function () {
+    it('registers all expected tool classes', function (): void {
         $reflection = new ReflectionClass(SpotifyServer::class);
         $property = $reflection->getProperty('tools');
         $tools = $property->getDefaultValue();
@@ -57,7 +57,7 @@ describe('SpotifyServer', function () {
             ->toContain(SessionAdjustTool::class);
     });
 
-    it('registers all expected resource classes', function () {
+    it('registers all expected resource classes', function (): void {
         $reflection = new ReflectionClass(SpotifyServer::class);
         $property = $reflection->getProperty('resources');
         $resources = $property->getDefaultValue();
@@ -66,7 +66,7 @@ describe('SpotifyServer', function () {
             ->toContain(DevicesResource::class);
     });
 
-    it('registers exactly 12 tools', function () {
+    it('registers exactly 12 tools', function (): void {
         $reflection = new ReflectionClass(SpotifyServer::class);
         $property = $reflection->getProperty('tools');
         $tools = $property->getDefaultValue();
@@ -74,7 +74,7 @@ describe('SpotifyServer', function () {
         expect($tools)->toHaveCount(15);
     });
 
-    it('registers exactly 2 resources', function () {
+    it('registers exactly 2 resources', function (): void {
         $reflection = new ReflectionClass(SpotifyServer::class);
         $property = $reflection->getProperty('resources');
         $resources = $property->getDefaultValue();
@@ -84,9 +84,9 @@ describe('SpotifyServer', function () {
 
 });
 
-describe('Tool schema definitions', function () {
+describe('Tool schema definitions', function (): void {
 
-    it('PlayTool schema includes required query field', function () {
+    it('PlayTool schema includes required query field', function (): void {
         $tool = app(PlayTool::class);
         $array = $tool->toArray();
 
@@ -95,14 +95,14 @@ describe('Tool schema definitions', function () {
         expect($array['inputSchema']['required'] ?? [])->toContain('query');
     });
 
-    it('SkipTool schema includes direction field with enum', function () {
+    it('SkipTool schema includes direction field with enum', function (): void {
         $tool = app(SkipTool::class);
         $array = $tool->toArray();
 
         expect($array['inputSchema']['properties'])->toHaveKey('direction');
     });
 
-    it('VolumeTool schema includes optional level field', function () {
+    it('VolumeTool schema includes optional level field', function (): void {
         $tool = app(VolumeTool::class);
         $array = $tool->toArray();
 
@@ -112,7 +112,7 @@ describe('Tool schema definitions', function () {
         expect($required)->not->toContain('level');
     });
 
-    it('QueueAddTool schema includes required query field', function () {
+    it('QueueAddTool schema includes required query field', function (): void {
         $tool = app(QueueAddTool::class);
         $array = $tool->toArray();
 
@@ -120,7 +120,7 @@ describe('Tool schema definitions', function () {
         expect($array['inputSchema']['required'] ?? [])->toContain('query');
     });
 
-    it('SearchTool schema includes query, type and limit fields', function () {
+    it('SearchTool schema includes query, type and limit fields', function (): void {
         $tool = app(SearchTool::class);
         $array = $tool->toArray();
 
@@ -130,7 +130,7 @@ describe('Tool schema definitions', function () {
         expect($array['inputSchema']['required'] ?? [])->toContain('query');
     });
 
-    it('ShuffleTool schema includes optional enabled field', function () {
+    it('ShuffleTool schema includes optional enabled field', function (): void {
         $tool = app(ShuffleTool::class);
         $array = $tool->toArray();
 
@@ -139,7 +139,7 @@ describe('Tool schema definitions', function () {
         expect($required)->not->toContain('enabled');
     });
 
-    it('RepeatTool schema includes required mode field', function () {
+    it('RepeatTool schema includes required mode field', function (): void {
         $tool = app(RepeatTool::class);
         $array = $tool->toArray();
 
@@ -147,7 +147,7 @@ describe('Tool schema definitions', function () {
         expect($array['inputSchema']['required'] ?? [])->toContain('mode');
     });
 
-    it('PauseTool schema has no required inputs', function () {
+    it('PauseTool schema has no required inputs', function (): void {
         $tool = app(PauseTool::class);
         $array = $tool->toArray();
 
@@ -155,7 +155,7 @@ describe('Tool schema definitions', function () {
         expect($required)->toBeEmpty();
     });
 
-    it('ResumeTool schema has no required inputs', function () {
+    it('ResumeTool schema has no required inputs', function (): void {
         $tool = app(ResumeTool::class);
         $array = $tool->toArray();
 
@@ -163,7 +163,7 @@ describe('Tool schema definitions', function () {
         expect($required)->toBeEmpty();
     });
 
-    it('CurrentTool schema has no required inputs', function () {
+    it('CurrentTool schema has no required inputs', function (): void {
         $tool = app(CurrentTool::class);
         $array = $tool->toArray();
 
@@ -171,7 +171,7 @@ describe('Tool schema definitions', function () {
         expect($required)->toBeEmpty();
     });
 
-    it('DevicesTool schema has no required inputs', function () {
+    it('DevicesTool schema has no required inputs', function (): void {
         $tool = app(DevicesTool::class);
         $array = $tool->toArray();
 
@@ -179,7 +179,7 @@ describe('Tool schema definitions', function () {
         expect($required)->toBeEmpty();
     });
 
-    it('QueueShowTool schema has no required inputs', function () {
+    it('QueueShowTool schema has no required inputs', function (): void {
         $tool = app(QueueShowTool::class);
         $array = $tool->toArray();
 
@@ -187,7 +187,7 @@ describe('Tool schema definitions', function () {
         expect($required)->toBeEmpty();
     });
 
-    it('SessionStartTool schema includes required prompt and optional duration', function () {
+    it('SessionStartTool schema includes required prompt and optional duration', function (): void {
         $tool = app(SessionStartTool::class);
         $array = $tool->toArray();
 
@@ -197,7 +197,7 @@ describe('Tool schema definitions', function () {
         expect($array['inputSchema']['required'] ?? [])->not->toContain('duration');
     });
 
-    it('SessionStatusTool schema has no required inputs', function () {
+    it('SessionStatusTool schema has no required inputs', function (): void {
         $tool = app(SessionStatusTool::class);
         $array = $tool->toArray();
 
@@ -205,7 +205,7 @@ describe('Tool schema definitions', function () {
         expect($required)->toBeEmpty();
     });
 
-    it('SessionAdjustTool schema includes required feedback field', function () {
+    it('SessionAdjustTool schema includes required feedback field', function (): void {
         $tool = app(SessionAdjustTool::class);
         $array = $tool->toArray();
 

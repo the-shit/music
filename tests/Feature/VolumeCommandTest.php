@@ -2,9 +2,9 @@
 
 use App\Services\SpotifyService;
 
-describe('VolumeCommand', function () {
+describe('VolumeCommand', function (): void {
 
-    it('shows current volume when no argument', function () {
+    it('shows current volume when no argument', function (): void {
         $currentPlayback = [
             'name' => 'Test Song',
             'artist' => 'Test Artist',
@@ -14,52 +14,52 @@ describe('VolumeCommand', function () {
             ],
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback) {
+        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
         });
 
         $this->artisan('volume')
-            ->expectsOutput('🔊 Current volume: 42%')
+            ->expectsOutputToContain('🔊 Current volume: 42%')
             ->assertExitCode(0);
     });
 
-    it('sets volume to specific level', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('sets volume to specific level', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('setVolume')->once()->with(75)->andReturn(true);
         });
 
         $this->artisan('volume', ['level' => '75'])
-            ->expectsOutput('🔊 Volume set to 75%')
+            ->expectsOutputToContain('🔊 Volume set to 75%')
             ->assertExitCode(0);
     });
 
-    it('handles zero volume correctly', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('handles zero volume correctly', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('setVolume')->once()->with(0)->andReturn(true);
         });
 
         $this->artisan('volume', ['level' => '0'])
-            ->expectsOutput('🔇 Volume set to 0%')
+            ->expectsOutputToContain('🔇 Volume set to 0%')
             ->assertExitCode(0);
     });
 
-    it('clamps values above 100', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('clamps values above 100', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('setVolume')->once()->with(100)->andReturn(true);
         });
 
         $this->artisan('volume', ['level' => '150'])
-            ->expectsOutput('🔊 Volume set to 100%')
+            ->expectsOutputToContain('🔊 Volume set to 100%')
             ->assertExitCode(0);
     });
 
-    it('handles relative negative values', function () {
+    it('handles relative negative values', function (): void {
         // -10 is treated as relative change (current - 10)
-        $this->mock(SpotifyService::class, function ($mock) {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'device' => ['volume_percent' => 50],
@@ -71,42 +71,42 @@ describe('VolumeCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('handles API failure', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('handles API failure', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('setVolume')->once()->with(50)->andReturn(false);
         });
 
         $this->artisan('volume', ['level' => '50'])
-            ->expectsOutput('❌ Failed to set volume')
+            ->expectsOutputToContain('❌ Failed to set volume')
             ->assertExitCode(1);
     });
 
-    it('requires configuration', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('requires configuration', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
         $this->artisan('volume')
-            ->expectsOutput('❌ Spotify is not configured')
-            ->expectsOutput('💡 Run "spotify setup" first')
+            ->expectsOutputToContain('Spotify is not configured')
+            ->expectsOutputToContain('Run "spotify setup" first')
             ->assertExitCode(1);
     });
 
-    it('handles no active device', function () {
+    it('handles no active device', function (): void {
         $currentPlayback = [
             'name' => 'Test Song',
             'artist' => 'Test Artist',
             'device' => null,
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback) {
+        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
         });
 
         $this->artisan('volume')
-            ->expectsOutput('❌ No active device found')
+            ->expectsOutputToContain('❌ No active device found')
             ->assertExitCode(1);
     });
 

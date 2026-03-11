@@ -22,7 +22,7 @@ class CurrentTool extends Tool
 
     public function handle(Request $request, SpotifyService $spotify): Response
     {
-        return $this->withAuthHandling(function () use ($spotify) {
+        return $this->withAuthHandling(function () use ($spotify): \Laravel\Mcp\Response {
             $playback = $spotify->getCurrentPlayback();
 
             if (! $playback) {

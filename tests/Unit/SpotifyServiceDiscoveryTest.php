@@ -10,7 +10,7 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-beforeEach(function () {
+beforeEach(function (): void {
     Config::set('spotify.client_id', 'test_client_id');
     Config::set('spotify.client_secret', 'test_client_secret');
 
@@ -36,9 +36,9 @@ beforeEach(function () {
     }
 });
 
-describe('Discovery Methods', function () {
+describe('Discovery Methods', function (): void {
 
-    it('passes mood audio features to recommendations endpoint', function () {
+    it('passes mood audio features to recommendations endpoint', function (): void {
         Http::fake([
             'api.spotify.com/v1/recommendations*' => Http::response([
                 'tracks' => [[
@@ -61,7 +61,7 @@ describe('Discovery Methods', function () {
         expect($tracks)->toHaveCount(1);
         expect($tracks[0]['name'])->toBe('Mood Track');
 
-        Http::assertSent(function (Request $request) {
+        Http::assertSent(function (Request $request): bool {
             $url = urldecode($request->url());
 
             return str_contains($url, '/recommendations?')
@@ -74,7 +74,7 @@ describe('Discovery Methods', function () {
         });
     });
 
-    it('requests recommendations without audio features by default', function () {
+    it('requests recommendations without audio features by default', function (): void {
         Http::fake([
             'api.spotify.com/v1/recommendations*' => Http::response([
                 'tracks' => [],
@@ -86,7 +86,7 @@ describe('Discovery Methods', function () {
 
         $this->service->getRecommendations(['seed_track_1'], [], 10);
 
-        Http::assertSent(function (Request $request) {
+        Http::assertSent(function (Request $request): bool {
             $url = urldecode($request->url());
 
             return str_contains($url, '/recommendations?')
@@ -96,7 +96,7 @@ describe('Discovery Methods', function () {
         });
     });
 
-    it('preserves mood intent when recommendations fallback to smart discovery', function () {
+    it('preserves mood intent when recommendations fallback to smart discovery', function (): void {
         Http::fake([
             'api.spotify.com/v1/recommendations*' => Http::response(['tracks' => []]),
             'api.spotify.com/v1/me/top/tracks*' => Http::response(['items' => []]),
@@ -124,7 +124,7 @@ describe('Discovery Methods', function () {
 
         expect($tracks)->not->toBeEmpty();
 
-        Http::assertSent(function (Request $request) {
+        Http::assertSent(function (Request $request): bool {
             $url = urldecode($request->url());
 
             return str_contains($url, '/search?')
@@ -132,7 +132,7 @@ describe('Discovery Methods', function () {
         });
     });
 
-    it('falls back to smart discovery when no recommendation seeds are available', function () {
+    it('falls back to smart discovery when no recommendation seeds are available', function (): void {
         Http::fake([
             'api.spotify.com/v1/me/player/recently-played*' => Http::response(['items' => []]),
             'api.spotify.com/v1/me/top/tracks*' => Http::response(['items' => []]),
@@ -161,7 +161,7 @@ describe('Discovery Methods', function () {
         expect($tracks)->toHaveCount(1);
         expect($tracks[0]['name'])->toBe('No Seed Track');
 
-        Http::assertSent(function (Request $request) {
+        Http::assertSent(function (Request $request): bool {
             $url = urldecode($request->url());
 
             return str_contains($url, '/search?')
@@ -169,7 +169,7 @@ describe('Discovery Methods', function () {
         });
     });
 
-    it('gets top tracks', function () {
+    it('gets top tracks', function (): void {
         Http::fake([
             'api.spotify.com/v1/me/top/tracks*' => Http::response([
                 'items' => [
@@ -196,26 +196,26 @@ describe('Discovery Methods', function () {
         expect($tracks[0]['name'])->toBe('Top Song');
         expect($tracks[0]['artist'])->toBe('Top Artist');
 
-        Http::assertSent(function (Request $request) {
+        Http::assertSent(function (Request $request): bool {
             return str_contains($request->url(), 'me/top/tracks')
                 && str_contains($request->url(), 'time_range=medium_term');
         });
     });
 
-    it('gets top tracks with short_term range', function () {
+    it('gets top tracks with short_term range', function (): void {
         Http::fake([
             'api.spotify.com/v1/me/top/tracks*' => Http::response(['items' => []]),
         ]);
 
         $this->service->getTopTracks('short_term', 5);
 
-        Http::assertSent(function (Request $request) {
+        Http::assertSent(function (Request $request): bool {
             return str_contains($request->url(), 'time_range=short_term')
                 && str_contains($request->url(), 'limit=5');
         });
     });
 
-    it('gets top artists', function () {
+    it('gets top artists', function (): void {
         Http::fake([
             'api.spotify.com/v1/me/top/artists*' => Http::response([
                 'items' => [
@@ -236,7 +236,7 @@ describe('Discovery Methods', function () {
         expect($artists[0]['genres'])->toBe(['rock', 'alternative']);
     });
 
-    it('gets recently played tracks', function () {
+    it('gets recently played tracks', function (): void {
         Http::fake([
             'api.spotify.com/v1/me/player/recently-played*' => Http::response([
                 'items' => [
@@ -260,13 +260,13 @@ describe('Discovery Methods', function () {
         expect($tracks[0]['name'])->toBe('Recent Song');
         expect($tracks[0]['played_at'])->toBe('2025-01-01T12:00:00Z');
 
-        Http::assertSent(function (Request $request) {
+        Http::assertSent(function (Request $request): bool {
             return str_contains($request->url(), 'recently-played')
                 && str_contains($request->url(), 'limit=10');
         });
     });
 
-    it('searches by genre', function () {
+    it('searches by genre', function (): void {
         Http::fake([
             'api.spotify.com/v1/search*' => Http::response([
                 'tracks' => [
@@ -287,7 +287,7 @@ describe('Discovery Methods', function () {
         expect($tracks)->toHaveCount(1);
         expect($tracks[0]['name'])->toBe('Genre Track');
 
-        Http::assertSent(function (Request $request) {
+        Http::assertSent(function (Request $request): bool {
             $url = urldecode($request->url());
 
             return str_contains($url, 'genre:electronic')
@@ -295,7 +295,7 @@ describe('Discovery Methods', function () {
         });
     });
 
-    it('searches by genre without mood', function () {
+    it('searches by genre without mood', function (): void {
         Http::fake([
             'api.spotify.com/v1/search*' => Http::response([
                 'tracks' => ['items' => []],
@@ -304,14 +304,14 @@ describe('Discovery Methods', function () {
 
         $this->service->searchByGenre('jazz');
 
-        Http::assertSent(function (Request $request) {
+        Http::assertSent(function (Request $request): bool {
             $url = urldecode($request->url());
 
             return str_contains($url, 'genre:jazz');
         });
     });
 
-    it('returns empty array when top tracks API fails', function () {
+    it('returns empty array when top tracks API fails', function (): void {
         Http::fake([
             'api.spotify.com/v1/me/top/tracks*' => Http::response([], 500),
         ]);
@@ -321,7 +321,7 @@ describe('Discovery Methods', function () {
         expect($tracks)->toBe([]);
     });
 
-    it('returns empty array when recently played API fails', function () {
+    it('returns empty array when recently played API fails', function (): void {
         Http::fake([
             'api.spotify.com/v1/me/player/recently-played*' => Http::response([], 500),
         ]);
