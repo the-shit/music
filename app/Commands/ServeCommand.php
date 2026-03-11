@@ -5,6 +5,8 @@ namespace App\Commands;
 use App\Commands\Concerns\RequiresSpotifyConfig;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\info;
+
 class ServeCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -15,7 +17,7 @@ class ServeCommand extends Command
 
     protected $description = 'Run the Spotify request server (accepts Slack slash commands)';
 
-    public function handle()
+    public function handle(): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -27,17 +29,17 @@ class ServeCommand extends Command
         // Write the request handler script
         $handlerScript = $this->createHandler();
 
-        $this->info('🎵 Spotify Request Server');
-        $this->info("📡 Listening on http://{$host}:{$port}");
+        info('🎵 Spotify Request Server');
+        info("📡 Listening on http://{$host}:{$port}");
         $this->newLine();
-        $this->info('Slack slash command URL: http://<your-domain>:{$port}/slack/queue');
-        $this->info('API endpoint: POST http://{$host}:{$port}/api/queue?track=<query>');
+        info('Slack slash command URL: http://<your-domain>:{$port}/slack/queue');
+        info('API endpoint: POST http://{$host}:{$port}/api/queue?track=<query>');
         $this->newLine();
-        $this->info('Ctrl+C to stop');
+        info('Ctrl+C to stop');
         $this->newLine();
 
         // Clean up handler script on exit
-        register_shutdown_function(function () use ($handlerScript) {
+        register_shutdown_function(function () use ($handlerScript): void {
             @unlink($handlerScript);
         });
 

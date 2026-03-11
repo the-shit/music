@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use Exception;
 use Illuminate\Support\Facades\Http;
 
 class SpotifyAuthManager
@@ -35,8 +34,8 @@ class SpotifyAuthManager
      */
     public function isConfigured(): bool
     {
-        return ! empty($this->clientId) && ! empty($this->clientSecret)
-            && (! empty($this->accessToken) || ! empty($this->refreshToken));
+        return ! in_array($this->clientId, [null, '', '0'], true) && ! in_array($this->clientSecret, [null, '', '0'], true)
+            && (! in_array($this->accessToken, [null, '', '0'], true) || ! in_array($this->refreshToken, [null, '', '0'], true));
     }
 
     /**
@@ -182,6 +181,7 @@ class SpotifyAuthManager
     public function getAccessToken(): ?string
     {
         $this->ensureValidToken();
+
         return $this->accessToken;
     }
 }

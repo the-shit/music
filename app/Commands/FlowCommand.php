@@ -6,6 +6,10 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class FlowCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -17,13 +21,11 @@ class FlowCommand extends Command
 
     protected $description = 'Queue focus/flow state music for deep work';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
         $duration = (int) $this->option('duration');
         $limit = $this->option('limit');
 
@@ -39,8 +41,8 @@ class FlowCommand extends Command
 
             $allTracks = $this->gatherTracks($spotify, $queries, $trackCount);
 
-            if (empty($allTracks)) {
-                $this->warn('No flow tracks found.');
+            if ($allTracks === []) {
+                warning('No flow tracks found.');
 
                 return self::FAILURE;
             }
@@ -57,7 +59,7 @@ class FlowCommand extends Command
                 return self::SUCCESS;
             }
 
-            $this->info("🧘 Flow mode activated — {$duration} min session");
+            info("🧘 Flow mode activated — {$duration} min session");
             $this->newLine();
             foreach ($queued as $i => $track) {
                 $action = $i === 0 ? '▶️ Now' : '📋 Queue';
@@ -67,7 +69,7 @@ class FlowCommand extends Command
             return self::SUCCESS;
 
         } catch (\Exception $e) {
-            $this->error('❌ '.$e->getMessage());
+            error('❌ '.$e->getMessage());
 
             return self::FAILURE;
         }
@@ -117,7 +119,7 @@ class FlowCommand extends Command
         }
 
         // Filter out duplicates
-        $tracks = array_filter($tracks, fn ($track) => ! isset($excludeUris[$track['uri']]));
+        $tracks = array_filter($tracks, fn (array $track): bool => ! isset($excludeUris[$track['uri']]));
         $tracks = array_values($tracks);
 
         $queued = [];

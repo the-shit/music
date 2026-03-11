@@ -3,7 +3,7 @@
 use App\Services\SpotifyService;
 use Illuminate\Support\Facades\Http;
 
-it('shares now playing to slack', function () {
+it('shares now playing to slack', function (): void {
     $configDir = sys_get_temp_dir().'/spotify-slack-test';
     if (! is_dir($configDir)) {
         mkdir($configDir, 0755, true);
@@ -32,14 +32,14 @@ it('shares now playing to slack', function () {
         ->expectsOutputToContain('Shared to Slack')
         ->assertSuccessful();
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'hooks.slack.com'));
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'hooks.slack.com'));
 
     // Cleanup
     @unlink($configDir.'/slack.json');
     @rmdir($configDir);
 });
 
-it('tests webhook connectivity', function () {
+it('tests webhook connectivity', function (): void {
     $configDir = sys_get_temp_dir().'/spotify-slack-test2';
     if (! is_dir($configDir)) {
         mkdir($configDir, 0755, true);
@@ -63,7 +63,7 @@ it('tests webhook connectivity', function () {
     @rmdir($configDir);
 });
 
-it('fails when no webhook configured', function () {
+it('fails when no webhook configured', function (): void {
     $configDir = sys_get_temp_dir().'/spotify-slack-empty';
     config(['spotify.config_dir' => $configDir]);
 
@@ -75,7 +75,7 @@ it('fails when no webhook configured', function () {
         ->assertFailed();
 });
 
-it('handles invalid action', function () {
+it('handles invalid action', function (): void {
     $this->artisan('slack', ['action' => 'invalid'])
         ->assertFailed();
 });

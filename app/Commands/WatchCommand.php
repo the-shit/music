@@ -7,6 +7,9 @@ use App\Services\SpotifyService;
 use Illuminate\Support\Facades\Http;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class WatchCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -22,32 +25,30 @@ class WatchCommand extends Command
 
     private ?string $lastTrackUri = null;
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
         $interval = max(3, (int) $this->option('interval'));
         $slackWebhook = $this->option('slack') ?: $this->loadSlackWebhook();
         $jsonMode = $this->option('json');
 
         if (! $jsonMode) {
-            $this->info('👀 Watching Spotify playback...');
+            info('👀 Watching Spotify playback...');
             if ($slackWebhook) {
-                $this->info('📡 Streaming to Slack');
+                info('📡 Streaming to Slack');
             }
-            $this->info("⏱️  Polling every {$interval}s — Ctrl+C to stop");
+            info("⏱️  Polling every {$interval}s — Ctrl+C to stop");
             $this->newLine();
         }
 
         // Register signal handler for clean shutdown
         if (function_exists('pcntl_signal')) {
-            pcntl_signal(SIGINT, function () use ($jsonMode) {
+            pcntl_signal(SIGINT, function () use ($jsonMode): void {
                 if (! $jsonMode) {
                     $this->newLine();
-                    $this->info('👋 Stopped watching.');
+                    info('👋 Stopped watching.');
                 }
                 exit(0);
             });
@@ -59,7 +60,7 @@ class WatchCommand extends Command
                 $this->processState($current, $slackWebhook, $jsonMode);
             } catch (\Exception $e) {
                 if (! $jsonMode) {
-                    $this->warn("⚠️  API error: {$e->getMessage()}");
+                    warning("⚠️  API error: {$e->getMessage()}");
                 }
             }
 

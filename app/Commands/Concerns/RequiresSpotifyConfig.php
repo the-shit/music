@@ -4,12 +4,11 @@ namespace App\Commands\Concerns;
 
 use App\Services\SpotifyService;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+
 trait RequiresSpotifyConfig
 {
-    /**
-     * Ensure Spotify is configured, auto-launching setup if not.
-     * Returns true if configured, false if user cancelled setup.
-     */
     protected function ensureConfigured(): bool
     {
         $spotify = app(SpotifyService::class);
@@ -18,10 +17,8 @@ trait RequiresSpotifyConfig
             return true;
         }
 
-        // Show error message
-        // Use $this->line() because $this->error()/info() go to STDERR which tests don't capture
-        $this->line('❌ Spotify is not configured');
-        $this->line('💡 Run "spotify setup" first');
+        error('Spotify is not configured');
+        info('Run "spotify setup" first');
 
         return false;
     }

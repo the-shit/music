@@ -3,18 +3,18 @@
 use App\Agents\IntentParserAgent;
 use Laravel\Ai\Contracts\Agent;
 
-it('implements Agent interface', function () {
+it('implements Agent interface', function (): void {
     expect(new IntentParserAgent)->toBeInstanceOf(Agent::class);
 });
 
-it('returns non-empty instructions', function () {
+it('returns non-empty instructions', function (): void {
     $agent = new IntentParserAgent;
     $instructions = $agent->instructions();
 
     expect($instructions)->toBeString()->not->toBeEmpty();
 });
 
-it('includes mood presets in instructions', function () {
+it('includes mood presets in instructions', function (): void {
     $agent = new IntentParserAgent;
     $instructions = $agent->instructions();
 
@@ -26,7 +26,7 @@ it('includes mood presets in instructions', function () {
         ->toContain('tempo');
 });
 
-it('uses the configured parser model', function () {
+it('uses the configured parser model', function (): void {
     config(['ai.session.parser_model' => 'test/model-123']);
 
     $agent = new IntentParserAgent;
@@ -34,13 +34,13 @@ it('uses the configured parser model', function () {
     expect($agent->model())->toBe('test/model-123');
 });
 
-it('uses openrouter provider', function () {
+it('uses openrouter provider', function (): void {
     $agent = new IntentParserAgent;
 
     expect($agent->provider())->toBe('openrouter');
 });
 
-it('instructions include JSON output format', function () {
+it('instructions include JSON output format', function (): void {
     $agent = new IntentParserAgent;
 
     expect($agent->instructions())

@@ -6,13 +6,15 @@ use App\Helpers\ConfigHelper;
 use Illuminate\Support\Facades\Http;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\info;
+
 class EventEmitCommand extends Command
 {
     protected $signature = 'event:emit {event : Event name} {data? : JSON data}';
 
     protected $description = 'Emit an event to the event bus';
 
-    public function handle()
+    public function handle(): int
     {
         $event = $this->argument('event');
         $data = $this->argument('data') ? json_decode($this->argument('data'), true) : [];
@@ -45,7 +47,7 @@ class EventEmitCommand extends Command
         // Forward to webhook if configured
         $this->forwardToWebhook($eventData);
 
-        $this->info("✅ Event emitted: spotify.{$event}");
+        info("✅ Event emitted: spotify.{$event}");
 
         return self::SUCCESS;
     }

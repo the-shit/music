@@ -5,6 +5,10 @@ namespace App\Commands;
 use App\Commands\Concerns\RequiresSpotifyConfig;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class NowPlayingCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -30,19 +34,19 @@ class NowPlayingCommand extends Command
         $interval = max(2, (int) $this->option('interval'));
 
         if (! $bridgeScript || ! file_exists($bridgeScript)) {
-            $this->error('Bridge script not found: nowplaying-bridge.py');
+            error('Bridge script not found: nowplaying-bridge.py');
 
             return self::FAILURE;
         }
 
         $python = trim(shell_exec('which python3') ?: '');
-        if (! $python) {
-            $this->error('python3 not found — required for nowplaying bridge.');
+        if ($python === '' || $python === '0') {
+            error('python3 not found — required for nowplaying bridge.');
 
             return self::FAILURE;
         }
 
-        $this->info('Starting macOS NowPlaying bridge...');
+        info('Starting macOS NowPlaying bridge...');
         $this->line('Media keys and Control Center widget will reflect Spotify playback.');
         $this->line('Ctrl+C to stop.');
         $this->newLine();
@@ -123,9 +127,9 @@ class NowPlayingCommand extends Command
         exec("pkill -f 'nowplaying-bridge.py'", $output, $code);
 
         if ($code === 0) {
-            $this->info('NowPlaying bridge stopped.');
+            info('NowPlaying bridge stopped.');
         } else {
-            $this->warn('No running nowplaying bridge found.');
+            warning('No running nowplaying bridge found.');
         }
 
         return self::SUCCESS;

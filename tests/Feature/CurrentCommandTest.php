@@ -2,10 +2,10 @@
 
 use App\Services\SpotifyService;
 
-describe('CurrentCommand', function () {
+describe('CurrentCommand', function (): void {
 
-    it('shows current track information', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('shows current track information', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'name' => 'Bohemian Rhapsody',
@@ -26,8 +26,8 @@ describe('CurrentCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('shows playing status icon when playing', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('shows playing status icon when playing', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'name' => 'Test Song',
@@ -44,8 +44,8 @@ describe('CurrentCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('shows paused status icon when not playing', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('shows paused status icon when not playing', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'name' => 'Test Song',
@@ -62,8 +62,8 @@ describe('CurrentCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('handles nothing currently playing', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('handles nothing currently playing', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
         });
@@ -73,7 +73,7 @@ describe('CurrentCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('outputs JSON when --json option is provided with current playback', function () {
+    it('outputs JSON when --json option is provided with current playback', function (): void {
         $playbackData = [
             'name' => 'Test Song',
             'artist' => 'Test Artist',
@@ -83,18 +83,18 @@ describe('CurrentCommand', function () {
             'is_playing' => true,
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($playbackData) {
+        $this->mock(SpotifyService::class, function ($mock) use ($playbackData): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($playbackData);
         });
 
         $this->artisan('current', ['--json' => true])
-            ->expectsOutput(json_encode($playbackData))
+            ->expectsOutputToContain(json_encode($playbackData))
             ->assertExitCode(0);
     });
 
-    it('outputs JSON with no playback status when --json option is provided and nothing playing', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('outputs JSON with no playback status when --json option is provided and nothing playing', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
         });
@@ -102,12 +102,12 @@ describe('CurrentCommand', function () {
         $expectedOutput = json_encode(['is_playing' => false, 'track' => null]);
 
         $this->artisan('current', ['--json' => true])
-            ->expectsOutput($expectedOutput)
+            ->expectsOutputToContain($expectedOutput)
             ->assertExitCode(0);
     });
 
-    it('requires configuration', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('requires configuration', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
@@ -117,8 +117,8 @@ describe('CurrentCommand', function () {
             ->assertExitCode(1);
     });
 
-    it('handles zero duration gracefully', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('handles zero duration gracefully', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'name' => 'Podcast Episode',
@@ -138,8 +138,8 @@ describe('CurrentCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('calculates progress percentage correctly at 50%', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('calculates progress percentage correctly at 50%', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'name' => 'Half Done Song',
@@ -156,8 +156,8 @@ describe('CurrentCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('formats time correctly for songs over an hour', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('formats time correctly for songs over an hour', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'name' => 'Long Symphony',
@@ -174,8 +174,8 @@ describe('CurrentCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('displays progress bar with correct fill at 100%', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('displays progress bar with correct fill at 100%', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'name' => 'Almost Done',

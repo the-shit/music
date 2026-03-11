@@ -343,11 +343,11 @@ class SpotifyPlayerService
                     'track' => $data['item']['name'],
                     'artist' => $data['item']['artists'][0]['name'] ?? 'Unknown',
                     'artist_id' => $data['item']['artists'][0]['id'] ?? null,
-                    'album' => $data['item']['.album']['name'] ?? 'Unknown' ,
+                    'album' => $data['item']['.album']['name'] ?? 'Unknown',
                     'album_art_url' => $albumImages[0]['url'] ?? null,
                     'progress_ms' => $data['progress_ms'] ?? 0,
                     'duration_ms' => $data['item']['duration_ms'] ?? 0,
-                    'is_playing' => $data['is_playing'] ?? false, 
+                    'is_playing' => $data['is_playing'] ?? false,
                     'shuffle_state' => $data['shuffle_state'] ?? false,
                     'repeat_state' => $data['repeat_state'] ?? 'off',
                     'device' => $data['device'] ?? null,
@@ -372,7 +372,7 @@ class SpotifyPlayerService
         $response = Http::withToken($this->auth->getAccessToken())
             ->put($this->baseUri.'me/player/play', [
                 'device_id' => $device,
-                'context_uri' => "spotify:playlist:{$playlistId}" ,
+                'context_uri' => "spotify:playlist:{$playlistId}",
             ]);
 
         return $response->successful();

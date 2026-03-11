@@ -7,6 +7,10 @@ use App\Services\SessionService;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class SessionCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -19,13 +23,15 @@ class SessionCommand extends Command
 
     protected $description = 'Start an AI-powered listening session with mood-aware phases';
 
-    public function handle(): int
+    private SpotifyService $spotify;
+
+    public function handle(SpotifyService $spotify): int
     {
+        $this->spotify = $spotify;
+
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
         $session = new SessionService($spotify);
 
         $description = $this->argument('description');
@@ -35,7 +41,7 @@ class SessionCommand extends Command
 
         // Validate we have something to work with
         if (! $description && ! $mood) {
-            $this->error('Provide a description or --mood flag.');
+            error('Provide a description or --mood flag.');
             $this->line('');
             $this->line('  <fg=cyan>spotify session "chill for 20 mins then hype me up"</>');
             $this->line('  <fg=cyan>spotify session --mood=flow --duration=45</>');
@@ -47,7 +53,7 @@ class SessionCommand extends Command
         // Validate mood preset
         $validMoods = array_keys(config('autopilot.mood_presets', []));
         if ($mood && ! in_array($mood, $validMoods)) {
-            $this->error("Unknown mood: {$mood}");
+            error("Unknown mood: {$mood}");
             $this->line('Available: '.implode(', ', $validMoods));
 
             return self::FAILURE;
@@ -56,7 +62,7 @@ class SessionCommand extends Command
         // Check for active device
         $device = $spotify->getActiveDevice();
         if (! $device) {
-            $this->error('No active Spotify device found. Start playing something first.');
+            error('No active Spotify device found. Start playing something first.');
 
             return self::FAILURE;
         }
@@ -70,29 +76,29 @@ class SessionCommand extends Command
 
     private function runQuickSession(SessionService $session, string $mood, int $duration): int
     {
-        $this->info("Starting {$mood} session ({$duration} min)...");
+        info("Starting {$mood} session ({$duration} min)...");
         $this->newLine();
 
         try {
             $result = $session->quickSession($mood, $duration);
         } catch (\Exception $e) {
-            $this->error("Session failed: {$e->getMessage()}");
+            error("Session failed: {$e->getMessage()}");
 
             return self::FAILURE;
         }
 
         if ($result['tracks_queued'] === 0) {
-            $this->warn('No tracks could be queued. Try a different mood or check your Spotify connection.');
+            warning('No tracks could be queued. Try a different mood or check your Spotify connection.');
 
             return self::FAILURE;
         }
 
-        $this->info("Queued {$result['tracks_queued']} tracks for your {$mood} session.");
+        info("Queued {$result['tracks_queued']} tracks for your {$mood} session.");
         $this->newLine();
 
         $this->table(
             ['#', 'Track', 'Artist'],
-            collect($result['tracks'])->map(fn (array $track, int $i) => [
+            collect($result['tracks'])->map(fn (array $track, int $i): array => [
                 $i + 1,
                 $track['name'] ?? 'Unknown',
                 $track['artist'] ?? 'Unknown',
@@ -111,7 +117,7 @@ class SessionCommand extends Command
     {
         // Check for OpenRouter API key
         if (! config('ai.providers.openrouter.key')) {
-            $this->warn('No OpenRouter API key configured. Falling back to quick session.');
+            warning('No OpenRouter API key configured. Falling back to quick session.');
             $this->line('Set OPENROUTER_API_KEY in your environment for AI-powered sessions.');
             $this->newLine();
 
@@ -121,25 +127,25 @@ class SessionCommand extends Command
             return $this->runQuickSession($session, $mood, $duration);
         }
 
-        $this->info('Planning session...');
+        info('Planning session...');
 
         try {
             $plan = $session->planFromDescription($description, $duration);
         } catch (\Exception $e) {
-            $this->warn("AI planning failed: {$e->getMessage()}");
+            warning("AI planning failed: {$e->getMessage()}");
             $this->line('Falling back to quick session.');
             $mood = $this->extractMoodFallback($description);
 
             return $this->runQuickSession($session, $mood, $duration);
         }
 
-        $this->info("Session: {$plan['playlist_name']} ({$plan['total_duration']} min)");
+        info("Session: {$plan['playlist_name']} ({$plan['total_duration']} min)");
         $this->newLine();
 
         // Show phases
         $this->table(
             ['Phase', 'Mood', 'Duration', 'Energy', 'Vibe'],
-            collect($plan['phases'])->map(fn (array $phase) => [
+            collect($plan['phases'])->map(fn (array $phase): array => [
                 $phase['name'],
                 $phase['mood'],
                 $phase['duration_minutes'].'m',
@@ -149,25 +155,25 @@ class SessionCommand extends Command
         );
 
         $this->newLine();
-        $this->info('Finding tracks...');
+        info('Finding tracks...');
 
         try {
             $candidates = $session->fetchCandidates();
         } catch (\Exception $e) {
-            $this->error("Failed to fetch tracks: {$e->getMessage()}");
+            error("Failed to fetch tracks: {$e->getMessage()}");
 
             return self::FAILURE;
         }
 
-        $totalCandidates = collect($candidates)->sum(fn (array $g) => count($g['tracks']));
+        $totalCandidates = collect($candidates)->sum(fn (array $g): int => count($g['tracks']));
         $this->line("Found {$totalCandidates} candidates across ".count($candidates).' phases.');
 
-        $this->info('Curating...');
+        info('Curating...');
 
         try {
             $curated = $session->curate($candidates);
         } catch (\Exception $e) {
-            $this->warn("Curation failed: {$e->getMessage()}");
+            warning("Curation failed: {$e->getMessage()}");
             $this->line('Queueing uncurated tracks instead.');
 
             // Fallback: queue all candidates directly
@@ -175,7 +181,7 @@ class SessionCommand extends Command
             foreach ($candidates as $group) {
                 foreach ($group['tracks'] as $track) {
                     try {
-                        app(SpotifyService::class)->addToQueue($track['uri']);
+                        $this->spotify->addToQueue($track['uri']);
                         $queued++;
                     } catch (\Exception) {
                         continue;
@@ -183,13 +189,13 @@ class SessionCommand extends Command
                 }
             }
 
-            $this->info("Queued {$queued} tracks.");
+            info("Queued {$queued} tracks.");
 
             return $queued > 0 ? self::SUCCESS : self::FAILURE;
         }
 
         $this->newLine();
-        $this->info("Curated: {$curated['playlist_name']}");
+        info("Curated: {$curated['playlist_name']}");
         if (! empty($curated['playlist_description'])) {
             $this->line("  {$curated['playlist_description']}");
         }
@@ -205,17 +211,17 @@ class SessionCommand extends Command
         }
 
         $this->newLine();
-        $this->info('Queueing...');
+        info('Queueing...');
 
         $queued = $session->queueTracks($curated);
 
         if ($queued === 0) {
-            $this->error('No tracks could be queued.');
+            error('No tracks could be queued.');
 
             return self::FAILURE;
         }
 
-        $this->info("Queued {$queued} tracks. Enjoy your session.");
+        info("Queued {$queued} tracks. Enjoy your session.");
 
         return self::SUCCESS;
     }

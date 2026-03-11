@@ -28,7 +28,7 @@ class QueueAddTool extends Tool
 
     public function handle(Request $request, SpotifyService $spotify): Response
     {
-        return $this->withAuthHandling(function () use ($request, $spotify) {
+        return $this->withAuthHandling(function () use ($request, $spotify): \Laravel\Mcp\Response {
             $query = $request->get('query');
             $result = $spotify->search($query);
 

@@ -2,7 +2,7 @@
 
 use App\Services\SpotifyService;
 
-it('requires configuration', function () {
+it('requires configuration', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(false);
     $this->app->instance(SpotifyService::class, $mock);
@@ -11,7 +11,7 @@ it('requires configuration', function () {
         ->assertFailed();
 });
 
-it('requires description or mood flag', function () {
+it('requires description or mood flag', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $this->app->instance(SpotifyService::class, $mock);
@@ -20,7 +20,7 @@ it('requires description or mood flag', function () {
         ->assertFailed();
 });
 
-it('rejects invalid mood preset', function () {
+it('rejects invalid mood preset', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $this->app->instance(SpotifyService::class, $mock);
@@ -29,7 +29,7 @@ it('rejects invalid mood preset', function () {
         ->assertFailed();
 });
 
-it('requires an active device', function () {
+it('requires an active device', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getActiveDevice')->andReturn(null);
@@ -39,7 +39,7 @@ it('requires an active device', function () {
         ->assertFailed();
 });
 
-it('runs a quick session with mood preset', function () {
+it('runs a quick session with mood preset', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getActiveDevice')->andReturn(['id' => 'device-1', 'name' => 'Test']);
@@ -54,7 +54,7 @@ it('runs a quick session with mood preset', function () {
         ->assertSuccessful();
 });
 
-it('has correct signature options', function () {
+it('has correct signature options', function (): void {
     $command = $this->app->make(\App\Commands\SessionCommand::class);
     $definition = $command->getDefinition();
 
@@ -64,13 +64,13 @@ it('has correct signature options', function () {
     expect($definition->getOption('duration')->getDefault())->toBe('30');
 });
 
-it('has correct command metadata', function () {
+it('has correct command metadata', function (): void {
     $command = $this->app->make(\App\Commands\SessionCommand::class);
     expect($command->getName())->toBe('session');
     expect($command->getDescription())->not->toBeEmpty();
 });
 
-it('accepts all valid mood presets', function () {
+it('accepts all valid mood presets', function (): void {
     $validMoods = ['chill', 'flow', 'hype', 'focus', 'party', 'upbeat', 'melancholy', 'ambient', 'workout', 'sleep'];
 
     foreach ($validMoods as $mood) {
@@ -78,7 +78,7 @@ it('accepts all valid mood presets', function () {
     }
 });
 
-it('falls back to quick session when no OpenRouter key', function () {
+it('falls back to quick session when no OpenRouter key', function (): void {
     config(['ai.providers.openrouter.key' => null]);
 
     $mock = Mockery::mock(SpotifyService::class);
@@ -94,7 +94,7 @@ it('falls back to quick session when no OpenRouter key', function () {
         ->assertSuccessful();
 });
 
-it('extracts mood from description keywords', function () {
+it('extracts mood from description keywords', function (): void {
     $command = new \App\Commands\SessionCommand;
     $method = new ReflectionMethod($command, 'extractMoodFallback');
     $method->setAccessible(true);
@@ -108,7 +108,7 @@ it('extracts mood from description keywords', function () {
     expect($method->invoke($command, 'something random and unknown'))->toBe('flow'); // default
 });
 
-it('shows zero tracks warning on empty results', function () {
+it('shows zero tracks warning on empty results', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(true);
     $mock->shouldReceive('getActiveDevice')->andReturn(['id' => 'device-1', 'name' => 'Test']);
@@ -119,7 +119,7 @@ it('shows zero tracks warning on empty results', function () {
         ->assertFailed();
 });
 
-it('renders energy bar correctly', function () {
+it('renders energy bar correctly', function (): void {
     $command = new \App\Commands\SessionCommand;
     $method = new ReflectionMethod($command, 'energyBar');
     $method->setAccessible(true);

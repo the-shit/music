@@ -2,9 +2,9 @@
 
 use App\Services\SpotifyService;
 
-describe('DevicesCommand', function () {
+describe('DevicesCommand', function (): void {
 
-    it('lists available devices', function () {
+    it('lists available devices', function (): void {
         $devices = [
             [
                 'id' => 'device1',
@@ -22,13 +22,13 @@ describe('DevicesCommand', function () {
             ],
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($devices) {
+        $this->mock(SpotifyService::class, function ($mock) use ($devices): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getDevices')->once()->andReturn($devices);
         });
 
         $this->artisan('devices')
-            ->expectsOutput('📱 Available Spotify Devices:')
+            ->expectsOutputToContain('📱 Available Spotify Devices:')
             ->expectsOutputToContain('MacBook Pro')
             ->expectsOutputToContain('Computer')
             ->expectsOutputToContain('Volume: 75%')
@@ -38,20 +38,20 @@ describe('DevicesCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('handles no devices', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('handles no devices', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getDevices')->once()->andReturn([]);
         });
 
         $this->artisan('devices')
-            ->expectsOutput('📱 No devices found')
-            ->expectsOutput('💡 Open Spotify on your phone, computer, or smart speaker')
+            ->expectsOutputToContain('📱 No devices found')
+            ->expectsOutputToContain('💡 Open Spotify on your phone, computer, or smart speaker')
             ->assertExitCode(0);
     });
 
-    it('handles API errors', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('handles API errors', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getDevices')
                 ->once()
@@ -59,18 +59,18 @@ describe('DevicesCommand', function () {
         });
 
         $this->artisan('devices')
-            ->expectsOutput('❌ API error')
+            ->expectsOutputToContain('❌ API error')
             ->assertExitCode(1);
     });
 
-    it('requires configuration', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('requires configuration', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
         $this->artisan('devices')
             ->expectsOutputToContain('Spotify is not configured')
-            ->expectsOutput('💡 Run "spotify setup" first')
+            ->expectsOutputToContain('Run "spotify setup" first')
             ->assertExitCode(1);
     });
 

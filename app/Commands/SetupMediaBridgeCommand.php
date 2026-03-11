@@ -59,7 +59,7 @@ class SetupMediaBridgeCommand extends Command
         info('📦 Checking dependencies...');
 
         $swiftc = trim((string) shell_exec('which swiftc 2>/dev/null'));
-        if (! $swiftc) {
+        if ($swiftc === '' || $swiftc === '0') {
             error('swiftc not found — install Xcode Command Line Tools:');
             info('  xcode-select --install');
 
@@ -290,11 +290,9 @@ XML;
         $home = $_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp';
         $oldPlist = $home.'/Library/LaunchAgents/com.spotify-cli.nowplaying.plist';
 
-        if (file_exists($oldPlist)) {
-            if (confirm('Remove old Python nowplaying LaunchAgent?', true)) {
-                @unlink($oldPlist);
-                info('✅ Old Python bridge LaunchAgent removed');
-            }
+        if (file_exists($oldPlist) && confirm('Remove old Python nowplaying LaunchAgent?', true)) {
+            @unlink($oldPlist);
+            info('✅ Old Python bridge LaunchAgent removed');
         }
     }
 
@@ -309,14 +307,14 @@ XML;
     {
         $pid = trim((string) shell_exec("pgrep -f 'spotify-media-bridge' 2>/dev/null | head -1"));
 
-        return $pid ? (int) $pid : null;
+        return $pid !== '' && $pid !== '0' ? (int) $pid : null;
     }
 
     private function isLaunchAgentLoaded(): bool
     {
         $output = trim((string) shell_exec('launchctl list '.self::LAUNCH_AGENT_LABEL.' 2>&1'));
 
-        return ! empty($output) && ! str_contains($output, 'Could not find');
+        return $output !== '' && $output !== '0' && ! str_contains($output, 'Could not find');
     }
 
     private function banner(): void

@@ -31,7 +31,7 @@ class SessionStartTool extends Tool
 
     public function handle(Request $request, SessionService $session): Response
     {
-        return $this->withAuthHandling(function () use ($request, $session) {
+        return $this->withAuthHandling(function () use ($request, $session): \Laravel\Mcp\Response {
             $prompt = $request->get('prompt');
             $duration = $request->get('duration', 60);
 
@@ -43,7 +43,7 @@ class SessionStartTool extends Tool
                 $curated = $result['curated'];
                 $queued = $result['tracks_queued'];
 
-                self::saveSessionState([
+                $this->saveSessionState([
                     'plan' => $plan,
                     'curated' => $curated,
                     'tracks_queued' => $queued,
@@ -52,21 +52,21 @@ class SessionStartTool extends Tool
                 ]);
 
                 $phases = collect($curated['phases'] ?? [])
-                    ->map(fn (array $phase) => "- {$phase['name']}: {$phase['dj_note']} (" . count($phase['track_uris'] ?? []) . ' tracks)')
+                    ->map(fn (array $phase): string => "- {$phase['name']}: {$phase['dj_note']} (".count($phase['track_uris'] ?? []).' tracks)')
                     ->implode("\n");
 
                 return Response::text(
                     "{$curated['playlist_name']}\n{$curated['playlist_description']}\n\n"
-                    . "Phases:\n{$phases}\n\n"
-                    . "{$queued} tracks queued. Enjoy!"
+                    ."Phases:\n{$phases}\n\n"
+                    ."{$queued} tracks queued. Enjoy!"
                 );
             }
 
             // Fallback: extract mood keyword from prompt
-            $mood = self::extractMood($prompt);
+            $mood = $this->extractMood($prompt);
             $result = $session->quickSession($mood, $duration);
 
-            self::saveSessionState([
+            $this->saveSessionState([
                 'plan' => $session->getSessionPlan(),
                 'tracks_queued' => $result['tracks_queued'],
                 'started_at' => time(),
@@ -76,12 +76,12 @@ class SessionStartTool extends Tool
 
             return Response::text(
                 "{$result['playlist_name']}\n\n"
-                . "{$result['tracks_queued']} tracks queued for a {$duration}-minute {$mood} session."
+                ."{$result['tracks_queued']} tracks queued for a {$duration}-minute {$mood} session."
             );
         });
     }
 
-    private static function extractMood(string $prompt): string
+    private function extractMood(string $prompt): string
     {
         $moods = ['chill', 'flow', 'hype', 'focus', 'party', 'upbeat', 'melancholy', 'ambient', 'workout', 'sleep'];
         $lower = strtolower($prompt);
@@ -107,7 +107,7 @@ class SessionStartTool extends Tool
         return 'flow';
     }
 
-    private static function saveSessionState(array $state): void
+    private function saveSessionState(array $state): void
     {
         $path = self::sessionStatePath();
         $dir = dirname($path);
@@ -121,6 +121,6 @@ class SessionStartTool extends Tool
 
     public static function sessionStatePath(): string
     {
-        return ($_ENV['HOME'] ?? $_SERVER['HOME'] ?? '/tmp') . '/.spotify-cli/session.json';
+        return ($_ENV['HOME'] ?? $_SERVER['HOME'] ?? '/tmp').'/.spotify-cli/session.json';
     }
 }

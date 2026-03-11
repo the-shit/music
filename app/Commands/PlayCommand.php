@@ -6,6 +6,10 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class PlayCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -18,21 +22,19 @@ class PlayCommand extends Command
 
     protected $description = 'Play a specific song/artist/playlist (use "resume" to continue paused playback)';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
 
-        $spotify = app(SpotifyService::class);
-
         $query = $this->argument('query');
         $deviceName = $this->option('device');
 
         if (! $query) {
-            $this->error('❌ Please specify what to play');
-            $this->info('💡 Usage: spotify play "song name"');
-            $this->info('💡 Or use "spotify resume" to continue paused playback');
+            error('❌ Please specify what to play');
+            info('💡 Usage: spotify play "song name"');
+            info('💡 Or use "spotify resume" to continue paused playback');
 
             return self::FAILURE;
         }
@@ -44,20 +46,20 @@ class PlayCommand extends Command
             foreach ($devices as $device) {
                 if (stripos($device['name'], $deviceName) !== false || $device['id'] === $deviceName) {
                     $deviceId = $device['id'];
-                    $this->info("🔊 Using device: {$device['name']}");
+                    info("🔊 Using device: {$device['name']}");
                     break;
                 }
             }
 
             if (! $deviceId) {
-                $this->error("❌ Device '{$deviceName}' not found");
+                error("❌ Device '{$deviceName}' not found");
 
                 return self::FAILURE;
             }
         }
 
         if (! $this->option('json')) {
-            $this->info("🎵 Searching for: {$query}");
+            info("🎵 Searching for: {$query}");
         }
 
         try {
@@ -90,8 +92,8 @@ class PlayCommand extends Command
                             ]),
                         ]);
                     } else {
-                        $this->info("➕ Added to queue: {$result['name']} by {$result['artist']}");
-                        $this->info('📋 It will play after the current track');
+                        info("➕ Added to queue: {$result['name']} by {$result['artist']}");
+                        info('📋 It will play after the current track');
 
                         // Emit queue event
                         $this->call('event:emit', [
@@ -131,7 +133,7 @@ class PlayCommand extends Command
                             ]),
                         ]);
                     } else {
-                        $this->info("▶️  Playing: {$result['name']} by {$result['artist']}");
+                        info("▶️  Playing: {$result['name']} by {$result['artist']}");
 
                         // Emit play event
                         $this->call('event:emit', [
@@ -152,7 +154,7 @@ class PlayCommand extends Command
                         'error' => "No results found for: {$query}",
                     ]));
                 } else {
-                    $this->warn("No results found for: {$query}");
+                    warning("No results found for: {$query}");
                 }
 
                 return self::FAILURE;
@@ -164,7 +166,7 @@ class PlayCommand extends Command
                     'error' => $e->getMessage(),
                 ]));
             } else {
-                $this->error('Failed to play: '.$e->getMessage());
+                error('Failed to play: '.$e->getMessage());
 
                 // Emit error event
                 $this->call('event:emit', [
@@ -181,7 +183,7 @@ class PlayCommand extends Command
         }
 
         if (! $this->option('json')) {
-            $this->info('✅ Playback started!');
+            info('✅ Playback started!');
         }
 
         return self::SUCCESS;

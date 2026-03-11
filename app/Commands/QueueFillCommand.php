@@ -6,6 +6,10 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class QueueFillCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -14,13 +18,11 @@ class QueueFillCommand extends Command
 
     protected $description = 'Keep the queue topped up using Spotify\'s recommendation engine';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
         $target = (int) $this->option('target');
 
         try {
@@ -91,7 +93,7 @@ class QueueFillCommand extends Command
                         'message' => 'No recommendations available — try playing a track first',
                     ]));
                 } else {
-                    $this->warn('No recommendations available — try playing a track first');
+                    warning('No recommendations available — try playing a track first');
                 }
 
                 return self::SUCCESS;
@@ -129,9 +131,9 @@ class QueueFillCommand extends Command
                 ]));
             } else {
                 foreach ($queued as $track) {
-                    $this->info("➕ Queued: {$track['name']} by {$track['artist']}");
+                    info("➕ Queued: {$track['name']} by {$track['artist']}");
                 }
-                $this->info('📋 Queue: '.($queueLength + count($queued))."/{$target}");
+                info('📋 Queue: '.($queueLength + count($queued))."/{$target}");
             }
 
         } catch (\Exception $e) {
@@ -141,7 +143,7 @@ class QueueFillCommand extends Command
                     'error' => $e->getMessage(),
                 ]));
             } else {
-                $this->error('Failed to fill queue: '.$e->getMessage());
+                error('Failed to fill queue: '.$e->getMessage());
             }
 
             return self::FAILURE;

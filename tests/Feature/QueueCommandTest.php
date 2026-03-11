@@ -2,16 +2,16 @@
 
 use App\Services\SpotifyService;
 
-describe('QueueCommand', function () {
+describe('QueueCommand', function (): void {
 
-    it('adds track to queue', function () {
+    it('adds track to queue', function (): void {
         $searchResult = [
             'uri' => 'spotify:track:123',
             'name' => 'Test Song',
             'artist' => 'Test Artist',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult) {
+        $this->mock(SpotifyService::class, function ($mock) use ($searchResult): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('search')
                 ->once()
@@ -23,15 +23,15 @@ describe('QueueCommand', function () {
         });
 
         $this->artisan('queue', ['query' => 'test song'])
-            ->expectsOutput('🎵 Searching for: test song')
-            ->expectsOutput('➕ Added to queue: Test Song by Test Artist')
-            ->expectsOutput('📋 It will play after the current track')
-            ->expectsOutput('✅ Successfully added to queue!')
+            ->expectsOutputToContain('🎵 Searching for: test song')
+            ->expectsOutputToContain('➕ Added to queue: Test Song by Test Artist')
+            ->expectsOutputToContain('📋 It will play after the current track')
+            ->expectsOutputToContain('✅ Successfully added to queue!')
             ->assertExitCode(0);
     });
 
-    it('handles no search results', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('handles no search results', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('search')
                 ->once()
@@ -40,19 +40,19 @@ describe('QueueCommand', function () {
         });
 
         $this->artisan('queue', ['query' => 'nonexistent'])
-            ->expectsOutput('🎵 Searching for: nonexistent')
-            ->expectsOutput('No results found for: nonexistent')
+            ->expectsOutputToContain('🎵 Searching for: nonexistent')
+            ->expectsOutputToContain('No results found for: nonexistent')
             ->assertExitCode(1);
     });
 
-    it('handles API errors', function () {
+    it('handles API errors', function (): void {
         $searchResult = [
             'uri' => 'spotify:track:123',
             'name' => 'Test Song',
             'artist' => 'Test Artist',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult) {
+        $this->mock(SpotifyService::class, function ($mock) use ($searchResult): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('search')
                 ->once()
@@ -65,18 +65,18 @@ describe('QueueCommand', function () {
         });
 
         $this->artisan('queue', ['query' => 'test song'])
-            ->expectsOutput('🎵 Searching for: test song')
-            ->expectsOutput('Failed to add to queue: No active device')
+            ->expectsOutputToContain('🎵 Searching for: test song')
+            ->expectsOutputToContain('Failed to add to queue: No active device')
             ->assertExitCode(1);
     });
 
-    it('requires configuration', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('requires configuration', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
         $this->artisan('queue', ['query' => 'test'])
-            ->expectsOutput('❌ Spotify is not configured')
+            ->expectsOutputToContain('Spotify is not configured')
             ->expectsOutputToContain('Run "spotify setup"')
             ->assertExitCode(1);
     });

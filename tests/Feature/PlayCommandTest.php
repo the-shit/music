@@ -2,16 +2,16 @@
 
 use App\Services\SpotifyService;
 
-describe('PlayCommand', function () {
+describe('PlayCommand', function (): void {
 
-    it('searches and plays a track', function () {
+    it('searches and plays a track', function (): void {
         $searchResult = [
             'uri' => 'spotify:track:123',
             'name' => 'Test Song',
             'artist' => 'Test Artist',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult) {
+        $this->mock(SpotifyService::class, function ($mock) use ($searchResult): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('search')
                 ->once()
@@ -23,14 +23,14 @@ describe('PlayCommand', function () {
         });
 
         $this->artisan('play', ['query' => 'test song'])
-            ->expectsOutput('🎵 Searching for: test song')
-            ->expectsOutput('▶️  Playing: Test Song by Test Artist')
-            ->expectsOutput('✅ Playback started!')
+            ->expectsOutputToContain('🎵 Searching for: test song')
+            ->expectsOutputToContain('▶️  Playing: Test Song by Test Artist')
+            ->expectsOutputToContain('✅ Playback started!')
             ->assertExitCode(0);
     });
 
-    it('handles no search results', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('handles no search results', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('search')
                 ->once()
@@ -39,19 +39,19 @@ describe('PlayCommand', function () {
         });
 
         $this->artisan('play', ['query' => 'nonexistent song'])
-            ->expectsOutput('🎵 Searching for: nonexistent song')
-            ->expectsOutput('No results found for: nonexistent song')
+            ->expectsOutputToContain('🎵 Searching for: nonexistent song')
+            ->expectsOutputToContain('No results found for: nonexistent song')
             ->assertExitCode(1);
     });
 
-    it('handles API errors gracefully', function () {
+    it('handles API errors gracefully', function (): void {
         $searchResult = [
             'uri' => 'spotify:track:123',
             'name' => 'Test Song',
             'artist' => 'Test Artist',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult) {
+        $this->mock(SpotifyService::class, function ($mock) use ($searchResult): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('search')
                 ->once()
@@ -64,30 +64,30 @@ describe('PlayCommand', function () {
         });
 
         $this->artisan('play', ['query' => 'test song'])
-            ->expectsOutput('🎵 Searching for: test song')
-            ->expectsOutput('Failed to play: No active device')
+            ->expectsOutputToContain('🎵 Searching for: test song')
+            ->expectsOutputToContain('Failed to play: No active device')
             ->assertExitCode(1);
     });
 
-    it('requires configuration', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('requires configuration', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
         $this->artisan('play', ['query' => 'test'])
-            ->expectsOutput('❌ Spotify is not configured')
+            ->expectsOutputToContain('Spotify is not configured')
             ->expectsOutputToContain('Run "spotify setup"')
             ->assertExitCode(1);
     });
 
-    it('plays with --json flag suppresses normal output', function () {
+    it('plays with --json flag suppresses normal output', function (): void {
         $searchResult = [
             'uri' => 'spotify:track:abc',
             'name' => 'JSON Song',
             'artist' => 'JSON Artist',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult) {
+        $this->mock(SpotifyService::class, function ($mock) use ($searchResult): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('search')->once()->andReturn($searchResult);
             $mock->shouldReceive('play')->once()->with('spotify:track:abc', null);
@@ -99,14 +99,14 @@ describe('PlayCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('adds to queue with --queue flag', function () {
+    it('adds to queue with --queue flag', function (): void {
         $searchResult = [
             'uri' => 'spotify:track:456',
             'name' => 'Queue Song',
             'artist' => 'Queue Artist',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult) {
+        $this->mock(SpotifyService::class, function ($mock) use ($searchResult): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('search')->once()->andReturn($searchResult);
             $mock->shouldReceive('addToQueue')->once()->with('spotify:track:456');
@@ -117,14 +117,14 @@ describe('PlayCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('adds to queue with --queue and --json flags', function () {
+    it('adds to queue with --queue and --json flags', function (): void {
         $searchResult = [
             'uri' => 'spotify:track:789',
             'name' => 'Queue JSON Song',
             'artist' => 'Queue Artist',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult) {
+        $this->mock(SpotifyService::class, function ($mock) use ($searchResult): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('search')->once()->andReturn($searchResult);
             $mock->shouldReceive('addToQueue')->once()->with('spotify:track:789');
@@ -134,8 +134,8 @@ describe('PlayCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('outputs json on no search results with --json flag', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('outputs json on no search results with --json flag', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('search')->once()->andReturn(null);
         });
@@ -144,8 +144,8 @@ describe('PlayCommand', function () {
             ->assertExitCode(1);
     });
 
-    it('outputs json error on API exception with --json flag', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('outputs json error on API exception with --json flag', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('search')->once()->andThrow(new Exception('API down'));
         });
@@ -154,7 +154,7 @@ describe('PlayCommand', function () {
             ->assertExitCode(1);
     });
 
-    it('finds device by name and plays on it', function () {
+    it('finds device by name and plays on it', function (): void {
         $searchResult = [
             'uri' => 'spotify:track:device1',
             'name' => 'Device Song',
@@ -165,7 +165,7 @@ describe('PlayCommand', function () {
             ['id' => 'device-id-123', 'name' => 'Living Room Speaker'],
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult, $devices) {
+        $this->mock(SpotifyService::class, function ($mock) use ($searchResult, $devices): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getDevices')->once()->andReturn($devices);
             $mock->shouldReceive('search')->once()->andReturn($searchResult);
@@ -177,8 +177,8 @@ describe('PlayCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('fails when specified device is not found', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('fails when specified device is not found', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-1', 'name' => 'Kitchen'],

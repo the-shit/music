@@ -6,6 +6,9 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+
 class PauseCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -14,16 +17,14 @@ class PauseCommand extends Command
 
     protected $description = 'Pause Spotify playback';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
 
-        $spotify = app(SpotifyService::class);
-
         if (! $this->option('json')) {
-            $this->info('⏸️  Pausing Spotify playback...');
+            info('⏸️  Pausing Spotify playback...');
         }
 
         try {
@@ -43,7 +44,7 @@ class PauseCommand extends Command
                     ] : null,
                 ]));
             } else {
-                $this->info('✅ Playback paused!');
+                info('✅ Playback paused!');
 
                 // Emit pause event
                 if ($current) {
@@ -64,7 +65,7 @@ class PauseCommand extends Command
                     'error' => $e->getMessage(),
                 ]));
             } else {
-                $this->error('❌ Failed to pause: '.$e->getMessage());
+                error('❌ Failed to pause: '.$e->getMessage());
             }
 
             return self::FAILURE;

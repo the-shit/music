@@ -76,14 +76,14 @@ class WebhookConfigureCommand extends Command
             label: 'Webhook URL',
             placeholder: 'https://example.com/webhook/spotify',
             required: true,
-            validate: fn (string $value) => filter_var($value, FILTER_VALIDATE_URL) ? null : 'Must be a valid URL',
+            validate: fn (string $value): ?string => filter_var($value, FILTER_VALIDATE_URL) ? null : 'Must be a valid URL',
         );
 
         $secret = $this->option('secret') ?: password(
             label: 'HMAC Secret',
             placeholder: 'Your webhook signing secret',
             required: true,
-            validate: fn (string $value) => strlen($value) >= 8 ? null : 'Secret must be at least 8 characters',
+            validate: fn (string $value): ?string => strlen($value) >= 8 ? null : 'Secret must be at least 8 characters',
         );
 
         ConfigHelper::saveWebhookConfig([

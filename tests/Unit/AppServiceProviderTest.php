@@ -6,11 +6,11 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-describe('AppServiceProvider', function () {
+describe('AppServiceProvider', function (): void {
 
-    describe('class structure', function () {
+    describe('class structure', function (): void {
 
-        it('extends ServiceProvider', function () {
+        it('extends ServiceProvider', function (): void {
             $provider = new AppServiceProvider($this->app);
 
             expect($provider)->toBeInstanceOf(ServiceProvider::class);
@@ -18,15 +18,15 @@ describe('AppServiceProvider', function () {
 
     });
 
-    describe('register method', function () {
+    describe('register method', function (): void {
 
-        it('exists and is callable', function () {
+        it('exists and is callable', function (): void {
             $provider = new AppServiceProvider($this->app);
 
             expect(method_exists($provider, 'register'))->toBeTrue();
         });
 
-        it('returns void', function () {
+        it('returns void', function (): void {
             $provider = new AppServiceProvider($this->app);
 
             $result = $provider->register();
@@ -36,15 +36,15 @@ describe('AppServiceProvider', function () {
 
     });
 
-    describe('boot method', function () {
+    describe('boot method', function (): void {
 
-        it('exists and is callable', function () {
+        it('exists and is callable', function (): void {
             $provider = new AppServiceProvider($this->app);
 
             expect(method_exists($provider, 'boot'))->toBeTrue();
         });
 
-        it('returns void', function () {
+        it('returns void', function (): void {
             $provider = new AppServiceProvider($this->app);
 
             $result = $provider->boot();
@@ -52,7 +52,7 @@ describe('AppServiceProvider', function () {
             expect($result)->toBeNull();
         });
 
-        it('loads dotenv when .env file exists', function () {
+        it('loads dotenv when .env file exists', function (): void {
             // Create a temporary directory with a .env file
             $tempDir = sys_get_temp_dir().'/appserviceprovider_test_'.uniqid();
             mkdir($tempDir);
@@ -72,7 +72,7 @@ describe('AppServiceProvider', function () {
             rmdir($tempDir);
         });
 
-        it('does not throw when .env file does not exist', function () {
+        it('does not throw when .env file does not exist', function (): void {
             // Create a temporary directory without a .env file
             $tempDir = sys_get_temp_dir().'/appserviceprovider_test_'.uniqid();
             mkdir($tempDir);
@@ -95,9 +95,9 @@ describe('AppServiceProvider', function () {
 
     });
 
-    describe('provider registration', function () {
+    describe('provider registration', function (): void {
 
-        it('is registered in the application', function () {
+        it('is registered in the application', function (): void {
             $providers = $this->app->getLoadedProviders();
 
             expect($providers)->toHaveKey(AppServiceProvider::class);

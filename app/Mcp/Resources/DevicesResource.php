@@ -20,7 +20,7 @@ class DevicesResource extends Resource
     {
         $devices = $spotify->getDevices();
 
-        $result = array_map(fn (array $device) => [
+        $result = array_map(fn (array $device): array => [
             'id' => $device['id'],
             'name' => $device['name'],
             'type' => $device['type'],

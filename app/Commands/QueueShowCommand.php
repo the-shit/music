@@ -6,6 +6,10 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class QueueShowCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -14,13 +18,11 @@ class QueueShowCommand extends Command
 
     protected $description = 'Show upcoming tracks in the queue';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
 
         try {
             $queueData = $spotify->getQueue();
@@ -33,7 +35,7 @@ class QueueShowCommand extends Command
                         'name' => $current['name'],
                         'artist' => $current['artists'][0]['name'] ?? 'Unknown',
                     ] : null,
-                    'queue' => array_map(fn ($t) => [
+                    'queue' => array_map(fn (array $t): array => [
                         'name' => $t['name'],
                         'artist' => $t['artists'][0]['name'] ?? 'Unknown',
                     ], array_slice($queue, 0, 20)),
@@ -45,18 +47,18 @@ class QueueShowCommand extends Command
 
             if ($current) {
                 $artist = $current['artists'][0]['name'] ?? 'Unknown';
-                $this->info("▶️  Now: {$current['name']} by {$artist}");
+                info("▶️  Now: {$current['name']} by {$artist}");
                 $this->newLine();
             }
 
             if (empty($queue)) {
-                $this->warn('Queue is empty');
-                $this->info('Use: spotify queue "song name" to add tracks');
+                warning('Queue is empty');
+                info('Use: spotify queue "song name" to add tracks');
 
                 return self::SUCCESS;
             }
 
-            $this->info('📋 Up Next:');
+            info('📋 Up Next:');
             $this->newLine();
 
             foreach (array_slice($queue, 0, 20) as $i => $track) {
@@ -67,14 +69,14 @@ class QueueShowCommand extends Command
 
             if (count($queue) > 20) {
                 $this->newLine();
-                $this->info('  ... and '.(count($queue) - 20).' more');
+                info('  ... and '.(count($queue) - 20).' more');
             }
 
             $this->newLine();
-            $this->info('📋 '.count($queue).' tracks queued');
+            info('📋 '.count($queue).' tracks queued');
 
         } catch (\Exception $e) {
-            $this->error('Failed to get queue: '.$e->getMessage());
+            error('Failed to get queue: '.$e->getMessage());
 
             return self::FAILURE;
         }

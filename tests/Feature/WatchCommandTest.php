@@ -2,7 +2,7 @@
 
 use App\Services\SpotifyService;
 
-it('requires configuration', function () {
+it('requires configuration', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(false);
     $this->app->instance(SpotifyService::class, $mock);
@@ -11,7 +11,7 @@ it('requires configuration', function () {
         ->assertFailed();
 });
 
-it('has correct signature options', function () {
+it('has correct signature options', function (): void {
     $command = $this->app->make(\App\Commands\WatchCommand::class);
     $definition = $command->getDefinition();
 
@@ -21,21 +21,21 @@ it('has correct signature options', function () {
     expect($definition->getOption('interval')->getDefault())->toBe('10');
 });
 
-describe('WatchCommand extended', function () {
+describe('WatchCommand extended', function (): void {
 
-    describe('command metadata', function () {
+    describe('command metadata', function (): void {
 
-        it('has correct command name', function () {
+        it('has correct command name', function (): void {
             $command = $this->app->make(\App\Commands\WatchCommand::class);
             expect($command->getName())->toBe('watch');
         });
 
-        it('has a description', function () {
+        it('has a description', function (): void {
             $command = $this->app->make(\App\Commands\WatchCommand::class);
             expect($command->getDescription())->not->toBeEmpty();
         });
 
-        it('enforces minimum interval of 3 seconds', function () {
+        it('enforces minimum interval of 3 seconds', function (): void {
             // interval option exists and has default
             $command = $this->app->make(\App\Commands\WatchCommand::class);
             $definition = $command->getDefinition();
@@ -44,9 +44,9 @@ describe('WatchCommand extended', function () {
 
     });
 
-    describe('slack webhook loading', function () {
+    describe('slack webhook loading', function (): void {
 
-        it('reads slack webhook from config file when present', function () {
+        it('reads slack webhook from config file when present', function (): void {
             $tempDir = sys_get_temp_dir().'/watch-test-'.uniqid();
             mkdir($tempDir, 0755, true);
             config(['spotify.config_dir' => $tempDir]);
@@ -62,7 +62,7 @@ describe('WatchCommand extended', function () {
             rmdir($tempDir);
         });
 
-        it('falls back to env var when slack.json missing', function () {
+        it('falls back to env var when slack.json missing', function (): void {
             $tempDir = sys_get_temp_dir().'/watch-test-nofile-'.uniqid();
             mkdir($tempDir, 0755, true);
             config(['spotify.config_dir' => $tempDir]);

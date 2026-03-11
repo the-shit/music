@@ -6,6 +6,10 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class ShuffleCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -16,13 +20,11 @@ class ShuffleCommand extends Command
 
     protected $description = '🔀 Toggle or set shuffle mode for Spotify playback';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
 
         $state = strtolower($this->argument('state') ?? 'toggle');
 
@@ -31,8 +33,8 @@ class ShuffleCommand extends Command
             $current = $spotify->getCurrentPlayback();
 
             if (! $current) {
-                $this->warn('⚠️  Nothing is currently playing');
-                $this->info('💡 Start playing something first');
+                warning('⚠️  Nothing is currently playing');
+                info('💡 Start playing something first');
 
                 return self::FAILURE;
             }
@@ -54,12 +56,10 @@ class ShuffleCommand extends Command
                     'shuffle' => $newState,
                     'message' => $newState ? 'Shuffle enabled' : 'Shuffle disabled',
                 ]));
+            } elseif ($newState) {
+                info('🔀 Shuffle enabled');
             } else {
-                if ($newState) {
-                    $this->info('🔀 Shuffle enabled');
-                } else {
-                    $this->info('➡️  Shuffle disabled');
-                }
+                info('➡️  Shuffle disabled');
             }
 
             // Emit event (but suppress output in JSON mode)
@@ -93,7 +93,7 @@ class ShuffleCommand extends Command
                     'message' => $e->getMessage(),
                 ]));
             } else {
-                $this->error('❌ Failed to change shuffle: '.$e->getMessage());
+                error('❌ Failed to change shuffle: '.$e->getMessage());
             }
 
             return self::FAILURE;

@@ -6,6 +6,10 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class HypeCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -16,13 +20,11 @@ class HypeCommand extends Command
 
     protected $description = 'Queue high-energy hype tracks';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
 
         try {
             $queries = [
@@ -33,8 +35,8 @@ class HypeCommand extends Command
 
             $tracks = $this->gatherTracks($spotify, $queries, (int) $this->option('limit'));
 
-            if (empty($tracks)) {
-                $this->warn('No hype tracks found.');
+            if ($tracks === []) {
+                warning('No hype tracks found.');
 
                 return self::FAILURE;
             }
@@ -50,7 +52,7 @@ class HypeCommand extends Command
                 return self::SUCCESS;
             }
 
-            $this->info('🔥 Hype mode activated!');
+            info('🔥 Hype mode activated!');
             $this->newLine();
             foreach ($queued as $i => $track) {
                 $action = $i === 0 ? '▶️ Now' : '📋 Queue';
@@ -60,7 +62,7 @@ class HypeCommand extends Command
             return self::SUCCESS;
 
         } catch (\Exception $e) {
-            $this->error('❌ '.$e->getMessage());
+            error('❌ '.$e->getMessage());
 
             return self::FAILURE;
         }
@@ -110,7 +112,7 @@ class HypeCommand extends Command
         }
 
         // Filter out duplicates
-        $tracks = array_filter($tracks, fn ($track) => ! isset($excludeUris[$track['uri']]));
+        $tracks = array_filter($tracks, fn (array $track): bool => ! isset($excludeUris[$track['uri']]));
         $tracks = array_values($tracks);
 
         $queued = [];

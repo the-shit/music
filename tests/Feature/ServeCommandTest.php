@@ -2,7 +2,7 @@
 
 use App\Services\SpotifyService;
 
-it('requires configuration', function () {
+it('requires configuration', function (): void {
     $mock = Mockery::mock(SpotifyService::class);
     $mock->shouldReceive('isConfigured')->andReturn(false);
     $this->app->instance(SpotifyService::class, $mock);
@@ -11,7 +11,7 @@ it('requires configuration', function () {
         ->assertFailed();
 });
 
-it('has correct signature options', function () {
+it('has correct signature options', function (): void {
     $command = $this->app->make(\App\Commands\ServeCommand::class);
     $definition = $command->getDefinition();
 
@@ -21,25 +21,25 @@ it('has correct signature options', function () {
     expect($definition->getOption('host')->getDefault())->toBe('127.0.0.1');
 });
 
-describe('ServeCommand extended', function () {
+describe('ServeCommand extended', function (): void {
 
-    describe('command metadata', function () {
+    describe('command metadata', function (): void {
 
-        it('has correct command name', function () {
+        it('has correct command name', function (): void {
             $command = $this->app->make(\App\Commands\ServeCommand::class);
             expect($command->getName())->toBe('serve');
         });
 
-        it('has a description', function () {
+        it('has a description', function (): void {
             $command = $this->app->make(\App\Commands\ServeCommand::class);
             expect($command->getDescription())->not->toBeEmpty();
         });
 
     });
 
-    describe('handler script generation', function () {
+    describe('handler script generation', function (): void {
 
-        it('creates handler script that reads credentials from file at runtime', function () {
+        it('creates handler script that reads credentials from file at runtime', function (): void {
             $configDir = sys_get_temp_dir().'/test-spotify-serve';
             config(['spotify.client_id' => 'test_client_id_123456789012345']);
             config(['spotify.client_secret' => 'test_secret_123456789012345']);
@@ -75,7 +75,7 @@ describe('ServeCommand extended', function () {
             unlink($scriptPath);
         });
 
-        it('sets handler script permissions to 0600', function () {
+        it('sets handler script permissions to 0600', function (): void {
             config(['spotify.token_path' => sys_get_temp_dir().'/test-token.json']);
             config(['spotify.config_dir' => sys_get_temp_dir().'/test-spotify-serve2']);
 
@@ -97,7 +97,7 @@ describe('ServeCommand extended', function () {
             unlink($scriptPath);
         });
 
-        it('handler script contains health endpoint', function () {
+        it('handler script contains health endpoint', function (): void {
             config(['spotify.token_path' => sys_get_temp_dir().'/test-token.json']);
             config(['spotify.config_dir' => sys_get_temp_dir().'/test-spotify-serve3']);
 
@@ -124,9 +124,9 @@ describe('ServeCommand extended', function () {
 
     });
 
-    describe('security', function () {
+    describe('security', function (): void {
 
-        it('handler script includes slack verification token check', function () {
+        it('handler script includes slack verification token check', function (): void {
             config(['spotify.token_path' => sys_get_temp_dir().'/test-token.json']);
             config(['spotify.config_dir' => sys_get_temp_dir().'/test-spotify-serve-sec']);
 

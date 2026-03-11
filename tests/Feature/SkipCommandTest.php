@@ -2,12 +2,12 @@
 
 use App\Services\SpotifyService;
 
-describe('SkipCommand', function () {
+describe('SkipCommand', function (): void {
 
-    describe('skip to next track', function () {
+    describe('skip to next track', function (): void {
 
-        it('skips to next track by default', function () {
-            $this->mock(SpotifyService::class, function ($mock) {
+        it('skips to next track by default', function (): void {
+            $this->mock(SpotifyService::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
                 $mock->shouldReceive('getCurrentPlayback')->andReturn([
                     'name' => 'Song',
@@ -22,8 +22,8 @@ describe('SkipCommand', function () {
                 ->assertExitCode(0);
         });
 
-        it('skips to next track with explicit next argument', function () {
-            $this->mock(SpotifyService::class, function ($mock) {
+        it('skips to next track with explicit next argument', function (): void {
+            $this->mock(SpotifyService::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
                 $mock->shouldReceive('getCurrentPlayback')->andReturn([
                     'name' => 'Song',
@@ -40,10 +40,10 @@ describe('SkipCommand', function () {
 
     });
 
-    describe('skip to previous track', function () {
+    describe('skip to previous track', function (): void {
 
-        it('skips to previous track with prev argument', function () {
-            $this->mock(SpotifyService::class, function ($mock) {
+        it('skips to previous track with prev argument', function (): void {
+            $this->mock(SpotifyService::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
                 $mock->shouldReceive('getCurrentPlayback')->andReturn([
                     'name' => 'Song',
@@ -58,8 +58,8 @@ describe('SkipCommand', function () {
                 ->assertExitCode(0);
         });
 
-        it('skips to previous track with previous argument', function () {
-            $this->mock(SpotifyService::class, function ($mock) {
+        it('skips to previous track with previous argument', function (): void {
+            $this->mock(SpotifyService::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
                 $mock->shouldReceive('getCurrentPlayback')->andReturn([
                     'name' => 'Song',
@@ -76,10 +76,10 @@ describe('SkipCommand', function () {
 
     });
 
-    describe('error handling', function () {
+    describe('error handling', function (): void {
 
-        it('requires configuration', function () {
-            $this->mock(SpotifyService::class, function ($mock) {
+        it('requires configuration', function (): void {
+            $this->mock(SpotifyService::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(false);
             });
 
@@ -87,8 +87,8 @@ describe('SkipCommand', function () {
                 ->assertExitCode(1);
         });
 
-        it('handles API errors', function () {
-            $this->mock(SpotifyService::class, function ($mock) {
+        it('handles API errors', function (): void {
+            $this->mock(SpotifyService::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
                 $mock->shouldReceive('getCurrentPlayback')->andReturn([
                     'name' => 'Song',
@@ -103,20 +103,20 @@ describe('SkipCommand', function () {
 
     });
 
-    describe('command metadata', function () {
+    describe('command metadata', function (): void {
 
-        it('has correct command name', function () {
+        it('has correct command name', function (): void {
             $command = $this->app->make(\App\Commands\SkipCommand::class);
             expect($command->getName())->toBe('skip');
         });
 
-        it('has optional direction argument', function () {
+        it('has optional direction argument', function (): void {
             $command = $this->app->make(\App\Commands\SkipCommand::class);
             $definition = $command->getDefinition();
             expect($definition->hasArgument('direction'))->toBeTrue();
         });
 
-        it('has json option', function () {
+        it('has json option', function (): void {
             $command = $this->app->make(\App\Commands\SkipCommand::class);
             $definition = $command->getDefinition();
             expect($definition->hasOption('json'))->toBeTrue();

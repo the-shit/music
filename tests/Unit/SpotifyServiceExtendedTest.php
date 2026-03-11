@@ -44,136 +44,136 @@ function makeService(bool $authenticated = true): SpotifyService
     return $service;
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     Config::set('spotify.client_id', 'test_client_id');
     Config::set('spotify.client_secret', 'test_client_secret');
 
     $this->service = makeService();
 });
 
-describe('SpotifyService Extended', function () {
+describe('SpotifyService Extended', function (): void {
 
-    describe('Unauthenticated method throws', function () {
+    describe('Unauthenticated method throws', function (): void {
 
-        beforeEach(function () {
+        beforeEach(function (): void {
             $this->unauthService = makeService(false);
         });
 
-        it('search() throws when not authenticated', function () {
+        it('search() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->search('test'))
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('play() throws when not authenticated', function () {
+        it('play() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->play('spotify:track:123'))
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('resume() throws when not authenticated', function () {
+        it('resume() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->resume())
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('pause() throws when not authenticated', function () {
+        it('pause() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->pause())
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('next() throws when not authenticated', function () {
+        it('next() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->next())
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('previous() throws when not authenticated', function () {
+        it('previous() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->previous())
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('getDevices() throws when not authenticated', function () {
+        it('getDevices() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->getDevices())
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('transferPlayback() throws when not authenticated', function () {
+        it('transferPlayback() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->transferPlayback('device_id'))
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('addToQueue() throws when not authenticated', function () {
+        it('addToQueue() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->addToQueue('spotify:track:123'))
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('setVolume() throws when not authenticated', function () {
+        it('setVolume() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->setVolume(50))
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('setShuffle() throws when not authenticated', function () {
+        it('setShuffle() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->setShuffle(true))
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('setRepeat() throws when not authenticated', function () {
+        it('setRepeat() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->setRepeat('off'))
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('getTopTracks() throws when not authenticated', function () {
+        it('getTopTracks() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->getTopTracks())
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('getTopArtists() throws when not authenticated', function () {
+        it('getTopArtists() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->getTopArtists())
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('getRecentlyPlayed() throws when not authenticated', function () {
+        it('getRecentlyPlayed() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->getRecentlyPlayed())
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('getUserProfile() throws when not authenticated', function () {
+        it('getUserProfile() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->getUserProfile())
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('searchMultiple() throws when not authenticated', function () {
+        it('searchMultiple() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthService->searchMultiple('test'))
                 ->toThrow(\Exception::class, 'Not authenticated');
         });
 
-        it('getPlaylists() returns empty array when not authenticated', function () {
+        it('getPlaylists() returns empty array when not authenticated', function (): void {
             $result = $this->unauthService->getPlaylists();
             expect($result)->toBe([]);
         });
 
-        it('getPlaylistTracks() returns empty array when not authenticated', function () {
+        it('getPlaylistTracks() returns empty array when not authenticated', function (): void {
             $result = $this->unauthService->getPlaylistTracks('playlist123');
             expect($result)->toBe([]);
         });
 
-        it('getQueue() returns empty array when not authenticated', function () {
+        it('getQueue() returns empty array when not authenticated', function (): void {
             $result = $this->unauthService->getQueue();
             expect($result)->toBe([]);
         });
 
-        it('getCurrentPlayback() returns null when not authenticated', function () {
+        it('getCurrentPlayback() returns null when not authenticated', function (): void {
             $result = $this->unauthService->getCurrentPlayback();
             expect($result)->toBeNull();
         });
 
-        it('playPlaylist() returns false when not authenticated', function () {
+        it('playPlaylist() returns false when not authenticated', function (): void {
             $result = $this->unauthService->playPlaylist('playlist123');
             expect($result)->toBeFalse();
         });
 
     });
 
-    describe('API failure handling', function () {
+    describe('API failure handling', function (): void {
 
-        it('pause() throws on API failure', function () {
+        it('pause() throws on API failure', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/pause' => Http::response(
                     ['error' => ['message' => 'Player error']],
@@ -185,7 +185,7 @@ describe('SpotifyService Extended', function () {
                 ->toThrow(\Exception::class, 'Player error');
         });
 
-        it('next() throws on API failure', function () {
+        it('next() throws on API failure', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/next' => Http::response(
                     ['error' => ['message' => 'Skip failed']],
@@ -197,7 +197,7 @@ describe('SpotifyService Extended', function () {
                 ->toThrow(\Exception::class, 'Skip failed');
         });
 
-        it('previous() throws on API failure', function () {
+        it('previous() throws on API failure', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/previous' => Http::response(
                     ['error' => ['message' => 'Previous failed']],
@@ -209,7 +209,7 @@ describe('SpotifyService Extended', function () {
                 ->toThrow(\Exception::class, 'Previous failed');
         });
 
-        it('transferPlayback() throws on API failure', function () {
+        it('transferPlayback() throws on API failure', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player' => Http::response(
                     ['error' => ['message' => 'Transfer failed']],
@@ -221,7 +221,7 @@ describe('SpotifyService Extended', function () {
                 ->toThrow(\Exception::class, 'Transfer failed');
         });
 
-        it('addToQueue() throws when no active device', function () {
+        it('addToQueue() throws when no active device', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [],
@@ -232,7 +232,7 @@ describe('SpotifyService Extended', function () {
                 ->toThrow(\Exception::class, 'No active Spotify device');
         });
 
-        it('addToQueue() throws on API failure', function () {
+        it('addToQueue() throws on API failure', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [['id' => 'dev1', 'is_active' => true]],
@@ -247,7 +247,7 @@ describe('SpotifyService Extended', function () {
                 ->toThrow(\Exception::class, 'Queue error');
         });
 
-        it('play() throws when no device available', function () {
+        it('play() throws when no device available', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [],
@@ -258,7 +258,7 @@ describe('SpotifyService Extended', function () {
                 ->toThrow(\Exception::class, 'No Spotify devices available');
         });
 
-        it('play() throws on API failure', function () {
+        it('play() throws on API failure', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [['id' => 'dev1', 'is_active' => true]],
@@ -273,7 +273,7 @@ describe('SpotifyService Extended', function () {
                 ->toThrow(\Exception::class, 'Play failed');
         });
 
-        it('resume() throws when no device available', function () {
+        it('resume() throws when no device available', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [],
@@ -284,7 +284,7 @@ describe('SpotifyService Extended', function () {
                 ->toThrow(\Exception::class, 'No Spotify devices available');
         });
 
-        it('resume() throws on API failure', function () {
+        it('resume() throws on API failure', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [['id' => 'dev1', 'is_active' => true]],
@@ -299,12 +299,12 @@ describe('SpotifyService Extended', function () {
                 ->toThrow(\Exception::class, 'Resume failed');
         });
 
-        it('setRepeat() throws on invalid state', function () {
+        it('setRepeat() throws on invalid state', function (): void {
             expect(fn () => $this->service->setRepeat('invalid'))
                 ->toThrow(\Exception::class, 'Invalid repeat state');
         });
 
-        it('play() with inactive device transfers playback first', function () {
+        it('play() with inactive device transfers playback first', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [['id' => 'inactive_dev', 'is_active' => false, 'name' => 'Inactive']],
@@ -318,7 +318,7 @@ describe('SpotifyService Extended', function () {
             expect(true)->toBeTrue(); // got here without exception
         });
 
-        it('play() with specific device id transfers if inactive', function () {
+        it('play() with specific device id transfers if inactive', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [
@@ -333,7 +333,7 @@ describe('SpotifyService Extended', function () {
             expect(true)->toBeTrue();
         });
 
-        it('resume() with inactive device transfers playback', function () {
+        it('resume() with inactive device transfers playback', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [['id' => 'inactive_dev', 'is_active' => false]],
@@ -348,9 +348,9 @@ describe('SpotifyService Extended', function () {
 
     });
 
-    describe('Playlist tracks', function () {
+    describe('Playlist tracks', function (): void {
 
-        it('gets playlist tracks', function () {
+        it('gets playlist tracks', function (): void {
             Http::fake([
                 'api.spotify.com/v1/playlists/*/tracks' => Http::response([
                     'items' => [
@@ -366,7 +366,7 @@ describe('SpotifyService Extended', function () {
             expect($tracks[0]['track']['name'])->toBe('Track 1');
         });
 
-        it('returns empty array when playlist tracks API fails', function () {
+        it('returns empty array when playlist tracks API fails', function (): void {
             Http::fake([
                 'api.spotify.com/v1/playlists/*/tracks' => Http::response([], 500),
             ]);
@@ -377,9 +377,9 @@ describe('SpotifyService Extended', function () {
 
     });
 
-    describe('User profile', function () {
+    describe('User profile', function (): void {
 
-        it('gets user profile', function () {
+        it('gets user profile', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me' => Http::response([
                     'id' => 'user123',
@@ -394,7 +394,7 @@ describe('SpotifyService Extended', function () {
             expect($profile['id'])->toBe('user123');
         });
 
-        it('returns null when user profile API fails', function () {
+        it('returns null when user profile API fails', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me' => Http::response([], 500),
             ]);
@@ -405,9 +405,9 @@ describe('SpotifyService Extended', function () {
 
     });
 
-    describe('Playback state control', function () {
+    describe('Playback state control', function (): void {
 
-        it('sets shuffle on', function () {
+        it('sets shuffle on', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/shuffle*' => Http::response([], 204),
             ]);
@@ -415,12 +415,12 @@ describe('SpotifyService Extended', function () {
             $result = $this->service->setShuffle(true);
             expect($result)->toBeTrue();
 
-            Http::assertSent(function ($request) {
+            Http::assertSent(function ($request): bool {
                 return str_contains($request->url(), 'state=true');
             });
         });
 
-        it('sets shuffle off', function () {
+        it('sets shuffle off', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/shuffle*' => Http::response([], 204),
             ]);
@@ -428,12 +428,12 @@ describe('SpotifyService Extended', function () {
             $result = $this->service->setShuffle(false);
             expect($result)->toBeTrue();
 
-            Http::assertSent(function ($request) {
+            Http::assertSent(function ($request): bool {
                 return str_contains($request->url(), 'state=false');
             });
         });
 
-        it('sets repeat to track', function () {
+        it('sets repeat to track', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/repeat*' => Http::response([], 204),
             ]);
@@ -442,7 +442,7 @@ describe('SpotifyService Extended', function () {
             expect($result)->toBeTrue();
         });
 
-        it('sets repeat to context', function () {
+        it('sets repeat to context', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/repeat*' => Http::response([], 204),
             ]);
@@ -451,7 +451,7 @@ describe('SpotifyService Extended', function () {
             expect($result)->toBeTrue();
         });
 
-        it('sets repeat to off', function () {
+        it('sets repeat to off', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/repeat*' => Http::response([], 204),
             ]);
@@ -462,9 +462,9 @@ describe('SpotifyService Extended', function () {
 
     });
 
-    describe('Search edge cases', function () {
+    describe('Search edge cases', function (): void {
 
-        it('returns null when search returns no results', function () {
+        it('returns null when search returns no results', function (): void {
             Http::fake([
                 'api.spotify.com/v1/search*' => Http::response([
                     'tracks' => ['items' => []],
@@ -475,7 +475,7 @@ describe('SpotifyService Extended', function () {
             expect($result)->toBeNull();
         });
 
-        it('returns null when search API fails', function () {
+        it('returns null when search API fails', function (): void {
             Http::fake([
                 'api.spotify.com/v1/search*' => Http::response([], 500),
             ]);
@@ -484,7 +484,7 @@ describe('SpotifyService Extended', function () {
             expect($result)->toBeNull();
         });
 
-        it('returns empty array when searchMultiple API fails', function () {
+        it('returns empty array when searchMultiple API fails', function (): void {
             Http::fake([
                 'api.spotify.com/v1/search*' => Http::response([], 500),
             ]);
@@ -495,9 +495,9 @@ describe('SpotifyService Extended', function () {
 
     });
 
-    describe('Device edge cases', function () {
+    describe('Device edge cases', function (): void {
 
-        it('returns empty array when devices API fails', function () {
+        it('returns empty array when devices API fails', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([], 500),
             ]);
@@ -506,7 +506,7 @@ describe('SpotifyService Extended', function () {
             expect($result)->toBe([]);
         });
 
-        it('getActiveDevice returns null when no devices', function () {
+        it('getActiveDevice returns null when no devices', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [],
@@ -517,7 +517,7 @@ describe('SpotifyService Extended', function () {
             expect($result)->toBeNull();
         });
 
-        it('getActiveDevice returns first device when none active', function () {
+        it('getActiveDevice returns first device when none active', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/devices' => Http::response([
                     'devices' => [
@@ -533,9 +533,9 @@ describe('SpotifyService Extended', function () {
 
     });
 
-    describe('Playlist and queue edge cases', function () {
+    describe('Playlist and queue edge cases', function (): void {
 
-        it('returns empty array when playlists API fails', function () {
+        it('returns empty array when playlists API fails', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/playlists*' => Http::response([], 500),
             ]);
@@ -544,7 +544,7 @@ describe('SpotifyService Extended', function () {
             expect($result)->toBe([]);
         });
 
-        it('returns empty array when queue API fails', function () {
+        it('returns empty array when queue API fails', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player/queue' => Http::response([], 500),
             ]);
@@ -555,9 +555,9 @@ describe('SpotifyService Extended', function () {
 
     });
 
-    describe('getCurrentPlayback edge cases', function () {
+    describe('getCurrentPlayback edge cases', function (): void {
 
-        it('returns null when no item in playback response', function () {
+        it('returns null when no item in playback response', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player' => Http::response([
                     'is_playing' => false,
@@ -569,7 +569,7 @@ describe('SpotifyService Extended', function () {
             expect($result)->toBeNull();
         });
 
-        it('returns null when API fails', function () {
+        it('returns null when API fails', function (): void {
             Http::fake([
                 'api.spotify.com/v1/me/player' => Http::response([], 500),
             ]);

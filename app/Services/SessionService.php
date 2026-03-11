@@ -31,7 +31,7 @@ class SessionService
         $parser = new IntentParserAgent;
         $response = $parser->prompt($prompt);
         /** @var array{phases: array<array{name: string, mood: string, duration_minutes: int, energy: float, valence: float, tempo: int, description: string}>, total_duration: int, playlist_name: string} $plan */
-        $plan = self::parseJson($response->text);
+        $plan = $this->parseJson($response->text);
 
         $this->sessionPlan = $plan;
         $this->phases = $plan['phases'];
@@ -115,13 +115,13 @@ class SessionService
             $prompt .= "\n";
         }
 
-        $prompt .= "Select the best tracks for each phase. Maintain energy flow between phases.";
+        $prompt .= 'Select the best tracks for each phase. Maintain energy flow between phases.';
 
         $curator = new CuratorAgent;
         $response = $curator->prompt($prompt);
 
         /** @var array{playlist_name: string, playlist_description: string, phases: array<array{name: string, track_uris: string[], dj_note: string}>} */
-        return self::parseJson($response->text);
+        return $this->parseJson($response->text);
     }
 
     /**
@@ -206,7 +206,7 @@ class SessionService
         return $this->sessionPlan;
     }
 
-    private static function parseJson(string $text): array
+    private function parseJson(string $text): array
     {
         // Strip markdown code fences if present
         $text = preg_replace('/^```(?:json)?\s*/m', '', $text);

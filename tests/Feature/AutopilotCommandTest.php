@@ -3,14 +3,14 @@
 use App\Commands\AutopilotCommand;
 use Illuminate\Support\Facades\Config;
 
-describe('AutopilotCommand', function () {
+describe('AutopilotCommand', function (): void {
 
-    beforeEach(function () {
+    beforeEach(function (): void {
         Config::set('autopilot.mood_presets', config('autopilot.mood_presets'));
         $this->command = $this->app->make(AutopilotCommand::class);
     });
 
-    it('uses mood presets from config', function () {
+    it('uses mood presets from config', function (): void {
         $reflection = new ReflectionClass($this->command);
         $method = $reflection->getMethod('moodPresets');
         $method->setAccessible(true);
@@ -22,7 +22,7 @@ describe('AutopilotCommand', function () {
         expect($presets['flow'])->toHaveKey('target_energy');
     });
 
-    it('builds track and artist seeds from current and recent playback', function () {
+    it('builds track and artist seeds from current and recent playback', function (): void {
         $reflection = new ReflectionClass($this->command);
         $method = $reflection->getMethod('buildRecommendationSeeds');
         $method->setAccessible(true);
@@ -52,7 +52,7 @@ describe('AutopilotCommand', function () {
         ]);
     });
 
-    it('parses launchctl pid output robustly', function () {
+    it('parses launchctl pid output robustly', function (): void {
         $reflection = new ReflectionClass($this->command);
         $method = $reflection->getMethod('parseLaunchctlPid');
         $method->setAccessible(true);

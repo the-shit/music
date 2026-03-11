@@ -18,8 +18,8 @@ class SessionStatusTool extends Tool
 
     public function handle(Request $request, SpotifyService $spotify): Response
     {
-        return $this->withAuthHandling(function () use ($spotify) {
-            $state = self::loadSessionState();
+        return $this->withAuthHandling(function () use ($spotify): \Laravel\Mcp\Response {
+            $state = $this->loadSessionState();
 
             if (! $state) {
                 return Response::text('No active session. Use session_start to begin one.');
@@ -34,14 +34,14 @@ class SessionStatusTool extends Tool
                 ? "{$playback['track']} by {$playback['artist']}"
                 : 'Nothing playing';
 
-            $output = "Session: " . ($state['curated']['playlist_name'] ?? $state['plan']['playlist_name'] ?? 'Unknown') . "\n"
-                . "Mode: {$state['mode']}\n"
-                . "Now playing: {$nowPlaying}\n"
-                . "Elapsed: {$elapsed} min | Remaining: ~{$remaining} min\n"
-                . "Tracks queued: {$state['tracks_queued']}\n";
+            $output = 'Session: '.($state['curated']['playlist_name'] ?? $state['plan']['playlist_name'] ?? 'Unknown')."\n"
+                ."Mode: {$state['mode']}\n"
+                ."Now playing: {$nowPlaying}\n"
+                ."Elapsed: {$elapsed} min | Remaining: ~{$remaining} min\n"
+                ."Tracks queued: {$state['tracks_queued']}\n";
 
             if (isset($state['curated']['phases'])) {
-                $currentPhase = self::estimateCurrentPhase($state, $elapsed);
+                $currentPhase = $this->estimateCurrentPhase($state, $elapsed);
                 $output .= "\nCurrent phase: {$currentPhase}";
             }
 
@@ -49,7 +49,7 @@ class SessionStatusTool extends Tool
         });
     }
 
-    private static function estimateCurrentPhase(array $state, int $elapsedMinutes): string
+    private function estimateCurrentPhase(array $state, int $elapsedMinutes): string
     {
         $phases = $state['plan']['phases'] ?? [];
         $accumulated = 0;
@@ -64,7 +64,7 @@ class SessionStatusTool extends Tool
         return 'Session complete';
     }
 
-    private static function loadSessionState(): ?array
+    private function loadSessionState(): ?array
     {
         $path = SessionStartTool::sessionStatePath();
 

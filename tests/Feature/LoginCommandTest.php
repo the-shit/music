@@ -1,8 +1,8 @@
 <?php
 
-describe('LoginCommand', function () {
+describe('LoginCommand', function (): void {
 
-    beforeEach(function () {
+    beforeEach(function (): void {
         // Point config_dir to an empty temp dir so no real credentials file is read
         $this->testConfigDir = sys_get_temp_dir().'/login-test-'.uniqid();
         mkdir($this->testConfigDir, 0755, true);
@@ -10,23 +10,23 @@ describe('LoginCommand', function () {
         config(['spotify.token_path' => $this->testConfigDir.'/token.json']);
     });
 
-    afterEach(function () {
-        if (isset($this->testConfigDir) && is_dir($this->testConfigDir)) {
+    afterEach(function (): void {
+        if (property_exists($this, 'testConfigDir') && $this->testConfigDir !== null && is_dir($this->testConfigDir)) {
             array_map('unlink', glob($this->testConfigDir.'/*') ?: []);
             rmdir($this->testConfigDir);
         }
     });
 
-    describe('missing credentials', function () {
+    describe('missing credentials', function (): void {
 
-        it('fails when credentials file is missing entirely', function () {
+        it('fails when credentials file is missing entirely', function (): void {
             // No credentials.json in testConfigDir → both null → failure
             $this->artisan('login')
                 ->expectsOutputToContain('Missing Spotify credentials')
                 ->assertExitCode(1);
         });
 
-        it('fails when client_id is missing from credentials file', function () {
+        it('fails when client_id is missing from credentials file', function (): void {
             file_put_contents($this->testConfigDir.'/credentials.json', json_encode([
                 'client_id' => null,
                 'client_secret' => 'test-secret-123',
@@ -37,7 +37,7 @@ describe('LoginCommand', function () {
                 ->assertExitCode(1);
         });
 
-        it('fails when client_secret is missing from credentials file', function () {
+        it('fails when client_secret is missing from credentials file', function (): void {
             file_put_contents($this->testConfigDir.'/credentials.json', json_encode([
                 'client_id' => 'test-id-123',
                 'client_secret' => null,
@@ -48,7 +48,7 @@ describe('LoginCommand', function () {
                 ->assertExitCode(1);
         });
 
-        it('fails when client_id is empty string in credentials file', function () {
+        it('fails when client_id is empty string in credentials file', function (): void {
             file_put_contents($this->testConfigDir.'/credentials.json', json_encode([
                 'client_id' => '',
                 'client_secret' => 'test-secret-123',
@@ -61,23 +61,23 @@ describe('LoginCommand', function () {
 
     });
 
-    describe('command metadata', function () {
+    describe('command metadata', function (): void {
 
-        it('has correct command name', function () {
+        it('has correct command name', function (): void {
             $command = $this->app->make(\App\Commands\LoginCommand::class);
             expect($command->getName())->toBe('login');
         });
 
-        it('has a description', function () {
+        it('has a description', function (): void {
             $command = $this->app->make(\App\Commands\LoginCommand::class);
             expect($command->getDescription())->not->toBeEmpty();
         });
 
     });
 
-    describe('findAvailablePort', function () {
+    describe('findAvailablePort', function (): void {
 
-        it('returns a port in the expected range', function () {
+        it('returns a port in the expected range', function (): void {
             $command = $this->app->make(\App\Commands\LoginCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('findAvailablePort');
@@ -90,9 +90,9 @@ describe('LoginCommand', function () {
 
     });
 
-    describe('createCallbackServer', function () {
+    describe('createCallbackServer', function (): void {
 
-        it('creates a PHP callback server script in temp dir', function () {
+        it('creates a PHP callback server script in temp dir', function (): void {
             $command = $this->app->make(\App\Commands\LoginCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('createCallbackServer');
@@ -112,9 +112,9 @@ describe('LoginCommand', function () {
 
     });
 
-    describe('waitForAuthCode', function () {
+    describe('waitForAuthCode', function (): void {
 
-        it('returns null immediately when timeout is 0 and no code file present', function () {
+        it('returns null immediately when timeout is 0 and no code file present', function (): void {
             // Clean slate
             $codeFile = sys_get_temp_dir().'/spotify_code.txt';
             @unlink($codeFile);
@@ -129,7 +129,7 @@ describe('LoginCommand', function () {
             expect($result)->toBeNull();
         });
 
-        it('reads and returns code when file appears during polling', function () {
+        it('reads and returns code when file appears during polling', function (): void {
             // We test the code-found branch by subclassing waitForAuthCode behaviour:
             // since the method clears then polls, we write the file from a background
             // process with enough delay to survive the unlink and appear on first poll.
@@ -154,9 +154,9 @@ describe('LoginCommand', function () {
 
     });
 
-    describe('exchangeCodeForToken', function () {
+    describe('exchangeCodeForToken', function (): void {
 
-        it('returns null when HTTP request fails', function () {
+        it('returns null when HTTP request fails', function (): void {
             \Illuminate\Support\Facades\Http::fake([
                 'accounts.spotify.com/*' => \Illuminate\Support\Facades\Http::response([], 400),
             ]);
@@ -170,7 +170,7 @@ describe('LoginCommand', function () {
             expect($result)->toBeNull();
         });
 
-        it('returns token array on successful exchange', function () {
+        it('returns token array on successful exchange', function (): void {
             \Illuminate\Support\Facades\Http::fake([
                 'accounts.spotify.com/*' => \Illuminate\Support\Facades\Http::response([
                     'access_token' => 'access_tok_123',

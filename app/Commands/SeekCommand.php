@@ -18,7 +18,7 @@ class SeekCommand extends Command
 
     protected $description = 'Seek to a position in the current track';
 
-    public function handle(SpotifyService $spotify)
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;

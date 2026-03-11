@@ -6,6 +6,10 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\warning;
+
 class RepeatCommand extends Command
 {
     use RequiresSpotifyConfig;
@@ -16,13 +20,11 @@ class RepeatCommand extends Command
 
     protected $description = '🔁 Set repeat mode for Spotify playback (off/track/context)';
 
-    public function handle()
+    public function handle(SpotifyService $spotify): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-
-        $spotify = app(SpotifyService::class);
 
         $state = strtolower($this->argument('state') ?? 'toggle');
 
@@ -31,8 +33,8 @@ class RepeatCommand extends Command
             $current = $spotify->getCurrentPlayback();
 
             if (! $current) {
-                $this->warn('⚠️  Nothing is currently playing');
-                $this->info('💡 Start playing something first');
+                warning('⚠️  Nothing is currently playing');
+                info('💡 Start playing something first');
 
                 return self::FAILURE;
             }
@@ -64,7 +66,7 @@ class RepeatCommand extends Command
                     'message' => $this->getRepeatMessage($newState),
                 ]));
             } else {
-                $this->info($this->getRepeatIcon($newState).' '.$this->getRepeatMessage($newState));
+                info($this->getRepeatIcon($newState).' '.$this->getRepeatMessage($newState));
             }
 
             // Emit event (but suppress output in JSON mode)
@@ -98,7 +100,7 @@ class RepeatCommand extends Command
                     'message' => $e->getMessage(),
                 ]));
             } else {
-                $this->error('❌ Failed to change repeat mode: '.$e->getMessage());
+                error('❌ Failed to change repeat mode: '.$e->getMessage());
             }
 
             return self::FAILURE;

@@ -4,19 +4,19 @@ use App\Services\SpotifyService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Process;
 
-describe('VibesCommand', function () {
+describe('VibesCommand', function (): void {
 
-    it('has the correct command signature', function () {
+    it('has the correct command signature', function (): void {
         $command = $this->app->make(\App\Commands\VibesCommand::class);
         expect($command->getName())->toBe('vibes');
     });
 
-    it('has a description', function () {
+    it('has a description', function (): void {
         $command = $this->app->make(\App\Commands\VibesCommand::class);
         expect($command->getDescription())->not->toBeEmpty();
     });
 
-    it('outputs success message when no commits with spotify URLs are found', function () {
+    it('outputs success message when no commits with spotify URLs are found', function (): void {
         Process::fake([
             'git log *' => Process::result(output: '', exitCode: 0),
         ]);
@@ -26,7 +26,7 @@ describe('VibesCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('exits early with info message when --json flag is used and no commits found', function () {
+    it('exits early with info message when --json flag is used and no commits found', function (): void {
         Process::fake([
             'git log *' => Process::result(output: '', exitCode: 0),
         ]);
@@ -37,7 +37,7 @@ describe('VibesCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('generates HTML and writes output to --output path', function () {
+    it('generates HTML and writes output to --output path', function (): void {
         $gitLog = implode("\n", [
             'COMMIT_START',
             'abc1234567890abc1234567890abc1234567890',
@@ -52,7 +52,7 @@ describe('VibesCommand', function () {
             'git log *' => Process::result(output: $gitLog, exitCode: 0),
         ]);
 
-        $this->mock(SpotifyService::class, function ($mock) {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->andReturn(true);
             $mock->shouldReceive('getTracks')
                 ->once()
@@ -75,7 +75,7 @@ describe('VibesCommand', function () {
         unlink($tempFile);
     });
 
-    it('groups commits by track and counts correctly in JSON output', function () {
+    it('groups commits by track and counts correctly in JSON output', function (): void {
         $trackId = '4iV5W9uYEdYUVa79Axb7Rh';
         $gitLog = implode("\n", [
             'COMMIT_START',
@@ -98,7 +98,7 @@ describe('VibesCommand', function () {
             'git log *' => Process::result(output: $gitLog, exitCode: 0),
         ]);
 
-        $this->mock(SpotifyService::class, function ($mock) {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->andReturn(true);
             $mock->shouldReceive('getTracks')
                 ->once()
@@ -114,7 +114,7 @@ describe('VibesCommand', function () {
             ->toContain('"total_tracks": 1');
     });
 
-    it('does not fetch track metadata when Spotify is not configured', function () {
+    it('does not fetch track metadata when Spotify is not configured', function (): void {
         $gitLog = implode("\n", [
             'COMMIT_START',
             'abc1234567890abc1234567890abc1234567890',
@@ -129,7 +129,7 @@ describe('VibesCommand', function () {
             'git log *' => Process::result(output: $gitLog, exitCode: 0),
         ]);
 
-        $this->mock(SpotifyService::class, function ($mock) {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->andReturn(false);
             $mock->shouldNotReceive('getTracks');
             $mock->shouldReceive('getTracksViaOEmbed')->andReturn([]);
@@ -145,7 +145,7 @@ describe('VibesCommand', function () {
         }
     });
 
-    it('uses default docs/vibes.html output path when --output is not specified', function () {
+    it('uses default docs/vibes.html output path when --output is not specified', function (): void {
         Process::fake([
             'git log *' => Process::result(output: '', exitCode: 0),
         ]);
@@ -155,7 +155,7 @@ describe('VibesCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('opens the file in browser unless --no-open is passed', function () {
+    it('opens the file in browser unless --no-open is passed', function (): void {
         Process::fake([
             'git log *' => Process::result(output: '', exitCode: 0),
             "open '*'" => Process::result(output: '', exitCode: 0),

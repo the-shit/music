@@ -2,28 +2,28 @@
 
 use App\Services\SpotifyService;
 
-describe('NowPlayingCommand', function () {
+describe('NowPlayingCommand', function (): void {
 
-    describe('command metadata', function () {
+    describe('command metadata', function (): void {
 
-        it('has correct command name', function () {
+        it('has correct command name', function (): void {
             $command = $this->app->make(\App\Commands\NowPlayingCommand::class);
             expect($command->getName())->toBe('nowplaying');
         });
 
-        it('has a description', function () {
+        it('has a description', function (): void {
             $command = $this->app->make(\App\Commands\NowPlayingCommand::class);
             expect($command->getDescription())->not->toBeEmpty();
         });
 
-        it('has --interval option with default of 3', function () {
+        it('has --interval option with default of 3', function (): void {
             $command = $this->app->make(\App\Commands\NowPlayingCommand::class);
             $definition = $command->getDefinition();
             expect($definition->hasOption('interval'))->toBeTrue();
             expect($definition->getOption('interval')->getDefault())->toBe('3');
         });
 
-        it('has --stop option', function () {
+        it('has --stop option', function (): void {
             $command = $this->app->make(\App\Commands\NowPlayingCommand::class);
             $definition = $command->getDefinition();
             expect($definition->hasOption('stop'))->toBeTrue();
@@ -31,25 +31,25 @@ describe('NowPlayingCommand', function () {
 
     });
 
-    describe('--stop flag', function () {
+    describe('--stop flag', function (): void {
 
-        it('reports no bridge running when pkill finds nothing', function () {
+        it('reports no bridge running when pkill finds nothing', function (): void {
             $this->artisan('nowplaying', ['--stop' => true])
                 ->expectsOutputToContain('No running nowplaying bridge found.')
                 ->assertExitCode(0);
         });
 
-        it('returns success exit code regardless of bridge state', function () {
+        it('returns success exit code regardless of bridge state', function (): void {
             $this->artisan('nowplaying', ['--stop' => true])
                 ->assertExitCode(0);
         });
 
     });
 
-    describe('not configured guard', function () {
+    describe('not configured guard', function (): void {
 
-        it('fails when not configured', function () {
-            $this->mock(SpotifyService::class, function ($mock) {
+        it('fails when not configured', function (): void {
+            $this->mock(SpotifyService::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(false);
             });
 
@@ -60,10 +60,10 @@ describe('NowPlayingCommand', function () {
 
     });
 
-    describe('bridge script missing', function () {
+    describe('bridge script missing', function (): void {
 
-        it('fails with error when bridge script does not exist', function () {
-            $this->mock(SpotifyService::class, function ($mock) {
+        it('fails with error when bridge script does not exist', function (): void {
+            $this->mock(SpotifyService::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             });
 
@@ -87,9 +87,9 @@ describe('NowPlayingCommand', function () {
 
     });
 
-    describe('python3 not found', function () {
+    describe('python3 not found', function (): void {
 
-        it('fails with error when python3 is not available', function () {
+        it('fails with error when python3 is not available', function (): void {
             // We can test this by checking the command structure is correct
             // The actual python3 check uses shell_exec('which python3')
             // In a real test environment python3 is usually available

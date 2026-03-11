@@ -12,10 +12,10 @@ uses(TestCase::class);
 // NowPlayingResource
 // ---------------------------------------------------------------------------
 
-describe('NowPlayingResource', function () {
+describe('NowPlayingResource', function (): void {
 
-    it('returns playing false JSON when nothing is playing', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('returns playing false JSON when nothing is playing', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
         });
 
@@ -25,8 +25,8 @@ describe('NowPlayingResource', function () {
         $response->assertSee('"playing":false');
     });
 
-    it('returns full playback JSON when a track is playing', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('returns full playback JSON when a track is playing', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'is_playing' => true,
                 'name' => 'Kashmir',
@@ -54,8 +54,8 @@ describe('NowPlayingResource', function () {
         $response->assertSee('"device":"MacBook Pro"');
     });
 
-    it('returns null device when device name is missing', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('returns null device when device name is missing', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'is_playing' => false,
                 'name' => 'Song',
@@ -75,8 +75,8 @@ describe('NowPlayingResource', function () {
         $response->assertSee('"device":null');
     });
 
-    it('has the correct MCP name', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('has the correct MCP name', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->andReturn(null);
         });
 
@@ -84,18 +84,18 @@ describe('NowPlayingResource', function () {
             ->assertName('now-playing');
     });
 
-    it('has the correct URI', function () {
+    it('has the correct URI', function (): void {
         $resource = app(NowPlayingResource::class);
         expect($resource->uri())->toBe('spotify://now-playing');
     });
 
-    it('has application/json MIME type', function () {
+    it('has application/json MIME type', function (): void {
         $resource = app(NowPlayingResource::class);
         expect($resource->mimeType())->toBe('application/json');
     });
 
-    it('has a description', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('has a description', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->andReturn(null);
         });
 
@@ -109,10 +109,10 @@ describe('NowPlayingResource', function () {
 // DevicesResource
 // ---------------------------------------------------------------------------
 
-describe('DevicesResource', function () {
+describe('DevicesResource', function (): void {
 
-    it('returns empty JSON array when no devices are available', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('returns empty JSON array when no devices are available', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([]);
         });
 
@@ -121,8 +121,8 @@ describe('DevicesResource', function () {
             ->assertSee('[]');
     });
 
-    it('returns JSON array of devices with mapped fields', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('returns JSON array of devices with mapped fields', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 [
                     'id' => 'device-1',
@@ -153,8 +153,8 @@ describe('DevicesResource', function () {
         $response->assertSee('"active":false');
     });
 
-    it('defaults active to false when is_active is missing', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('defaults active to false when is_active is missing', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 [
                     'id' => 'device-1',
@@ -170,8 +170,8 @@ describe('DevicesResource', function () {
             ->assertSee('"active":false');
     });
 
-    it('sets volume to null when volume_percent is missing', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('sets volume to null when volume_percent is missing', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 [
                     'id' => 'device-1',
@@ -188,8 +188,8 @@ describe('DevicesResource', function () {
             ->assertSee('"volume":null');
     });
 
-    it('has the correct MCP name', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('has the correct MCP name', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->andReturn([]);
         });
 
@@ -197,18 +197,18 @@ describe('DevicesResource', function () {
             ->assertName('devices');
     });
 
-    it('has the correct URI', function () {
+    it('has the correct URI', function (): void {
         $resource = app(DevicesResource::class);
         expect($resource->uri())->toBe('spotify://devices');
     });
 
-    it('has application/json MIME type', function () {
+    it('has application/json MIME type', function (): void {
         $resource = app(DevicesResource::class);
         expect($resource->mimeType())->toBe('application/json');
     });
 
-    it('has a description', function () {
-        $this->mock(SpotifyService::class, function ($mock) {
+    it('has a description', function (): void {
+        $this->mock(SpotifyService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->andReturn([]);
         });
 
