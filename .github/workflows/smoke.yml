@@ -33,10 +33,13 @@ jobs:
       - name: Static analysis passes
         run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
 
+      - name: Install Box
+        run: composer global require humbug/box --no-interaction
+
       - name: PHAR builds
-        run: php spotify app:build spotify --build-version=smoke-${{ github.sha }}
-        env:
-          APP_ENV: production
+        run: |
+          export PATH="$HOME/.composer/vendor/bin:$PATH"
+          php spotify app:build spotify --build-version=smoke-${{ github.sha }}
 
       - name: PHAR binary boots
         run: ./builds/spotify list
