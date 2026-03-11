@@ -52,6 +52,46 @@ git commit
 
 ---
 
+## Fresh clone setup checklist
+
+Follow these steps on a clean machine to get fully operational.
+
+### Prerequisites
+
+- PHP 8.2+ with `curl`, `mbstring`, `dom`, `xml` extensions
+- Composer
+- Spotify Premium account
+- A [Spotify Developer App](https://developer.spotify.com/dashboard) with `http://localhost:8888/callback` as a redirect URI
+
+### Steps
+
+```bash
+git clone https://github.com/the-shit/music && cd music
+composer install
+cp .env.example .env          # fill in SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET
+./spotify setup               # guided credential setup
+./spotify login               # browser auth → writes token
+./spotify current             # verify: shows current track or "nothing playing"
+```
+
+### Optional: daemon for terminal playback (macOS)
+
+```bash
+./spotify daemon:setup        # installs spotifyd, writes config, starts daemon
+./spotify daemon status       # verify: shows running
+```
+
+### Verify everything works
+
+```bash
+php vendor/bin/pest            # test suite
+vendor/bin/phpstan analyse     # static analysis
+php spotify app:build spotify  # PHAR build (requires phar.readonly=0)
+./builds/spotify list          # built binary boots
+```
+
+---
+
 ## Running the test suite
 
 ```bash
@@ -64,11 +104,12 @@ Coverage must stay above 50% (enforced by Sentinel Gate).
 
 ## The vibe check
 
-CI runs two gates on every PR:
+CI runs three gates on every PR:
 
 | Gate | What it checks |
 |---|---|
 | **Sentinel Gate** | Test coverage ≥ 50% |
 | **Vibe Check** | Every commit has a Spotify track URL |
+| **Smoke Test** | App boots, tests pass, PHPStan clean, PHAR builds on PHP 8.2/8.3/8.4 |
 
-Both must pass. No exceptions.
+All must pass. No exceptions.
