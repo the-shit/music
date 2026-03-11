@@ -1,0 +1,44 @@
+name: Portability Smoke Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  smoke:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['8.2', '8.3', '8.4']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl,mbstring,dom,libxml,xml,xmlwriter
+          coverage: none
+          ini-values: phar.readonly=0
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: App boots
+        run: php spotify list
+
+      - name: Test suite passes
+        run: vendor/bin/pest --no-coverage
+
+      - name: Static analysis passes
+        run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+
+      - name: PHAR builds
+        run: php spotify app:build spotify --build-version=smoke-${{ github.sha }}
+
+      - name: PHAR binary boots
+        run: ./builds/spotify list
