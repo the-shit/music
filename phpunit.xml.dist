@@ -24,4 +24,7 @@
             <clover outputFile="coverage/clover.xml"/>
         </report>
     </coverage>
+    <php>
+        <env name="HOME" value="/tmp/spotify-cli-test" force="true"/>
+    </php>
 </phpunit>

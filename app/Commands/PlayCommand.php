@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
+use App\Commands\Concerns\ResolvesDevice;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
@@ -13,6 +14,7 @@ use function Laravel\Prompts\warning;
 class PlayCommand extends Command
 {
     use RequiresSpotifyConfig;
+    use ResolvesDevice;
 
     protected $signature = 'play
                             {query : Song, artist, or playlist to play}
@@ -39,23 +41,13 @@ class PlayCommand extends Command
             return self::FAILURE;
         }
 
-        // Find device by name if specified
-        $deviceId = null;
-        if ($deviceName) {
-            $devices = $spotify->getDevices();
-            foreach ($devices as $device) {
-                if (stripos($device['name'], $deviceName) !== false || $device['id'] === $deviceName) {
-                    $deviceId = $device['id'];
-                    info("🔊 Using device: {$device['name']}");
-                    break;
-                }
-            }
+        $resolved = $this->resolveDevice($spotify, $deviceName);
+        $deviceId = $resolved['id'] ?? null;
 
-            if (! $deviceId) {
-                error("❌ Device '{$deviceName}' not found");
+        if ($deviceName && ! $deviceId) {
+            error("Device '{$deviceName}' not found");
 
-                return self::FAILURE;
-            }
+            return self::FAILURE;
         }
 
         if (! $this->option('json')) {
