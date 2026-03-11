@@ -58,7 +58,7 @@ Follow these steps on a clean machine to get fully operational.
 
 ### Prerequisites
 
-- PHP 8.2+ with `curl`, `mbstring`, `dom`, `xml` extensions
+- PHP 8.4+ with `curl`, `mbstring`, `dom`, `xml` extensions
 - Composer
 - Spotify Premium account
 - A [Spotify Developer App](https://developer.spotify.com/dashboard) with `http://localhost:8888/callback` as a redirect URI
@@ -110,6 +110,6 @@ CI runs three gates on every PR:
 |---|---|
 | **Sentinel Gate** | Test coverage ≥ 50% |
 | **Vibe Check** | Every commit has a Spotify track URL |
-| **Smoke Test** | App boots, tests pass, PHPStan clean, PHAR builds on PHP 8.2/8.3/8.4 |
+| **Smoke Test** | App boots, tests pass, PHPStan clean, PHAR builds (PHP 8.4) |
 
 All must pass. No exceptions.
