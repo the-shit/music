@@ -3,7 +3,7 @@
 return [
     'name' => 'Spotify',
     'version' => 'v0.0.1',
-    'env' => 'production',
+    'env' => env('APP_ENV', 'production'),
     'providers' => [
         App\Providers\AppServiceProvider::class,
         App\Providers\McpServiceProvider::class,
