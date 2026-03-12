@@ -39,7 +39,7 @@ jobs:
       - name: PHAR builds
         run: |
           export PATH="$HOME/.composer/vendor/bin:$PATH"
-          php spotify app:build spotify --build-version=smoke-${{ github.sha }}
+          APP_ENV=development php spotify app:build spotify --build-version=smoke-${{ github.sha }}
 
       - name: PHAR binary boots
         run: ./builds/spotify list
