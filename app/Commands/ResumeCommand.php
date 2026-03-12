@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
+use App\Commands\Concerns\ResolvesDevice;
 use App\Services\SpotifyService;
 use LaravelZero\Framework\Commands\Command;
 
@@ -12,6 +13,7 @@ use function Laravel\Prompts\info;
 class ResumeCommand extends Command
 {
     use RequiresSpotifyConfig;
+    use ResolvesDevice;
 
     protected $signature = 'resume
                             {--device= : Device name or ID to resume on}
@@ -26,24 +28,13 @@ class ResumeCommand extends Command
         }
 
         $deviceName = $this->option('device');
+        $resolved = $this->resolveDevice($spotify, $deviceName);
+        $deviceId = $resolved['id'] ?? null;
 
-        // Find device by name if specified
-        $deviceId = null;
-        if ($deviceName) {
-            $devices = $spotify->getDevices();
-            foreach ($devices as $device) {
-                if (stripos($device['name'], $deviceName) !== false || $device['id'] === $deviceName) {
-                    $deviceId = $device['id'];
-                    info("🔊 Using device: {$device['name']}");
-                    break;
-                }
-            }
+        if ($deviceName && ! $deviceId) {
+            error("Device '{$deviceName}' not found");
 
-            if (! $deviceId) {
-                error("❌ Device '{$deviceName}' not found");
-
-                return self::FAILURE;
-            }
+            return self::FAILURE;
         }
 
         if (! $this->option('json')) {

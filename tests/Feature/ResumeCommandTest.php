@@ -81,7 +81,7 @@ describe('ResumeCommand', function (): void {
         });
 
         $this->artisan('resume', ['--device' => 'Nonexistent Device'])
-            ->expectsOutputToContain("❌ Device 'Nonexistent Device' not found")
+            ->expectsOutputToContain("Device 'Nonexistent Device' not found")
             ->assertExitCode(1);
     });
 
