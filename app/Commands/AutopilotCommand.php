@@ -35,6 +35,10 @@ class AutopilotCommand extends Command
     /** Tracks older than this many seconds can be re-queued */
     private const DEDUP_WINDOW_SECONDS = 1800; // 30 minutes
 
+    private const HEALTH_CHECK_THRESHOLD = 3;
+
+    private int $consecutiveFailures = 0;
+
     private SpotifyService $spotify;
 
     public function handle(SpotifyService $spotify): int
@@ -120,8 +124,15 @@ class AutopilotCommand extends Command
 
             try {
                 $this->maybeRefill($this->spotify, $threshold, $mood);
+                $this->consecutiveFailures = 0;
             } catch (\Exception $e) {
+                $this->consecutiveFailures++;
                 warning("Refill error: {$e->getMessage()}");
+
+                if ($this->consecutiveFailures >= self::HEALTH_CHECK_THRESHOLD) {
+                    $this->triggerDaemonHealthCheck();
+                    $this->consecutiveFailures = 0;
+                }
             }
         }
 
@@ -323,6 +334,23 @@ XML;
         $home = $_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp';
 
         return $home.'/Library/LaunchAgents/'.self::LAUNCH_AGENT_LABEL.'.plist';
+    }
+
+    private function triggerDaemonHealthCheck(): void
+    {
+        warning('Multiple consecutive failures — running daemon health check...');
+
+        try {
+            $exitCode = $this->call('daemon', ['action' => 'health', '--heal' => true]);
+
+            if ($exitCode === self::SUCCESS) {
+                info('Daemon health restored');
+            } else {
+                warning('Daemon health check could not fully resolve the issue');
+            }
+        } catch (\Exception $e) {
+            warning("Health check failed: {$e->getMessage()}");
+        }
     }
 
     private function getAutopilotPid(): ?int

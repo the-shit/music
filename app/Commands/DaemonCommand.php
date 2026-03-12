@@ -8,13 +8,14 @@ use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
+use function Laravel\Prompts\note;
 use function Laravel\Prompts\warning;
 
 class DaemonCommand extends Command
 {
     use RequiresSpotifyConfig;
 
-    protected $signature = 'daemon {action : start, stop, status, install, or uninstall} {--name= : Device name for Spotify Connect} {--audio-device= : Audio output device (e.g. "Wave Link Stream")}';
+    protected $signature = 'daemon {action : start, stop, status, health, install, or uninstall} {--name= : Device name for Spotify Connect} {--audio-device= : Audio output device (e.g. "Wave Link Stream")} {--heal : Auto-heal when health check detects issues} {--json : Output health status as JSON}';
 
     protected $description = 'Manage the Spotify daemon for terminal playback';
 
@@ -45,6 +46,7 @@ class DaemonCommand extends Command
             'start' => $this->start(),
             'stop' => $this->stop(),
             'status' => $this->status(),
+            'health' => $this->health(),
             'install' => $this->install(),
             'uninstall' => $this->uninstall(),
             default => $this->invalidAction($action),
@@ -551,10 +553,230 @@ XML;
         }
     }
 
+    private function health(): int
+    {
+        $diagnosis = $this->diagnose();
+
+        if ($this->option('json')) {
+            $this->line(json_encode($diagnosis));
+
+            return $diagnosis['status'] === 'healthy' ? self::SUCCESS : self::FAILURE;
+        }
+
+        $statusIcon = match ($diagnosis['status']) {
+            'healthy' => '✅',
+            'degraded' => '⚠️',
+            default => '💀',
+        };
+
+        info("{$statusIcon} Daemon status: {$diagnosis['status']}");
+
+        if ($diagnosis['pid']) {
+            note("PID: {$diagnosis['pid']}");
+        }
+
+        if ($diagnosis['errors']) {
+            warning('Recent errors in spotifyd.log:');
+            foreach ($diagnosis['errors'] as $pattern => $count) {
+                note("  {$pattern}: {$count} occurrences");
+            }
+        }
+
+        if ($diagnosis['cache_size_mb'] !== null) {
+            note("Cache size: {$diagnosis['cache_size_mb']} MB");
+        }
+
+        if ($diagnosis['status'] !== 'healthy' && $this->option('heal')) {
+            return $this->heal($diagnosis);
+        }
+
+        if ($diagnosis['status'] !== 'healthy' && ! $this->option('heal')) {
+            info('Run with --heal to auto-fix: spotify daemon health --heal');
+        }
+
+        return $diagnosis['status'] === 'healthy' ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
+     * Diagnose daemon health by checking process status and log errors.
+     *
+     * @return array{status: string, pid: int|null, errors: array<string, int>, cache_size_mb: float|null, log_lines: int}
+     */
+    public function diagnose(): array
+    {
+        $pid = $this->getDaemonPid();
+        $logFile = $this->configDir.'/spotifyd.log';
+        $cachePath = $this->configDir.'/cache';
+
+        $errors = $this->scanLogErrors($logFile);
+        $totalErrors = array_sum($errors);
+        $cacheSize = $this->getCacheSizeMb($cachePath);
+
+        // Determine status
+        if (! $pid) {
+            $status = 'dead';
+        } elseif ($totalErrors > 10 || $cacheSize > 500) {
+            $status = 'degraded';
+        } else {
+            $status = 'healthy';
+        }
+
+        return [
+            'status' => $status,
+            'pid' => $pid,
+            'errors' => $errors,
+            'cache_size_mb' => $cacheSize,
+            'log_lines' => file_exists($logFile) ? count(file($logFile)) : 0,
+        ];
+    }
+
+    private function heal(array $diagnosis): int
+    {
+        info('Healing daemon...');
+
+        // 1. Clear audio cache (preserve credentials)
+        $cachePath = $this->configDir.'/cache';
+        if (is_dir($cachePath)) {
+            $credentialsPath = $cachePath.'/credentials.json';
+            $savedCredentials = file_exists($credentialsPath) ? file_get_contents($credentialsPath) : null;
+
+            $this->clearDirectory($cachePath);
+
+            if ($savedCredentials) {
+                file_put_contents($credentialsPath, $savedCredentials);
+                note('Preserved credentials.json');
+            }
+
+            info('Cleared audio cache');
+        }
+
+        // 2. Rotate the log file
+        $logFile = $this->configDir.'/spotifyd.log';
+        if (file_exists($logFile)) {
+            $rotated = $logFile.'.'.date('Ymd-His');
+            rename($logFile, $rotated);
+            info("Rotated log to {$rotated}");
+        }
+
+        // 3. Restart the daemon
+        if ($diagnosis['pid']) {
+            info('Restarting daemon...');
+
+            if ($this->isLaunchAgentLoaded()) {
+                shell_exec('launchctl stop '.self::LAUNCH_AGENT_LABEL.' 2>&1');
+                sleep(2);
+                shell_exec('launchctl start '.self::LAUNCH_AGENT_LABEL.' 2>&1');
+            } else {
+                posix_kill($diagnosis['pid'], SIGTERM);
+                sleep(2);
+
+                if (@posix_kill($diagnosis['pid'], 0)) {
+                    posix_kill($diagnosis['pid'], SIGKILL);
+                    sleep(1);
+                }
+
+                $spotifyd = $this->findSpotifyd();
+                if ($spotifyd) {
+                    $pid = $this->startSpotifyd($spotifyd);
+                    if ($pid) {
+                        $this->savePid($pid);
+                    }
+                }
+            }
+
+            // Verify restart
+            sleep(2);
+            if ($this->getDaemonPid()) {
+                info('Daemon restarted successfully');
+
+                $deviceName = $this->option('name') ?: 'Work Mac';
+                $this->transferPlaybackToDaemon($deviceName);
+
+                return self::SUCCESS;
+            }
+
+            error('Daemon failed to restart');
+
+            return self::FAILURE;
+        }
+
+        // Daemon was dead — try starting fresh
+        return $this->start();
+    }
+
+    /**
+     * Scan log file for known error patterns.
+     *
+     * @return array<string, int>
+     */
+    private function scanLogErrors(string $logFile): array
+    {
+        if (! file_exists($logFile)) {
+            return [];
+        }
+
+        $patterns = [
+            'context is not available' => 0,
+            'out of range integral' => 0,
+            'failed to handle request' => 0,
+            'Invalid start position' => 0,
+            'connection refused' => 0,
+        ];
+
+        // Read last 500 lines to avoid parsing massive logs
+        $lines = file($logFile);
+        $lines = array_slice($lines, -500);
+
+        foreach ($lines as $line) {
+            foreach ($patterns as $pattern => $count) {
+                if (stripos($line, $pattern) !== false) {
+                    $patterns[$pattern]++;
+                }
+            }
+        }
+
+        return array_filter($patterns);
+    }
+
+    private function getCacheSizeMb(string $path): ?float
+    {
+        if (! is_dir($path)) {
+            return null;
+        }
+
+        $bytes = trim((string) shell_exec("du -sk ".escapeshellarg($path)." 2>/dev/null | cut -f1"));
+
+        if ($bytes === '' || $bytes === '0') {
+            return 0.0;
+        }
+
+        return round((int) $bytes / 1024, 1);
+    }
+
+    private function clearDirectory(string $path): void
+    {
+        if (! is_dir($path)) {
+            return;
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        foreach ($iterator as $item) {
+            if ($item->isDir()) {
+                @rmdir($item->getPathname());
+            } else {
+                @unlink($item->getPathname());
+            }
+        }
+    }
+
     private function invalidAction(string $action): int
     {
         error("Invalid action: {$action}");
-        info('Available actions: start, stop, status, install, uninstall');
+        info('Available actions: start, stop, status, health, install, uninstall');
 
         return self::FAILURE;
     }

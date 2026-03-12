@@ -42,14 +42,14 @@ describe('DaemonCommand', function (): void {
         it('handles invalid action', function (): void {
             $this->artisan('daemon', ['action' => 'invalid'])
                 ->expectsOutputToContain('Invalid action: invalid')
-                ->expectsOutputToContain('Available actions: start, stop, status, install, uninstall')
+                ->expectsOutputToContain('Available actions: start, stop, status, health, install, uninstall')
                 ->assertExitCode(1);
         });
 
         it('handles restart as invalid action', function (): void {
             $this->artisan('daemon', ['action' => 'restart'])
                 ->expectsOutputToContain('Invalid action: restart')
-                ->expectsOutputToContain('Available actions: start, stop, status, install, uninstall')
+                ->expectsOutputToContain('Available actions: start, stop, status, health, install, uninstall')
                 ->assertExitCode(1);
         });
 
@@ -395,7 +395,7 @@ describe('DaemonCommand', function (): void {
         it('lists valid actions when invalid action provided', function (): void {
             $this->artisan('daemon', ['action' => 'unknown'])
                 ->expectsOutputToContain('Invalid action: unknown')
-                ->expectsOutputToContain('Available actions: start, stop, status, install, uninstall')
+                ->expectsOutputToContain('Available actions: start, stop, status, health, install, uninstall')
                 ->assertExitCode(1);
         });
 
