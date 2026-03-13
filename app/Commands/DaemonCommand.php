@@ -352,7 +352,7 @@ class DaemonCommand extends Command
 
         // Start spotifyd
         $logFile = $this->configDir.'/spotifyd.log';
-        $cmd = "{$daemonPath} --config-path {$configFile} --no-daemon > {$logFile} 2>&1 & echo $!";
+        $cmd = "{$daemonPath} --config-path {$configFile} --no-daemon --disable-discovery > {$logFile} 2>&1 & echo $!";
         $pid = (int) shell_exec($cmd);
 
         usleep(1500000);
@@ -469,6 +469,7 @@ class DaemonCommand extends Command
         <string>--config-path</string>
         <string>{$configFile}</string>
         <string>--no-daemon</string>
+        <string>--disable-discovery</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
