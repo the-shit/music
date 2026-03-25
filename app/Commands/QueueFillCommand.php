@@ -3,7 +3,8 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -18,7 +19,7 @@ class QueueFillCommand extends Command
 
     protected $description = 'Keep the queue topped up using Spotify\'s recommendation engine';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -26,7 +27,7 @@ class QueueFillCommand extends Command
         $target = (int) $this->option('target');
 
         try {
-            $queueData = $spotify->getQueue();
+            $queueData = $player->getQueue();
             $currentQueue = $queueData['queue'] ?? [];
             $currentlyPlaying = $queueData['currently_playing'] ?? null;
             $queueLength = count($currentQueue);
@@ -66,13 +67,13 @@ class QueueFillCommand extends Command
             foreach ($currentQueue as $item) {
                 $existingUris[] = $item['uri'] ?? '';
             }
-            foreach ($spotify->getRecentlyPlayed(20) as $recent) {
+            foreach ($discovery->getRecentlyPlayed(20) as $recent) {
                 $existingUris[] = $recent['uri'] ?? '';
             }
 
             // getRecommendations auto-falls through to smart discovery
             // when the deprecated /v1/recommendations endpoint returns empty
-            $recommendations = $spotify->getRecommendations($seedTrackIds, $seedArtistIds, $needed + 5);
+            $recommendations = $discovery->getRecommendations($seedTrackIds, $seedArtistIds, $needed + 5);
 
             // If still empty, fall back to improved related tracks
             if (empty($recommendations) && $currentlyPlaying) {
@@ -80,7 +81,7 @@ class QueueFillCommand extends Command
                 $trackName = $currentlyPlaying['name'] ?? null;
 
                 if ($artistName && $trackName) {
-                    $recommendations = $spotify->getRelatedTracks($artistName, $trackName, $needed + 5);
+                    $recommendations = $discovery->getRelatedTracks($artistName, $trackName, $needed + 5);
                 }
             }
 
@@ -110,7 +111,7 @@ class QueueFillCommand extends Command
                 }
 
                 try {
-                    $spotify->addToQueue($track['uri']);
+                    $player->addToQueue($track['uri']);
                     $existingUris[] = $track['uri'];
                     $queued[] = [
                         'name' => $track['name'],

@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\info;
@@ -16,13 +16,13 @@ class CurrentCommand extends Command
 
     protected $description = 'Show current track';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
 
-        $current = $spotify->getCurrentPlayback();
+        $current = $player->getCurrentPlayback();
 
         // JSON output mode
         if ($this->option('json')) {

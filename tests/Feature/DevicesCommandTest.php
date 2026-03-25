@@ -1,6 +1,7 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyPlayerService;
 
 describe('DevicesCommand', function (): void {
 
@@ -22,8 +23,10 @@ describe('DevicesCommand', function (): void {
             ],
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($devices): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($devices): void {
             $mock->shouldReceive('getDevices')->once()->andReturn($devices);
         });
 
@@ -39,8 +42,10 @@ describe('DevicesCommand', function (): void {
     });
 
     it('handles no devices', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([]);
         });
 
@@ -51,8 +56,10 @@ describe('DevicesCommand', function (): void {
     });
 
     it('handles API errors', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')
                 ->once()
                 ->andThrow(new Exception('API error'));
@@ -64,7 +71,7 @@ describe('DevicesCommand', function (): void {
     });
 
     it('requires configuration', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 

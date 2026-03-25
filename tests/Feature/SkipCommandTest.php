@@ -1,14 +1,17 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyPlayerService;
 
 describe('SkipCommand', function (): void {
 
     describe('skip to next track', function (): void {
 
         it('skips to next track by default', function (): void {
-            $this->mock(SpotifyService::class, function ($mock): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            });
+            $this->mock(SpotifyPlayerService::class, function ($mock): void {
                 $mock->shouldReceive('getCurrentPlayback')->andReturn([
                     'name' => 'Song',
                     'artist' => 'Artist',
@@ -23,8 +26,10 @@ describe('SkipCommand', function (): void {
         });
 
         it('skips to next track with explicit next argument', function (): void {
-            $this->mock(SpotifyService::class, function ($mock): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            });
+            $this->mock(SpotifyPlayerService::class, function ($mock): void {
                 $mock->shouldReceive('getCurrentPlayback')->andReturn([
                     'name' => 'Song',
                     'artist' => 'Artist',
@@ -43,8 +48,10 @@ describe('SkipCommand', function (): void {
     describe('skip to previous track', function (): void {
 
         it('skips to previous track with prev argument', function (): void {
-            $this->mock(SpotifyService::class, function ($mock): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            });
+            $this->mock(SpotifyPlayerService::class, function ($mock): void {
                 $mock->shouldReceive('getCurrentPlayback')->andReturn([
                     'name' => 'Song',
                     'artist' => 'Artist',
@@ -59,8 +66,10 @@ describe('SkipCommand', function (): void {
         });
 
         it('skips to previous track with previous argument', function (): void {
-            $this->mock(SpotifyService::class, function ($mock): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            });
+            $this->mock(SpotifyPlayerService::class, function ($mock): void {
                 $mock->shouldReceive('getCurrentPlayback')->andReturn([
                     'name' => 'Song',
                     'artist' => 'Artist',
@@ -79,7 +88,7 @@ describe('SkipCommand', function (): void {
     describe('error handling', function (): void {
 
         it('requires configuration', function (): void {
-            $this->mock(SpotifyService::class, function ($mock): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(false);
             });
 
@@ -88,8 +97,10 @@ describe('SkipCommand', function (): void {
         });
 
         it('handles API errors', function (): void {
-            $this->mock(SpotifyService::class, function ($mock): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            });
+            $this->mock(SpotifyPlayerService::class, function ($mock): void {
                 $mock->shouldReceive('getCurrentPlayback')->andReturn([
                     'name' => 'Song',
                     'artist' => 'Artist',

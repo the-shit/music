@@ -1,6 +1,7 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyPlayerService;
 use Illuminate\Support\Facades\Http;
 
 it('shares now playing to slack', function (): void {
@@ -18,15 +19,18 @@ it('shares now playing to slack', function (): void {
         'hooks.slack.com/*' => Http::response('ok'),
     ]);
 
-    $mock = Mockery::mock(SpotifyService::class);
-    $mock->shouldReceive('isConfigured')->andReturn(true);
-    $mock->shouldReceive('getCurrentPlayback')->andReturn([
+    $authMock = Mockery::mock(SpotifyAuthManager::class);
+    $authMock->shouldReceive('isConfigured')->andReturn(true);
+    $this->app->instance(SpotifyAuthManager::class, $authMock);
+
+    $playerMock = Mockery::mock(SpotifyPlayerService::class);
+    $playerMock->shouldReceive('getCurrentPlayback')->andReturn([
         'name' => 'Test Track',
         'artist' => 'Test Artist',
         'album' => 'Test Album',
         'is_playing' => true,
     ]);
-    $this->app->instance(SpotifyService::class, $mock);
+    $this->app->instance(SpotifyPlayerService::class, $playerMock);
 
     $this->artisan('slack', ['action' => 'now'])
         ->expectsOutputToContain('Shared to Slack')
@@ -67,9 +71,9 @@ it('fails when no webhook configured', function (): void {
     $configDir = sys_get_temp_dir().'/spotify-slack-empty';
     config(['spotify.config_dir' => $configDir]);
 
-    $mock = Mockery::mock(SpotifyService::class);
-    $mock->shouldReceive('isConfigured')->andReturn(true);
-    $this->app->instance(SpotifyService::class, $mock);
+    $authMock = Mockery::mock(SpotifyAuthManager::class);
+    $authMock->shouldReceive('isConfigured')->andReturn(true);
+    $this->app->instance(SpotifyAuthManager::class, $authMock);
 
     $this->artisan('slack', ['action' => 'now'])
         ->assertFailed();

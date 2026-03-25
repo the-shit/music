@@ -1,12 +1,15 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyPlayerService;
 
 describe('ResumeCommand', function (): void {
 
     it('resumes playback without device specified', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('resume')->once();
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'name' => 'Test Song',
@@ -23,8 +26,10 @@ describe('ResumeCommand', function (): void {
     });
 
     it('resumes playback on specified device by name', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-123', 'name' => 'Living Room Speaker'],
                 ['id' => 'device-456', 'name' => 'Kitchen Speaker'],
@@ -48,8 +53,10 @@ describe('ResumeCommand', function (): void {
     });
 
     it('resumes playback on specified device by ID', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-123', 'name' => 'Living Room Speaker'],
                 ['id' => 'device-456', 'name' => 'Kitchen Speaker'],
@@ -73,8 +80,10 @@ describe('ResumeCommand', function (): void {
     });
 
     it('fails when specified device is not found', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-123', 'name' => 'Living Room Speaker'],
             ]);
@@ -86,7 +95,7 @@ describe('ResumeCommand', function (): void {
     });
 
     it('requires configuration', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
@@ -97,8 +106,10 @@ describe('ResumeCommand', function (): void {
     });
 
     it('handles API errors', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('resume')
                 ->once()
                 ->andThrow(new Exception('No active device'));
@@ -111,8 +122,10 @@ describe('ResumeCommand', function (): void {
     });
 
     it('handles transfer playback errors when device specified', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-123', 'name' => 'Living Room Speaker'],
             ]);
@@ -129,8 +142,10 @@ describe('ResumeCommand', function (): void {
     });
 
     it('resumes without current track info', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('resume')->once();
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
         });
@@ -144,8 +159,10 @@ describe('ResumeCommand', function (): void {
     describe('JSON output mode', function (): void {
 
         it('outputs JSON on successful resume without device', function (): void {
-            $this->mock(SpotifyService::class, function ($mock): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            });
+            $this->mock(SpotifyPlayerService::class, function ($mock): void {
                 $mock->shouldReceive('resume')->once();
                 $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                     'name' => 'Test Song',
@@ -169,8 +186,10 @@ describe('ResumeCommand', function (): void {
         });
 
         it('outputs JSON on successful resume with device', function (): void {
-            $this->mock(SpotifyService::class, function ($mock): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            });
+            $this->mock(SpotifyPlayerService::class, function ($mock): void {
                 $mock->shouldReceive('getDevices')->once()->andReturn([
                     ['id' => 'device-123', 'name' => 'Living Room Speaker'],
                 ]);
@@ -200,8 +219,10 @@ describe('ResumeCommand', function (): void {
         });
 
         it('outputs JSON with null track when no current playback', function (): void {
-            $this->mock(SpotifyService::class, function ($mock): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            });
+            $this->mock(SpotifyPlayerService::class, function ($mock): void {
                 $mock->shouldReceive('resume')->once();
                 $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
             });
@@ -217,8 +238,10 @@ describe('ResumeCommand', function (): void {
         });
 
         it('outputs JSON error on failure', function (): void {
-            $this->mock(SpotifyService::class, function ($mock): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            });
+            $this->mock(SpotifyPlayerService::class, function ($mock): void {
                 $mock->shouldReceive('resume')
                     ->once()
                     ->andThrow(new Exception('Player command failed'));
@@ -233,8 +256,10 @@ describe('ResumeCommand', function (): void {
         });
 
         it('does not output resuming message in JSON mode', function (): void {
-            $this->mock(SpotifyService::class, function ($mock): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            });
+            $this->mock(SpotifyPlayerService::class, function ($mock): void {
                 $mock->shouldReceive('resume')->once();
                 $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                     'name' => 'Test Song',
@@ -252,8 +277,10 @@ describe('ResumeCommand', function (): void {
     });
 
     it('uses case-insensitive device name matching', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-123', 'name' => 'Living Room Speaker'],
             ]);
@@ -273,8 +300,10 @@ describe('ResumeCommand', function (): void {
     });
 
     it('matches partial device names', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-123', 'name' => 'Living Room Speaker'],
                 ['id' => 'device-456', 'name' => 'Kitchen Speaker'],

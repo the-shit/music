@@ -1,11 +1,15 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyDiscoveryService;
 
 it('outputs recently played as json', function (): void {
-    $mock = Mockery::mock(SpotifyService::class);
-    $mock->shouldReceive('isConfigured')->andReturn(true);
-    $mock->shouldReceive('getRecentlyPlayed')->with(20)->andReturn([
+    $authMock = Mockery::mock(SpotifyAuthManager::class);
+    $authMock->shouldReceive('isConfigured')->andReturn(true);
+    $this->app->instance(SpotifyAuthManager::class, $authMock);
+
+    $discoveryMock = Mockery::mock(SpotifyDiscoveryService::class);
+    $discoveryMock->shouldReceive('getRecentlyPlayed')->with(20)->andReturn([
         [
             'uri' => 'spotify:track:1',
             'name' => 'Recent Song',
@@ -14,16 +18,19 @@ it('outputs recently played as json', function (): void {
             'played_at' => '2025-01-01T12:00:00Z',
         ],
     ]);
-    $this->app->instance(SpotifyService::class, $mock);
+    $this->app->instance(SpotifyDiscoveryService::class, $discoveryMock);
 
     $this->artisan('recent', ['--json' => true])
         ->assertSuccessful();
 });
 
 it('displays recently played in human format', function (): void {
-    $mock = Mockery::mock(SpotifyService::class);
-    $mock->shouldReceive('isConfigured')->andReturn(true);
-    $mock->shouldReceive('getRecentlyPlayed')->andReturn([
+    $authMock = Mockery::mock(SpotifyAuthManager::class);
+    $authMock->shouldReceive('isConfigured')->andReturn(true);
+    $this->app->instance(SpotifyAuthManager::class, $authMock);
+
+    $discoveryMock = Mockery::mock(SpotifyDiscoveryService::class);
+    $discoveryMock->shouldReceive('getRecentlyPlayed')->andReturn([
         [
             'uri' => 'spotify:track:1',
             'name' => 'Recent Song',
@@ -32,7 +39,7 @@ it('displays recently played in human format', function (): void {
             'played_at' => '2025-01-01T12:00:00Z',
         ],
     ]);
-    $this->app->instance(SpotifyService::class, $mock);
+    $this->app->instance(SpotifyDiscoveryService::class, $discoveryMock);
 
     $this->artisan('recent')
         ->expectsOutputToContain('Recent Song')
@@ -40,10 +47,13 @@ it('displays recently played in human format', function (): void {
 });
 
 it('handles empty recently played', function (): void {
-    $mock = Mockery::mock(SpotifyService::class);
-    $mock->shouldReceive('isConfigured')->andReturn(true);
-    $mock->shouldReceive('getRecentlyPlayed')->andReturn([]);
-    $this->app->instance(SpotifyService::class, $mock);
+    $authMock = Mockery::mock(SpotifyAuthManager::class);
+    $authMock->shouldReceive('isConfigured')->andReturn(true);
+    $this->app->instance(SpotifyAuthManager::class, $authMock);
+
+    $discoveryMock = Mockery::mock(SpotifyDiscoveryService::class);
+    $discoveryMock->shouldReceive('getRecentlyPlayed')->andReturn([]);
+    $this->app->instance(SpotifyDiscoveryService::class, $discoveryMock);
 
     $this->artisan('recent')
         ->expectsOutputToContain('No recently played')
@@ -51,9 +61,9 @@ it('handles empty recently played', function (): void {
 });
 
 it('fails when not configured', function (): void {
-    $mock = Mockery::mock(SpotifyService::class);
-    $mock->shouldReceive('isConfigured')->andReturn(false);
-    $this->app->instance(SpotifyService::class, $mock);
+    $authMock = Mockery::mock(SpotifyAuthManager::class);
+    $authMock->shouldReceive('isConfigured')->andReturn(false);
+    $this->app->instance(SpotifyAuthManager::class, $authMock);
 
     $this->artisan('recent')
         ->assertFailed();

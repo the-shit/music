@@ -1,6 +1,7 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyPlayerService;
 
 describe('ShuffleCommand', function (): void {
 
@@ -12,8 +13,10 @@ describe('ShuffleCommand', function (): void {
             'repeat_state' => 'off',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
             $mock->shouldReceive('setShuffle')->once()->with(true)->andReturn(true);
         });
@@ -30,8 +33,10 @@ describe('ShuffleCommand', function (): void {
             'shuffle_state' => false,
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
             $mock->shouldReceive('setShuffle')->once()->with(true)->andReturn(true);
         });
@@ -48,8 +53,10 @@ describe('ShuffleCommand', function (): void {
             'shuffle_state' => true,
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
             $mock->shouldReceive('setShuffle')->once()->with(false)->andReturn(true);
         });
@@ -66,8 +73,10 @@ describe('ShuffleCommand', function (): void {
             'shuffle_state' => false,
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
         });
 
@@ -77,8 +86,10 @@ describe('ShuffleCommand', function (): void {
     });
 
     it('requires active playback', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
         });
 
@@ -89,7 +100,7 @@ describe('ShuffleCommand', function (): void {
     });
 
     it('requires configuration', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
@@ -106,8 +117,10 @@ describe('ShuffleCommand', function (): void {
             'shuffle_state' => false,
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
             $mock->shouldReceive('setShuffle')->once()->with(true)->andReturn(true);
         });

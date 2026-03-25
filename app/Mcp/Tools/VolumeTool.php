@@ -3,7 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\HandlesAuthErrors;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -25,13 +25,13 @@ class VolumeTool extends Tool
         ];
     }
 
-    public function handle(Request $request, SpotifyService $spotify): Response
+    public function handle(Request $request, SpotifyPlayerService $player): Response
     {
-        return $this->withAuthHandling(function () use ($request, $spotify): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($request, $player): \Laravel\Mcp\Response {
             $level = $request->get('level');
 
             if ($level === null) {
-                $playback = $spotify->getCurrentPlayback();
+                $playback = $player->getCurrentPlayback();
                 $volume = $playback['device']['volume_percent'] ?? null;
 
                 if ($volume === null) {
@@ -42,7 +42,7 @@ class VolumeTool extends Tool
             }
 
             $level = max(0, min(100, (int) $level));
-            $spotify->setVolume($level);
+            $player->setVolume($level);
 
             return Response::text("Volume set to {$level}%.");
         });

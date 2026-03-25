@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use Illuminate\Support\Facades\Http;
 use LaravelZero\Framework\Commands\Command;
 
@@ -22,11 +22,11 @@ class SlackCommand extends Command
 
     protected $description = 'Share what\'s playing to Slack';
 
-    private SpotifyService $spotify;
+    private SpotifyPlayerService $player;
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player): int
     {
-        $this->spotify = $spotify;
+        $this->player = $player;
         $action = $this->argument('action');
 
         return match ($action) {
@@ -85,7 +85,7 @@ class SlackCommand extends Command
 
             return self::FAILURE;
         }
-        $current = $this->spotify->getCurrentPlayback();
+        $current = $this->player->getCurrentPlayback();
 
         if (! $current) {
             warning('Nothing is currently playing.');

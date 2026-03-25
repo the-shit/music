@@ -1,12 +1,16 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 
 describe('QueueFillCommand', function (): void {
 
     it('fills queue with recommendations based on current track', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
                     'id' => 'track123',
@@ -15,6 +19,9 @@ describe('QueueFillCommand', function (): void {
                 ],
                 'queue' => [],
             ]);
+            $mock->shouldReceive('addToQueue')->twice();
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
@@ -23,7 +30,6 @@ describe('QueueFillCommand', function (): void {
                     ['uri' => 'spotify:track:rec1', 'name' => 'Rec One', 'artist' => 'Artist A'],
                     ['uri' => 'spotify:track:rec2', 'name' => 'Rec Two', 'artist' => 'Artist B'],
                 ]);
-            $mock->shouldReceive('addToQueue')->twice();
         });
 
         $this->artisan('queue:fill')
@@ -34,8 +40,10 @@ describe('QueueFillCommand', function (): void {
     });
 
     it('skips duplicates already in queue', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
                     'id' => 'track123',
@@ -46,6 +54,9 @@ describe('QueueFillCommand', function (): void {
                     ['uri' => 'spotify:track:existing1'],
                 ],
             ]);
+            $mock->shouldReceive('addToQueue')->once()->with('spotify:track:new1');
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
@@ -54,7 +65,6 @@ describe('QueueFillCommand', function (): void {
                     ['uri' => 'spotify:track:track123', 'name' => 'Currently Playing', 'artist' => 'Dup'],
                     ['uri' => 'spotify:track:new1', 'name' => 'New Track', 'artist' => 'Fresh'],
                 ]);
-            $mock->shouldReceive('addToQueue')->once()->with('spotify:track:new1');
         });
 
         $this->artisan('queue:fill')
@@ -63,8 +73,10 @@ describe('QueueFillCommand', function (): void {
     });
 
     it('skips recently played tracks', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
                     'id' => 'track123',
@@ -73,6 +85,9 @@ describe('QueueFillCommand', function (): void {
                 ],
                 'queue' => [],
             ]);
+            $mock->shouldReceive('addToQueue')->once()->with('spotify:track:fresh1');
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([
                 ['uri' => 'spotify:track:old1'],
                 ['uri' => 'spotify:track:old2'],
@@ -84,7 +99,6 @@ describe('QueueFillCommand', function (): void {
                     ['uri' => 'spotify:track:old2', 'name' => 'Old Two', 'artist' => 'Past'],
                     ['uri' => 'spotify:track:fresh1', 'name' => 'Fresh Track', 'artist' => 'New'],
                 ]);
-            $mock->shouldReceive('addToQueue')->once()->with('spotify:track:fresh1');
         });
 
         $this->artisan('queue:fill')
@@ -93,8 +107,10 @@ describe('QueueFillCommand', function (): void {
     });
 
     it('does nothing when queue is already at target', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
                 'queue' => [
@@ -109,12 +125,16 @@ describe('QueueFillCommand', function (): void {
     });
 
     it('warns when no recommendations available and no current track for fallback', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
                 'queue' => [],
             ]);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
@@ -127,8 +147,10 @@ describe('QueueFillCommand', function (): void {
     });
 
     it('falls back to search when recommendations API returns empty', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
                     'id' => 'track123',
@@ -138,6 +160,9 @@ describe('QueueFillCommand', function (): void {
                 ],
                 'queue' => [],
             ]);
+            $mock->shouldReceive('addToQueue')->twice();
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
@@ -150,7 +175,6 @@ describe('QueueFillCommand', function (): void {
                     ['uri' => 'spotify:track:search1', 'name' => 'Search Result 1', 'artist' => 'Test Artist'],
                     ['uri' => 'spotify:track:search2', 'name' => 'Search Result 2', 'artist' => 'Test Artist'],
                 ]);
-            $mock->shouldReceive('addToQueue')->twice();
         });
 
         $this->artisan('queue:fill')
@@ -161,8 +185,10 @@ describe('QueueFillCommand', function (): void {
     });
 
     it('deduplicates search fallback results against queue and recently played', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
                     'id' => 'track123',
@@ -174,6 +200,9 @@ describe('QueueFillCommand', function (): void {
                     ['uri' => 'spotify:track:queued1'],
                 ],
             ]);
+            $mock->shouldReceive('addToQueue')->once()->with('spotify:track:fresh1');
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([
                 ['uri' => 'spotify:track:recent1'],
             ]);
@@ -189,7 +218,6 @@ describe('QueueFillCommand', function (): void {
                     ['uri' => 'spotify:track:recent1', 'name' => 'Recent', 'artist' => 'Test Artist'],
                     ['uri' => 'spotify:track:fresh1', 'name' => 'Fresh One', 'artist' => 'Test Artist'],
                 ]);
-            $mock->shouldReceive('addToQueue')->once()->with('spotify:track:fresh1');
         });
 
         $this->artisan('queue:fill')
@@ -198,8 +226,10 @@ describe('QueueFillCommand', function (): void {
     });
 
     it('warns when both recommendations and search fallback return empty', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
                     'id' => 'track123',
@@ -209,6 +239,8 @@ describe('QueueFillCommand', function (): void {
                 ],
                 'queue' => [],
             ]);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
@@ -225,8 +257,10 @@ describe('QueueFillCommand', function (): void {
     });
 
     it('outputs JSON when --json flag is used', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
                     'id' => 'track123',
@@ -235,13 +269,15 @@ describe('QueueFillCommand', function (): void {
                 ],
                 'queue' => [],
             ]);
+            $mock->shouldReceive('addToQueue')->once();
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
                 ->andReturn([
                     ['uri' => 'spotify:track:rec1', 'name' => 'Rec', 'artist' => 'Art'],
                 ]);
-            $mock->shouldReceive('addToQueue')->once();
         });
 
         $this->artisan('queue:fill', ['--json' => true])
@@ -250,8 +286,10 @@ describe('QueueFillCommand', function (): void {
     });
 
     it('outputs JSON when queue already full', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
                 'queue' => [
@@ -267,8 +305,10 @@ describe('QueueFillCommand', function (): void {
     });
 
     it('respects custom target size', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
                     'id' => 'track123',
@@ -277,6 +317,9 @@ describe('QueueFillCommand', function (): void {
                 ],
                 'queue' => [],
             ]);
+            $mock->shouldReceive('addToQueue')->times(3);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
@@ -286,7 +329,6 @@ describe('QueueFillCommand', function (): void {
                     ['uri' => 'spotify:track:r2', 'name' => 'R2', 'artist' => 'A2'],
                     ['uri' => 'spotify:track:r3', 'name' => 'R3', 'artist' => 'A3'],
                 ]);
-            $mock->shouldReceive('addToQueue')->times(3);
         });
 
         $this->artisan('queue:fill', ['--target' => 3])
@@ -295,8 +337,10 @@ describe('QueueFillCommand', function (): void {
     });
 
     it('handles API errors gracefully', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')
                 ->once()
                 ->andThrow(new Exception('Network error'));
@@ -308,7 +352,7 @@ describe('QueueFillCommand', function (): void {
     });
 
     it('requires configuration', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
@@ -319,8 +363,10 @@ describe('QueueFillCommand', function (): void {
     });
 
     it('continues when individual queue additions fail', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
                     'id' => 'track123',
@@ -329,6 +375,15 @@ describe('QueueFillCommand', function (): void {
                 ],
                 'queue' => [],
             ]);
+            $mock->shouldReceive('addToQueue')
+                ->with('spotify:track:r1')
+                ->andThrow(new Exception('Device busy'));
+            $mock->shouldReceive('addToQueue')
+                ->with('spotify:track:r2');
+            $mock->shouldReceive('addToQueue')
+                ->with('spotify:track:r3');
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('getRecentlyPlayed')->once()->with(20)->andReturn([]);
             $mock->shouldReceive('getRecommendations')
                 ->once()
@@ -337,13 +392,6 @@ describe('QueueFillCommand', function (): void {
                     ['uri' => 'spotify:track:r2', 'name' => 'R2', 'artist' => 'A2'],
                     ['uri' => 'spotify:track:r3', 'name' => 'R3', 'artist' => 'A3'],
                 ]);
-            $mock->shouldReceive('addToQueue')
-                ->with('spotify:track:r1')
-                ->andThrow(new Exception('Device busy'));
-            $mock->shouldReceive('addToQueue')
-                ->with('spotify:track:r2');
-            $mock->shouldReceive('addToQueue')
-                ->with('spotify:track:r3');
         });
 
         $this->artisan('queue:fill')

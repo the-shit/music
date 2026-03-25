@@ -2,7 +2,7 @@
 
 namespace App\Commands\Concerns;
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
 
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
@@ -11,9 +11,9 @@ trait RequiresSpotifyConfig
 {
     protected function ensureConfigured(): bool
     {
-        $spotify = app(SpotifyService::class);
+        $auth = app(SpotifyAuthManager::class);
 
-        if ($spotify->isConfigured()) {
+        if ($auth->isConfigured()) {
             return true;
         }
 

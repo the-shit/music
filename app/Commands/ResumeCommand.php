@@ -4,7 +4,7 @@ namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Commands\Concerns\ResolvesDevice;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -21,14 +21,14 @@ class ResumeCommand extends Command
 
     protected $description = 'Resume Spotify playback from where it was paused';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
 
         $deviceName = $this->option('device');
-        $resolved = $this->resolveDevice($spotify, $deviceName);
+        $resolved = $this->resolveDevice($player, $deviceName);
         $deviceId = $resolved['id'] ?? null;
 
         if ($deviceName && ! $deviceId) {
@@ -44,13 +44,13 @@ class ResumeCommand extends Command
         try {
             // If device specified, transfer playback first
             if ($deviceId) {
-                $spotify->transferPlayback($deviceId, true);
+                $player->transferPlayback($deviceId, true);
             } else {
-                $spotify->resume();
+                $player->resume();
             }
 
             // Get current track info for event
-            $current = $spotify->getCurrentPlayback();
+            $current = $player->getCurrentPlayback();
 
             if ($this->option('json')) {
                 $this->line(json_encode([

@@ -3,7 +3,8 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -35,11 +36,14 @@ class DaemonCommand extends Command
         $this->pidFile = $this->configDir.'/daemon.pid';
     }
 
-    private SpotifyService $spotify;
+    private SpotifyAuthManager $auth;
 
-    public function handle(SpotifyService $spotify): int
+    private SpotifyPlayerService $player;
+
+    public function handle(SpotifyAuthManager $auth, SpotifyPlayerService $player): int
     {
-        $this->spotify = $spotify;
+        $this->auth = $auth;
+        $this->player = $player;
         $action = $this->argument('action');
 
         return match ($action) {
@@ -526,14 +530,14 @@ XML;
     {
         try {
 
-            if (! $this->spotify->isConfigured()) {
+            if (! $this->auth->isConfigured()) {
                 return;
             }
 
             // Poll for the daemon device to appear (up to 8 seconds)
             $device = null;
             for ($i = 0; $i < 8; $i++) {
-                $devices = $this->spotify->getDevices();
+                $devices = $this->player->getDevices();
                 foreach ($devices as $d) {
                     if (($d['name'] ?? '') === $deviceName) {
                         $device = $d;
@@ -549,7 +553,7 @@ XML;
                 return;
             }
 
-            $this->spotify->transferPlayback($device['id'], true);
+            $this->player->transferPlayback($device['id'], true);
             info("📱 Playback transferred to \"{$deviceName}\"");
         } catch (\Throwable $e) {
             warning('Could not transfer playback: '.$e->getMessage());

@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use Illuminate\Support\Facades\Http;
 use LaravelZero\Framework\Commands\Command;
 
@@ -25,7 +25,7 @@ class WatchCommand extends Command
 
     private ?string $lastTrackUri = null;
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -56,7 +56,7 @@ class WatchCommand extends Command
 
         while (true) {
             try {
-                $current = $spotify->getCurrentPlayback();
+                $current = $player->getCurrentPlayback();
                 $this->processState($current, $slackWebhook, $jsonMode);
             } catch (\Exception $e) {
                 if (! $jsonMode) {

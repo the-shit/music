@@ -3,7 +3,8 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -18,7 +19,7 @@ class QueueCommand extends Command
 
     protected $description = 'Add a song to the Spotify queue (plays after current track)';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -29,11 +30,11 @@ class QueueCommand extends Command
         info("🎵 Searching for: {$query}");
 
         try {
-            $result = $spotify->search($query);
+            $result = $discovery->search($query);
 
             if ($result) {
                 // Add to queue
-                $spotify->addToQueue($result['uri']);
+                $player->addToQueue($result['uri']);
 
                 if ($this->option('json')) {
                     $this->line(json_encode([

@@ -1,54 +1,65 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 
 it('requires configuration', function (): void {
-    $mock = Mockery::mock(SpotifyService::class);
-    $mock->shouldReceive('isConfigured')->andReturn(false);
-    $this->app->instance(SpotifyService::class, $mock);
+    $authMock = Mockery::mock(SpotifyAuthManager::class);
+    $authMock->shouldReceive('isConfigured')->andReturn(false);
+    $this->app->instance(SpotifyAuthManager::class, $authMock);
 
     $this->artisan('session', ['--mood' => 'flow'])
         ->assertFailed();
 });
 
 it('requires description or mood flag', function (): void {
-    $mock = Mockery::mock(SpotifyService::class);
-    $mock->shouldReceive('isConfigured')->andReturn(true);
-    $this->app->instance(SpotifyService::class, $mock);
+    $authMock = Mockery::mock(SpotifyAuthManager::class);
+    $authMock->shouldReceive('isConfigured')->andReturn(true);
+    $this->app->instance(SpotifyAuthManager::class, $authMock);
 
     $this->artisan('session')
         ->assertFailed();
 });
 
 it('rejects invalid mood preset', function (): void {
-    $mock = Mockery::mock(SpotifyService::class);
-    $mock->shouldReceive('isConfigured')->andReturn(true);
-    $this->app->instance(SpotifyService::class, $mock);
+    $authMock = Mockery::mock(SpotifyAuthManager::class);
+    $authMock->shouldReceive('isConfigured')->andReturn(true);
+    $this->app->instance(SpotifyAuthManager::class, $authMock);
 
     $this->artisan('session', ['--mood' => 'nonexistent'])
         ->assertFailed();
 });
 
 it('requires an active device', function (): void {
-    $mock = Mockery::mock(SpotifyService::class);
-    $mock->shouldReceive('isConfigured')->andReturn(true);
-    $mock->shouldReceive('getActiveDevice')->andReturn(null);
-    $this->app->instance(SpotifyService::class, $mock);
+    $authMock = Mockery::mock(SpotifyAuthManager::class);
+    $authMock->shouldReceive('isConfigured')->andReturn(true);
+    $this->app->instance(SpotifyAuthManager::class, $authMock);
+
+    $playerMock = Mockery::mock(SpotifyPlayerService::class);
+    $playerMock->shouldReceive('getActiveDevice')->andReturn(null);
+    $this->app->instance(SpotifyPlayerService::class, $playerMock);
 
     $this->artisan('session', ['--mood' => 'flow'])
         ->assertFailed();
 });
 
 it('runs a quick session with mood preset', function (): void {
-    $mock = Mockery::mock(SpotifyService::class);
-    $mock->shouldReceive('isConfigured')->andReturn(true);
-    $mock->shouldReceive('getActiveDevice')->andReturn(['id' => 'device-1', 'name' => 'Test']);
-    $mock->shouldReceive('getSmartRecommendations')->andReturn([
+    $authMock = Mockery::mock(SpotifyAuthManager::class);
+    $authMock->shouldReceive('isConfigured')->andReturn(true);
+    $this->app->instance(SpotifyAuthManager::class, $authMock);
+
+    $playerMock = Mockery::mock(SpotifyPlayerService::class);
+    $playerMock->shouldReceive('getActiveDevice')->andReturn(['id' => 'device-1', 'name' => 'Test']);
+    $playerMock->shouldReceive('addToQueue')->twice();
+    $this->app->instance(SpotifyPlayerService::class, $playerMock);
+
+    $discoveryMock = Mockery::mock(SpotifyDiscoveryService::class);
+    $discoveryMock->shouldReceive('getSmartRecommendations')->andReturn([
         ['uri' => 'spotify:track:abc', 'name' => 'Track 1', 'artist' => 'Artist 1'],
         ['uri' => 'spotify:track:def', 'name' => 'Track 2', 'artist' => 'Artist 2'],
     ]);
-    $mock->shouldReceive('addToQueue')->twice();
-    $this->app->instance(SpotifyService::class, $mock);
+    $this->app->instance(SpotifyDiscoveryService::class, $discoveryMock);
 
     $this->artisan('session', ['--mood' => 'chill', '--duration' => '10'])
         ->assertSuccessful();
@@ -81,14 +92,20 @@ it('accepts all valid mood presets', function (): void {
 it('falls back to quick session when no OpenRouter key', function (): void {
     config(['ai.providers.openrouter.key' => null]);
 
-    $mock = Mockery::mock(SpotifyService::class);
-    $mock->shouldReceive('isConfigured')->andReturn(true);
-    $mock->shouldReceive('getActiveDevice')->andReturn(['id' => 'device-1', 'name' => 'Test']);
-    $mock->shouldReceive('getSmartRecommendations')->andReturn([
+    $authMock = Mockery::mock(SpotifyAuthManager::class);
+    $authMock->shouldReceive('isConfigured')->andReturn(true);
+    $this->app->instance(SpotifyAuthManager::class, $authMock);
+
+    $playerMock = Mockery::mock(SpotifyPlayerService::class);
+    $playerMock->shouldReceive('getActiveDevice')->andReturn(['id' => 'device-1', 'name' => 'Test']);
+    $playerMock->shouldReceive('addToQueue')->once();
+    $this->app->instance(SpotifyPlayerService::class, $playerMock);
+
+    $discoveryMock = Mockery::mock(SpotifyDiscoveryService::class);
+    $discoveryMock->shouldReceive('getSmartRecommendations')->andReturn([
         ['uri' => 'spotify:track:abc', 'name' => 'Track 1', 'artist' => 'Artist 1'],
     ]);
-    $mock->shouldReceive('addToQueue')->once();
-    $this->app->instance(SpotifyService::class, $mock);
+    $this->app->instance(SpotifyDiscoveryService::class, $discoveryMock);
 
     $this->artisan('session', ['description' => 'chill vibes for studying'])
         ->assertSuccessful();
@@ -109,11 +126,17 @@ it('extracts mood from description keywords', function (): void {
 });
 
 it('shows zero tracks warning on empty results', function (): void {
-    $mock = Mockery::mock(SpotifyService::class);
-    $mock->shouldReceive('isConfigured')->andReturn(true);
-    $mock->shouldReceive('getActiveDevice')->andReturn(['id' => 'device-1', 'name' => 'Test']);
-    $mock->shouldReceive('getSmartRecommendations')->andReturn([]);
-    $this->app->instance(SpotifyService::class, $mock);
+    $authMock = Mockery::mock(SpotifyAuthManager::class);
+    $authMock->shouldReceive('isConfigured')->andReturn(true);
+    $this->app->instance(SpotifyAuthManager::class, $authMock);
+
+    $playerMock = Mockery::mock(SpotifyPlayerService::class);
+    $playerMock->shouldReceive('getActiveDevice')->andReturn(['id' => 'device-1', 'name' => 'Test']);
+    $this->app->instance(SpotifyPlayerService::class, $playerMock);
+
+    $discoveryMock = Mockery::mock(SpotifyDiscoveryService::class);
+    $discoveryMock->shouldReceive('getSmartRecommendations')->andReturn([]);
+    $this->app->instance(SpotifyDiscoveryService::class, $discoveryMock);
 
     $this->artisan('session', ['--mood' => 'ambient', '--duration' => '10'])
         ->assertFailed();

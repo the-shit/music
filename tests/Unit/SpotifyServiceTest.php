@@ -1,7 +1,8 @@
 <?php
 
 use App\Services\SpotifyAuthManager;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
@@ -14,26 +15,12 @@ beforeEach(function (): void {
     Config::set('spotify.client_id', 'test_client_id');
     Config::set('spotify.client_secret', 'test_client_secret');
 
-    $this->service = new SpotifyService;
-
     $mockAuth = Mockery::mock(SpotifyAuthManager::class)->makePartial();
     $mockAuth->shouldReceive('getAccessToken')->andReturn('valid_token');
     $mockAuth->shouldReceive('requireAuth')->andReturn(null);
 
-    $reflection = new ReflectionClass($this->service);
-    foreach (['auth', 'player', 'discovery'] as $prop) {
-        $r = $reflection->getProperty($prop);
-        $r->setAccessible(true);
-        $obj = $r->getValue($this->service);
-        if ($prop === 'auth') {
-            $r->setValue($this->service, $mockAuth);
-        } else {
-            $sub = new ReflectionClass($obj);
-            $subAuth = $sub->getProperty('auth');
-            $subAuth->setAccessible(true);
-            $subAuth->setValue($obj, $mockAuth);
-        }
-    }
+    $this->playerService = new SpotifyPlayerService($mockAuth);
+    $this->discoveryService = new SpotifyDiscoveryService($mockAuth);
 });
 
 describe('SpotifyService', function (): void {
@@ -54,7 +41,7 @@ describe('SpotifyService', function (): void {
                 ]),
             ]);
 
-            $result = $this->service->search('test');
+            $result = $this->discoveryService->search('test');
 
             expect($result)->toHaveKeys(['uri', 'name', 'artist']);
             expect($result['name'])->toBe('Test Song');
@@ -83,7 +70,7 @@ describe('SpotifyService', function (): void {
                 ]),
             ]);
 
-            $results = $this->service->searchMultiple('test', 'track', 10);
+            $results = $this->discoveryService->searchMultiple('test', 'track', 10);
 
             expect($results)->toHaveCount(2);
             expect($results[0]['name'])->toBe('Song 1');
@@ -109,7 +96,7 @@ describe('SpotifyService', function (): void {
                 ]),
             ]);
 
-            $current = $this->service->getCurrentPlayback();
+            $current = $this->playerService->getCurrentPlayback();
 
             expect($current)->toHaveKeys(['name', 'artist', 'album', 'device']);
             expect($current['name'])->toBe('Current Song');
@@ -121,7 +108,7 @@ describe('SpotifyService', function (): void {
                 'api.spotify.com/v1/me/player/volume*' => Http::response([], 204),
             ]);
 
-            $result = $this->service->setVolume(42);
+            $result = $this->playerService->setVolume(42);
 
             expect($result)->toBeTrue();
 
@@ -135,12 +122,12 @@ describe('SpotifyService', function (): void {
                 'api.spotify.com/v1/me/player/volume*' => Http::response([], 204),
             ]);
 
-            $this->service->setVolume(150);
+            $this->playerService->setVolume(150);
             Http::assertSent(function (Request $request): bool {
                 return str_contains($request->url(), 'volume_percent=100');
             });
 
-            $this->service->setVolume(-10);
+            $this->playerService->setVolume(-10);
             Http::assertSent(function (Request $request): bool {
                 return str_contains($request->url(), 'volume_percent=0');
             });
@@ -171,7 +158,7 @@ describe('SpotifyService', function (): void {
                 ]),
             ]);
 
-            $devices = $this->service->getDevices();
+            $devices = $this->playerService->getDevices();
 
             expect($devices)->toHaveCount(2);
             expect($devices[0]['name'])->toBe('MacBook');
@@ -195,7 +182,7 @@ describe('SpotifyService', function (): void {
                 ]),
             ]);
 
-            $device = $this->service->getActiveDevice();
+            $device = $this->playerService->getActiveDevice();
 
             expect($device['id'])->toBe('active');
             expect($device['is_active'])->toBeTrue();
@@ -217,7 +204,7 @@ describe('SpotifyService', function (): void {
                 ]),
             ]);
 
-            $queue = $this->service->getQueue();
+            $queue = $this->playerService->getQueue();
 
             expect($queue)->toHaveKeys(['currently_playing', 'queue']);
             expect($queue['queue'])->toHaveCount(2);
@@ -232,7 +219,7 @@ describe('SpotifyService', function (): void {
                 'api.spotify.com/v1/me/player/queue*' => Http::response([], 204),
             ]);
 
-            $this->service->addToQueue('spotify:track:123');
+            $this->playerService->addToQueue('spotify:track:123');
 
             Http::assertSent(function (Request $request): bool {
                 return str_contains($request->url(), 'uri=spotify%3Atrack%3A123');
@@ -256,7 +243,7 @@ describe('SpotifyService', function (): void {
                 ]),
             ]);
 
-            $playlists = $this->service->getPlaylists();
+            $playlists = $this->discoveryService->getPlaylists();
 
             expect($playlists)->toHaveCount(1);
             expect($playlists[0]['name'])->toBe('My Playlist');
@@ -270,7 +257,7 @@ describe('SpotifyService', function (): void {
                 'api.spotify.com/v1/me/player/play' => Http::response([], 204),
             ]);
 
-            $result = $this->service->playPlaylist('playlist123');
+            $result = $this->playerService->playPlaylist('playlist123');
 
             expect($result)->toBeTrue();
 

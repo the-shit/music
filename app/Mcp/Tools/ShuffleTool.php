@@ -3,7 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\HandlesAuthErrors;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -25,18 +25,18 @@ class ShuffleTool extends Tool
         ];
     }
 
-    public function handle(Request $request, SpotifyService $spotify): Response
+    public function handle(Request $request, SpotifyPlayerService $player): Response
     {
-        return $this->withAuthHandling(function () use ($request, $spotify): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($request, $player): \Laravel\Mcp\Response {
             $enabled = $request->get('enabled');
 
             if ($enabled === null) {
-                $playback = $spotify->getCurrentPlayback();
+                $playback = $player->getCurrentPlayback();
                 $current = $playback['shuffle_state'] ?? false;
                 $enabled = ! $current;
             }
 
-            $spotify->setShuffle((bool) $enabled);
+            $player->setShuffle((bool) $enabled);
             $state = $enabled ? 'on' : 'off';
 
             return Response::text("Shuffle turned {$state}.");

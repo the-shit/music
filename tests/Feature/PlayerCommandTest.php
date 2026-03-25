@@ -1,11 +1,12 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyPlayerService;
 
 describe('PlayerCommand', function (): void {
 
     it('requires configuration', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
@@ -16,7 +17,7 @@ describe('PlayerCommand', function (): void {
     });
 
     it('requires interactive terminal', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
         });
 
@@ -27,8 +28,10 @@ describe('PlayerCommand', function (): void {
     });
 
     it('shows nothing playing state', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
         });
 
@@ -50,8 +53,10 @@ describe('PlayerCommand', function (): void {
             ],
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentTrack): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentTrack): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentTrack);
         });
 

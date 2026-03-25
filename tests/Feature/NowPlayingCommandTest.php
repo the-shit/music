@@ -1,6 +1,6 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
 
 describe('NowPlayingCommand', function (): void {
 
@@ -49,7 +49,7 @@ describe('NowPlayingCommand', function (): void {
     describe('not configured guard', function (): void {
 
         it('fails when not configured', function (): void {
-            $this->mock(SpotifyService::class, function ($mock): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(false);
             });
 
@@ -63,7 +63,7 @@ describe('NowPlayingCommand', function (): void {
     describe('bridge script missing', function (): void {
 
         it('fails with error when bridge script does not exist', function (): void {
-            $this->mock(SpotifyService::class, function ($mock): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             });
 

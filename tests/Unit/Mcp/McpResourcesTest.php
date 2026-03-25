@@ -3,7 +3,7 @@
 use App\Mcp\Resources\DevicesResource;
 use App\Mcp\Resources\NowPlayingResource;
 use App\Mcp\SpotifyServer;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -15,7 +15,7 @@ uses(TestCase::class);
 describe('NowPlayingResource', function (): void {
 
     it('returns playing false JSON when nothing is playing', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
         });
 
@@ -26,7 +26,7 @@ describe('NowPlayingResource', function (): void {
     });
 
     it('returns full playback JSON when a track is playing', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'is_playing' => true,
                 'name' => 'Kashmir',
@@ -55,7 +55,7 @@ describe('NowPlayingResource', function (): void {
     });
 
     it('returns null device when device name is missing', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'is_playing' => false,
                 'name' => 'Song',
@@ -76,7 +76,7 @@ describe('NowPlayingResource', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->andReturn(null);
         });
 
@@ -95,7 +95,7 @@ describe('NowPlayingResource', function (): void {
     });
 
     it('has a description', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->andReturn(null);
         });
 
@@ -112,7 +112,7 @@ describe('NowPlayingResource', function (): void {
 describe('DevicesResource', function (): void {
 
     it('returns empty JSON array when no devices are available', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([]);
         });
 
@@ -122,7 +122,7 @@ describe('DevicesResource', function (): void {
     });
 
     it('returns JSON array of devices with mapped fields', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 [
                     'id' => 'device-1',
@@ -154,7 +154,7 @@ describe('DevicesResource', function (): void {
     });
 
     it('defaults active to false when is_active is missing', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 [
                     'id' => 'device-1',
@@ -171,7 +171,7 @@ describe('DevicesResource', function (): void {
     });
 
     it('sets volume to null when volume_percent is missing', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 [
                     'id' => 'device-1',
@@ -189,7 +189,7 @@ describe('DevicesResource', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->andReturn([]);
         });
 
@@ -208,7 +208,7 @@ describe('DevicesResource', function (): void {
     });
 
     it('has a description', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->andReturn([]);
         });
 

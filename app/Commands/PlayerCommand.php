@@ -3,7 +3,8 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -20,17 +21,20 @@ class PlayerCommand extends Command
 
     protected $description = '🎵 Interactive Spotify player with visual controls';
 
-    private SpotifyService $spotify;
+    private SpotifyPlayerService $player;
+
+    private SpotifyDiscoveryService $discovery;
 
     private bool $running = true;
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
 
-        $this->spotify = $spotify;
+        $this->player = $player;
+        $this->discovery = $discovery;
 
         // Check if we're in an interactive terminal
         if (! $this->input->isInteractive()) {
@@ -59,7 +63,7 @@ class PlayerCommand extends Command
     {
         // Get current playback state
         $current = spin(
-            fn (): ?array => $this->spotify->getCurrentPlayback(),
+            fn (): ?array => $this->player->getCurrentPlayback(),
             'Refreshing...'
         );
 
@@ -227,22 +231,22 @@ class PlayerCommand extends Command
         try {
             switch ($action) {
                 case 'pause':
-                    $this->spotify->pause();
+                    $this->player->pause();
                     info('⏸️  Paused');
                     break;
 
                 case 'resume':
-                    $this->spotify->resume();
+                    $this->player->resume();
                     info('▶️  Resumed');
                     break;
 
                 case 'next':
-                    $this->spotify->next();
+                    $this->player->next();
                     info('⏭️  Skipped to next');
                     break;
 
                 case 'previous':
-                    $this->spotify->previous();
+                    $this->player->previous();
                     info('⏮️  Back to previous');
                     break;
 
@@ -308,7 +312,7 @@ class PlayerCommand extends Command
             $newVolume = $this->ask('Enter volume (0-100)');
         }
 
-        $this->spotify->setVolume((int) $newVolume);
+        $this->player->setVolume((int) $newVolume);
         info("🔊 Volume set to {$newVolume}%");
     }
 
@@ -323,7 +327,7 @@ class PlayerCommand extends Command
         info("Searching for: {$query}");
 
         $results = spin(
-            fn (): array => $this->spotify->searchMultiple($query, 'track', 10),
+            fn (): array => $this->discovery->searchMultiple($query, 'track', 10),
             'Searching...'
         );
 
@@ -352,7 +356,7 @@ class PlayerCommand extends Command
         );
 
         if ($uri) {
-            $this->spotify->play($uri);
+            $this->player->play($uri);
             $selected = collect($results)->firstWhere('uri', $uri);
             info("▶️  Playing: {$selected['name']} by {$selected['artist']}");
         }
@@ -361,7 +365,7 @@ class PlayerCommand extends Command
     private function showQueue(): void
     {
         $queue = spin(
-            fn (): array => $this->spotify->getQueue(),
+            fn (): array => $this->player->getQueue(),
             'Loading queue...'
         );
 
@@ -395,7 +399,7 @@ class PlayerCommand extends Command
     private function browsePlaylists(): void
     {
         $playlists = spin(
-            fn (): array => $this->spotify->getPlaylists(20),
+            fn (): array => $this->discovery->getPlaylists(20),
             'Loading playlists...'
         );
 
@@ -429,7 +433,7 @@ class PlayerCommand extends Command
         }
 
         // Play the selected playlist
-        if ($this->spotify->playPlaylist($playlistId)) {
+        if ($this->player->playPlaylist($playlistId)) {
             $selected = collect($playlists)->firstWhere('id', $playlistId);
             info("▶️  Playing playlist: {$selected['name']}");
         } else {
@@ -440,7 +444,7 @@ class PlayerCommand extends Command
     private function switchDevice(): void
     {
         $devices = spin(
-            fn (): array => $this->spotify->getDevices(),
+            fn (): array => $this->player->getDevices(),
             'Loading devices...'
         );
 
@@ -458,7 +462,7 @@ class PlayerCommand extends Command
 
         $deviceId = select('Select device', $options);
 
-        $this->spotify->transferPlayback($deviceId);
+        $this->player->transferPlayback($deviceId);
         info('✅ Switched device');
     }
 
@@ -467,7 +471,7 @@ class PlayerCommand extends Command
         $currentShuffle = $current['shuffle_state'] ?? false;
         $newState = ! $currentShuffle;
 
-        $this->spotify->setShuffle($newState);
+        $this->player->setShuffle($newState);
 
         if ($newState) {
             info('🔀 Shuffle enabled');
@@ -489,7 +493,7 @@ class PlayerCommand extends Command
             ]
         );
 
-        $this->spotify->setRepeat($newState);
+        $this->player->setRepeat($newState);
 
         $message = match ($newState) {
             'off' => '➡️  Repeat disabled',

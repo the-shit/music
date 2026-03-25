@@ -3,7 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\HandlesAuthErrors;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -37,14 +37,14 @@ class SearchTool extends Tool
         ];
     }
 
-    public function handle(Request $request, SpotifyService $spotify): Response
+    public function handle(Request $request, SpotifyDiscoveryService $discovery): Response
     {
-        return $this->withAuthHandling(function () use ($request, $spotify): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($request, $discovery): \Laravel\Mcp\Response {
             $query = $request->get('query');
             $type = $request->get('type', 'track');
             $limit = min(20, max(1, (int) $request->get('limit', 5)));
 
-            $results = $spotify->searchMultiple($query, $type, $limit);
+            $results = $discovery->searchMultiple($query, $type, $limit);
 
             if ($results === []) {
                 return Response::text("No {$type}s found for \"{$query}\".");

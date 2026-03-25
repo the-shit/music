@@ -3,7 +3,8 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\confirm;
@@ -39,11 +40,14 @@ class AutopilotCommand extends Command
 
     private int $consecutiveFailures = 0;
 
-    private SpotifyService $spotify;
+    private SpotifyPlayerService $player;
 
-    public function handle(SpotifyService $spotify): int
+    private SpotifyDiscoveryService $discovery;
+
+    public function handle(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): int
     {
-        $this->spotify = $spotify;
+        $this->player = $player;
+        $this->discovery = $discovery;
 
         if ($this->option('install')) {
             return $this->installDaemon();
@@ -123,7 +127,7 @@ class AutopilotCommand extends Command
             $this->line("Track changed: <fg=cyan>{$event['track']}</> by {$event['artist']}");
 
             try {
-                $this->maybeRefill($this->spotify, $threshold, $mood);
+                $this->maybeRefill($threshold, $mood);
                 $this->consecutiveFailures = 0;
             } catch (\Exception $e) {
                 $this->consecutiveFailures++;
@@ -388,12 +392,12 @@ XML;
 
     // ── Queue logic ───────────────────────────────────────────────
 
-    private function maybeRefill(SpotifyService $spotify, int $threshold, string $mood): void
+    private function maybeRefill(int $threshold, string $mood): void
     {
-        $queueData = $spotify->getQueue();
+        $queueData = $this->player->getQueue();
         $queue = $queueData['queue'] ?? [];
         $queueDepth = count($queue);
-        $current = $spotify->getCurrentPlayback();
+        $current = $this->player->getCurrentPlayback();
 
         $this->line("  Queue depth: {$queueDepth} / threshold: {$threshold}");
 
@@ -403,10 +407,10 @@ XML;
             return;
         }
 
-        $this->refill($spotify, $current ?? [], $queue, $threshold, $mood);
+        $this->refill($current ?? [], $queue, $threshold, $mood);
     }
 
-    private function refill(SpotifyService $spotify, array $current, array $queue, int $threshold, string $mood): void
+    private function refill(array $current, array $queue, int $threshold, string $mood): void
     {
         $needed = $threshold - count($queue);
 
@@ -418,7 +422,7 @@ XML;
         );
 
         // Seed from recent history for variety
-        $recentlyPlayed = $spotify->getRecentlyPlayed(5);
+        $recentlyPlayed = $this->discovery->getRecentlyPlayed(5);
 
         [$seedTrackIds, $seedArtistIds] = $this->buildRecommendationSeeds($current, $recentlyPlayed);
         $moodParams = $this->moodPresets()[$mood] ?? $this->moodPresets()['flow'];
@@ -439,12 +443,12 @@ XML;
         // getRecommendations now auto-falls through to getSmartRecommendations
         // when the deprecated endpoint returns empty
         $currentArtist = $current['artist'] ?? null;
-        $recommendations = $spotify->getRecommendations($seedTrackIds, $seedArtistIds, $needed + 10, $moodParams, $currentArtist);
+        $recommendations = $this->discovery->getRecommendations($seedTrackIds, $seedArtistIds, $needed + 10, $moodParams, $currentArtist);
 
         // If still empty (unlikely now), fall back to improved related tracks
         if ($recommendations === [] && $currentArtist) {
             $this->line('  <fg=gray>Smart discovery empty — falling back to related tracks</>');
-            $recommendations = $spotify->getRelatedTracks($currentArtist, $current['name'] ?? '', $needed + 10);
+            $recommendations = $this->discovery->getRelatedTracks($currentArtist, $current['name'] ?? '', $needed + 10);
         }
 
         $added = 0;
@@ -458,7 +462,7 @@ XML;
             }
 
             try {
-                $spotify->addToQueue($track['uri']);
+                $this->player->addToQueue($track['uri']);
                 $this->sessionUriTimestamps[$track['uri']] = time();
                 $excludeUris[$track['uri']] = true;
                 $added++;

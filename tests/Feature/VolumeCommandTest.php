@@ -1,6 +1,7 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyPlayerService;
 
 describe('VolumeCommand', function (): void {
 
@@ -14,8 +15,10 @@ describe('VolumeCommand', function (): void {
             ],
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
         });
 
@@ -25,8 +28,10 @@ describe('VolumeCommand', function (): void {
     });
 
     it('sets volume to specific level', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setVolume')->once()->with(75)->andReturn(true);
         });
 
@@ -36,8 +41,10 @@ describe('VolumeCommand', function (): void {
     });
 
     it('handles zero volume correctly', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setVolume')->once()->with(0)->andReturn(true);
         });
 
@@ -47,8 +54,10 @@ describe('VolumeCommand', function (): void {
     });
 
     it('clamps values above 100', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setVolume')->once()->with(100)->andReturn(true);
         });
 
@@ -59,8 +68,10 @@ describe('VolumeCommand', function (): void {
 
     it('handles relative negative values', function (): void {
         // -10 is treated as relative change (current - 10)
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'device' => ['volume_percent' => 50],
             ]);
@@ -72,8 +83,10 @@ describe('VolumeCommand', function (): void {
     });
 
     it('handles API failure', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setVolume')->once()->with(50)->andReturn(false);
         });
 
@@ -83,7 +96,7 @@ describe('VolumeCommand', function (): void {
     });
 
     it('requires configuration', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
@@ -100,8 +113,10 @@ describe('VolumeCommand', function (): void {
             'device' => null,
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
         });
 

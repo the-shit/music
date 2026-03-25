@@ -3,7 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\HandlesAuthErrors;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -20,10 +20,10 @@ class DevicesTool extends Tool
 {
     use HandlesAuthErrors;
 
-    public function handle(Request $request, SpotifyService $spotify): Response
+    public function handle(Request $request, SpotifyPlayerService $player): Response
     {
-        return $this->withAuthHandling(function () use ($spotify): \Laravel\Mcp\Response {
-            $devices = $spotify->getDevices();
+        return $this->withAuthHandling(function () use ($player): \Laravel\Mcp\Response {
+            $devices = $player->getDevices();
 
             if ($devices === []) {
                 return Response::text('No Spotify devices available. Open Spotify on any device.');

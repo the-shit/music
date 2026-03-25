@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -22,7 +22,7 @@ class TopCommand extends Command
 
     protected $description = 'Show your top tracks or artists';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyDiscoveryService $discovery): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -34,7 +34,7 @@ class TopCommand extends Command
 
         try {
             if ($type === 'artists') {
-                $items = $spotify->getTopArtists($range, $limit);
+                $items = $discovery->getTopArtists($range, $limit);
 
                 if ($this->option('json')) {
                     $this->line(json_encode($items));
@@ -53,7 +53,7 @@ class TopCommand extends Command
                     }
                 }
             } else {
-                $items = $spotify->getTopTracks($range, $limit);
+                $items = $discovery->getTopTracks($range, $limit);
 
                 if ($this->option('json')) {
                     $this->line(json_encode($items));

@@ -1,6 +1,8 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 
 describe('PlayCommand', function (): void {
 
@@ -11,12 +13,16 @@ describe('PlayCommand', function (): void {
             'artist' => 'Test Artist',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock) use ($searchResult): void {
             $mock->shouldReceive('search')
                 ->once()
                 ->with('test song')
                 ->andReturn($searchResult);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('play')
                 ->once()
                 ->with('spotify:track:123', null);
@@ -30,8 +36,10 @@ describe('PlayCommand', function (): void {
     });
 
     it('handles no search results', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('search')
                 ->once()
                 ->with('nonexistent song')
@@ -51,12 +59,16 @@ describe('PlayCommand', function (): void {
             'artist' => 'Test Artist',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock) use ($searchResult): void {
             $mock->shouldReceive('search')
                 ->once()
                 ->with('test song')
                 ->andReturn($searchResult);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('play')
                 ->once()
                 ->with('spotify:track:123', null)
@@ -70,7 +82,7 @@ describe('PlayCommand', function (): void {
     });
 
     it('requires configuration', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
@@ -87,9 +99,13 @@ describe('PlayCommand', function (): void {
             'artist' => 'JSON Artist',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock) use ($searchResult): void {
             $mock->shouldReceive('search')->once()->andReturn($searchResult);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('play')->once()->with('spotify:track:abc', null);
         });
 
@@ -106,9 +122,13 @@ describe('PlayCommand', function (): void {
             'artist' => 'Queue Artist',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock) use ($searchResult): void {
             $mock->shouldReceive('search')->once()->andReturn($searchResult);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('addToQueue')->once()->with('spotify:track:456');
         });
 
@@ -124,9 +144,13 @@ describe('PlayCommand', function (): void {
             'artist' => 'Queue Artist',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock) use ($searchResult): void {
             $mock->shouldReceive('search')->once()->andReturn($searchResult);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('addToQueue')->once()->with('spotify:track:789');
         });
 
@@ -135,8 +159,10 @@ describe('PlayCommand', function (): void {
     });
 
     it('outputs json on no search results with --json flag', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('search')->once()->andReturn(null);
         });
 
@@ -145,8 +171,10 @@ describe('PlayCommand', function (): void {
     });
 
     it('outputs json error on API exception with --json flag', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('search')->once()->andThrow(new Exception('API down'));
         });
 
@@ -165,10 +193,14 @@ describe('PlayCommand', function (): void {
             ['id' => 'device-id-123', 'name' => 'Living Room Speaker'],
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($searchResult, $devices): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
-            $mock->shouldReceive('getDevices')->once()->andReturn($devices);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock) use ($searchResult): void {
             $mock->shouldReceive('search')->once()->andReturn($searchResult);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($devices): void {
+            $mock->shouldReceive('getDevices')->once()->andReturn($devices);
             $mock->shouldReceive('play')->once()->with('spotify:track:device1', 'device-id-123');
         });
 
@@ -178,8 +210,10 @@ describe('PlayCommand', function (): void {
     });
 
     it('fails when specified device is not found', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 ['id' => 'device-1', 'name' => 'Kitchen'],
             ]);

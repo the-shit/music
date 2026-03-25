@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -20,7 +20,7 @@ class RepeatCommand extends Command
 
     protected $description = '🔁 Set repeat mode for Spotify playback (off/track/context)';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -30,7 +30,7 @@ class RepeatCommand extends Command
 
         try {
             // Get current playback to determine current repeat state
-            $current = $spotify->getCurrentPlayback();
+            $current = $player->getCurrentPlayback();
 
             if (! $current) {
                 warning('⚠️  Nothing is currently playing');
@@ -57,7 +57,7 @@ class RepeatCommand extends Command
             }
 
             // Set repeat state
-            $spotify->setRepeat($newState);
+            $player->setRepeat($newState);
 
             // Output result
             if ($this->option('json')) {
