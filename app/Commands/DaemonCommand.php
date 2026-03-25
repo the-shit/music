@@ -474,9 +474,12 @@ class DaemonCommand extends Command
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
-    <true/>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
     <key>ThrottleInterval</key>
-    <integer>5</integer>
+    <integer>30</integer>
     <key>StandardOutPath</key>
     <string>{$logFile}</string>
     <key>StandardErrorPath</key>
@@ -722,6 +725,11 @@ XML;
             'failed to handle request' => 0,
             'Invalid start position' => 0,
             'connection refused' => 0,
+            'Connection reset without closing handshake' => 0,
+            'TLS error' => 0,
+            'Connection to server closed' => 0,
+            'IncompleteMessage' => 0,
+            'failed to put connect state' => 0,
         ];
 
         // Read last 500 lines to avoid parsing massive logs
