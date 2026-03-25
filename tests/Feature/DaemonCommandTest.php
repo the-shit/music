@@ -377,8 +377,9 @@ describe('DaemonCommand', function (): void {
             $plist = $method->invoke($command, '/usr/local/bin/spotifyd');
 
             expect($plist)->toContain('<key>KeepAlive</key>');
+            expect($plist)->toContain('<key>SuccessfulExit</key>');
             expect($plist)->toContain('<key>ThrottleInterval</key>');
-            expect($plist)->toContain('<integer>5</integer>');
+            expect($plist)->toContain('<integer>30</integer>');
         });
 
     });
