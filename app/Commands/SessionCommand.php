@@ -4,7 +4,7 @@ namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SessionService;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -23,16 +23,15 @@ class SessionCommand extends Command
 
     protected $description = 'Start an AI-powered listening session with mood-aware phases';
 
-    private SpotifyService $spotify;
+    private SpotifyPlayerService $player;
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player, SessionService $session): int
     {
-        $this->spotify = $spotify;
+        $this->player = $player;
 
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
-        $session = new SessionService($spotify);
 
         $description = $this->argument('description');
         $mood = $this->option('mood');
@@ -60,7 +59,7 @@ class SessionCommand extends Command
         }
 
         // Check for active device
-        $device = $spotify->getActiveDevice();
+        $device = $player->getActiveDevice();
         if (! $device) {
             error('No active Spotify device found. Start playing something first.');
 
@@ -181,7 +180,7 @@ class SessionCommand extends Command
             foreach ($candidates as $group) {
                 foreach ($group['tracks'] as $track) {
                     try {
-                        $this->spotify->addToQueue($track['uri']);
+                        $this->player->addToQueue($track['uri']);
                         $queued++;
                     } catch (\Exception) {
                         continue;

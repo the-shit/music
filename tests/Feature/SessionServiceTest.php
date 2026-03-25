@@ -1,11 +1,17 @@
 <?php
 
+use App\Agents\CuratorAgent;
+use App\Agents\IntentParserAgent;
 use App\Services\SessionService;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 
 beforeEach(function (): void {
-    $this->spotify = Mockery::mock(SpotifyService::class);
-    $this->session = new SessionService($this->spotify);
+    $this->player = Mockery::mock(SpotifyPlayerService::class);
+    $this->discovery = Mockery::mock(SpotifyDiscoveryService::class);
+    $this->intentParser = Mockery::mock(IntentParserAgent::class);
+    $this->curator = Mockery::mock(CuratorAgent::class);
+    $this->session = new SessionService($this->player, $this->discovery, $this->intentParser, $this->curator);
 });
 
 describe('planFromMood', function (): void {
@@ -39,7 +45,7 @@ describe('fetchCandidates', function (): void {
     it('fetches tracks for each phase', function (): void {
         $this->session->planFromMood('chill', 20);
 
-        $this->spotify->shouldReceive('getSmartRecommendations')
+        $this->discovery->shouldReceive('getSmartRecommendations')
             ->once()
             ->andReturn([
                 ['uri' => 'spotify:track:1', 'name' => 'Chill Track', 'artist' => 'Artist'],
@@ -55,7 +61,7 @@ describe('fetchCandidates', function (): void {
 
 describe('quickSession', function (): void {
     it('plans, fetches, and queues in one call', function (): void {
-        $this->spotify->shouldReceive('getSmartRecommendations')
+        $this->discovery->shouldReceive('getSmartRecommendations')
             ->once()
             ->andReturn([
                 ['uri' => 'spotify:track:aaa', 'name' => 'Track A', 'artist' => 'Artist A'],
@@ -63,7 +69,7 @@ describe('quickSession', function (): void {
                 ['uri' => 'spotify:track:ccc', 'name' => 'Track C', 'artist' => 'Artist C'],
             ]);
 
-        $this->spotify->shouldReceive('addToQueue')->times(3);
+        $this->player->shouldReceive('addToQueue')->times(3);
 
         $result = $this->session->quickSession('focus', 15);
 
@@ -74,16 +80,16 @@ describe('quickSession', function (): void {
     });
 
     it('skips tracks that fail to queue', function (): void {
-        $this->spotify->shouldReceive('getSmartRecommendations')
+        $this->discovery->shouldReceive('getSmartRecommendations')
             ->andReturn([
                 ['uri' => 'spotify:track:ok', 'name' => 'OK', 'artist' => 'A'],
                 ['uri' => 'spotify:track:fail', 'name' => 'Fail', 'artist' => 'B'],
             ]);
 
-        $this->spotify->shouldReceive('addToQueue')
+        $this->player->shouldReceive('addToQueue')
             ->with('spotify:track:ok')
             ->once();
-        $this->spotify->shouldReceive('addToQueue')
+        $this->player->shouldReceive('addToQueue')
             ->with('spotify:track:fail')
             ->once()
             ->andThrow(new Exception('Device not found'));
@@ -96,7 +102,7 @@ describe('quickSession', function (): void {
 
 describe('queueTracks', function (): void {
     it('queues tracks from curated plan', function (): void {
-        $this->spotify->shouldReceive('addToQueue')->times(3);
+        $this->player->shouldReceive('addToQueue')->times(3);
 
         $curated = [
             'playlist_name' => 'Test Playlist',
@@ -122,10 +128,10 @@ describe('queueTracks', function (): void {
 
 describe('queueTracks edge cases', function (): void {
     it('skips tracks that fail to queue', function (): void {
-        $this->spotify->shouldReceive('addToQueue')
+        $this->player->shouldReceive('addToQueue')
             ->with('spotify:track:1')
             ->once();
-        $this->spotify->shouldReceive('addToQueue')
+        $this->player->shouldReceive('addToQueue')
             ->with('spotify:track:2')
             ->once()
             ->andThrow(new Exception('Unavailable'));
@@ -145,7 +151,7 @@ describe('queueTracks edge cases', function (): void {
     });
 
     it('handles phases with no track_uris key', function (): void {
-        $this->spotify->shouldNotReceive('addToQueue');
+        $this->player->shouldNotReceive('addToQueue');
 
         $curated = [
             'phases' => [

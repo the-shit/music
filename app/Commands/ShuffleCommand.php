@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -20,7 +20,7 @@ class ShuffleCommand extends Command
 
     protected $description = '🔀 Toggle or set shuffle mode for Spotify playback';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -30,7 +30,7 @@ class ShuffleCommand extends Command
 
         try {
             // Get current playback to determine current shuffle state
-            $current = $spotify->getCurrentPlayback();
+            $current = $player->getCurrentPlayback();
 
             if (! $current) {
                 warning('⚠️  Nothing is currently playing');
@@ -48,7 +48,7 @@ class ShuffleCommand extends Command
             };
 
             // Set shuffle state
-            $spotify->setShuffle($newState);
+            $player->setShuffle($newState);
 
             // Output result
             if ($this->option('json')) {

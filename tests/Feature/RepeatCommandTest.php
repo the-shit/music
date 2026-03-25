@@ -1,6 +1,7 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyPlayerService;
 
 describe('RepeatCommand', function (): void {
 
@@ -11,8 +12,10 @@ describe('RepeatCommand', function (): void {
             'repeat_state' => 'off',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
             $mock->shouldReceive('setRepeat')->once()->with('context')->andReturn(true);
         });
@@ -29,8 +32,10 @@ describe('RepeatCommand', function (): void {
             'repeat_state' => 'context',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
             $mock->shouldReceive('setRepeat')->once()->with('track')->andReturn(true);
         });
@@ -47,8 +52,10 @@ describe('RepeatCommand', function (): void {
             'repeat_state' => 'track',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
             $mock->shouldReceive('setRepeat')->once()->with('off')->andReturn(true);
         });
@@ -65,8 +72,10 @@ describe('RepeatCommand', function (): void {
             'repeat_state' => 'off',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
             $mock->shouldReceive('setRepeat')->once()->with('track')->andReturn(true);
         });
@@ -83,8 +92,10 @@ describe('RepeatCommand', function (): void {
             'repeat_state' => 'off',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
         });
 
@@ -94,8 +105,10 @@ describe('RepeatCommand', function (): void {
     });
 
     it('requires active playback', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
         });
 
@@ -106,7 +119,7 @@ describe('RepeatCommand', function (): void {
     });
 
     it('requires configuration', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 
@@ -123,8 +136,10 @@ describe('RepeatCommand', function (): void {
             'repeat_state' => 'off',
         ];
 
-        $this->mock(SpotifyService::class, function ($mock) use ($currentPlayback): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($currentPlayback): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn($currentPlayback);
             $mock->shouldReceive('setRepeat')->once()->with('context')->andReturn(true);
         });

@@ -2,7 +2,7 @@
 
 namespace App\Commands\Concerns;
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 
 use function Laravel\Prompts\info;
 
@@ -13,11 +13,11 @@ trait ResolvesDevice
      *
      * @return array{id: string, name: string}|null
      */
-    protected function resolveDevice(SpotifyService $spotify, ?string $deviceName = null): ?array
+    protected function resolveDevice(SpotifyPlayerService $player, ?string $deviceName = null): ?array
     {
         // Explicit device name takes priority
         if ($deviceName) {
-            $devices = $spotify->getDevices();
+            $devices = $player->getDevices();
             $match = $this->findDevice($devices, $deviceName);
 
             if ($match) {
@@ -34,7 +34,7 @@ trait ResolvesDevice
             return null;
         }
 
-        $devices = $spotify->getDevices();
+        $devices = $player->getDevices();
         $match = $this->findDevice($devices, $daemonName);
 
         if ($match) {

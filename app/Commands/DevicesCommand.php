@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -19,14 +19,14 @@ class DevicesCommand extends Command
 
     protected $description = 'List or switch Spotify devices';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
 
         try {
-            $devices = $spotify->getDevices();
+            $devices = $player->getDevices();
 
             if (empty($devices)) {
                 warning('📱 No devices found');
@@ -106,7 +106,7 @@ class DevicesCommand extends Command
 
             // Transfer playback
             info('🔄 Switching to device...');
-            $spotify->transferPlayback($selected);
+            $player->transferPlayback($selected);
 
             info('✅ Playback transferred!');
 

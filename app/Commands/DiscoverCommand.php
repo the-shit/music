@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -22,7 +22,7 @@ class DiscoverCommand extends Command
 
     protected $description = 'AI-friendly search combining keywords with your listening patterns';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyDiscoveryService $discovery): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -33,9 +33,9 @@ class DiscoverCommand extends Command
 
         try {
             // Enrich query with user's listening context
-            $enrichedQuery = $this->enrichQuery($spotify, $query, $seedFrom);
+            $enrichedQuery = $this->enrichQuery($discovery, $query, $seedFrom);
 
-            $tracks = $spotify->searchMultiple($enrichedQuery, 'track', $limit);
+            $tracks = $discovery->searchMultiple($enrichedQuery, 'track', $limit);
 
             if ($this->option('json')) {
                 $this->line(json_encode([
@@ -68,13 +68,13 @@ class DiscoverCommand extends Command
         }
     }
 
-    private function enrichQuery(SpotifyService $spotify, string $query, string $seedFrom): string
+    private function enrichQuery(SpotifyDiscoveryService $discovery, string $query, string $seedFrom): string
     {
         try {
             if ($seedFrom === 'top') {
-                $artists = $spotify->getTopArtists('short_term', 3);
+                $artists = $discovery->getTopArtists('short_term', 3);
             } else {
-                $recent = $spotify->getRecentlyPlayed(5);
+                $recent = $discovery->getRecentlyPlayed(5);
                 // Extract unique artists from recent tracks
                 $artists = collect($recent)->pluck('artist')->unique()->take(2)->toArray();
 

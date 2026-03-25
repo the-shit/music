@@ -3,7 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\HandlesAuthErrors;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -20,10 +20,10 @@ class QueueShowTool extends Tool
 {
     use HandlesAuthErrors;
 
-    public function handle(Request $request, SpotifyService $spotify): Response
+    public function handle(Request $request, SpotifyPlayerService $player): Response
     {
-        return $this->withAuthHandling(function () use ($spotify): \Laravel\Mcp\Response {
-            $queue = $spotify->getQueue();
+        return $this->withAuthHandling(function () use ($player): \Laravel\Mcp\Response {
+            $queue = $player->getQueue();
 
             if ($queue === [] || empty($queue['queue'])) {
                 return Response::text('Queue is empty.');

@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -19,7 +19,7 @@ class VolumeCommand extends Command
 
     protected $description = 'Control Spotify volume';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -29,7 +29,7 @@ class VolumeCommand extends Command
 
         // If no level provided, show current volume (handle "0" as valid input)
         if ($level === null || $level === '') {
-            $current = $spotify->getCurrentPlayback();
+            $current = $player->getCurrentPlayback();
 
             if (! $current || ! isset($current['device'])) {
                 if ($this->option('json')) {
@@ -55,7 +55,7 @@ class VolumeCommand extends Command
         }
 
         // Parse volume level
-        $newVolume = $this->parseVolumeLevel($level, $spotify);
+        $newVolume = $this->parseVolumeLevel($level, $player);
 
         if ($newVolume === null) {
             if ($this->option('json')) {
@@ -68,7 +68,7 @@ class VolumeCommand extends Command
         }
 
         // Set the volume
-        $result = $spotify->setVolume($newVolume);
+        $result = $player->setVolume($newVolume);
 
         if (! $result) {
             if ($this->option('json')) {
@@ -105,11 +105,11 @@ class VolumeCommand extends Command
         return self::SUCCESS;
     }
 
-    private function parseVolumeLevel(string $level, SpotifyService $spotify): ?int
+    private function parseVolumeLevel(string $level, SpotifyPlayerService $player): ?int
     {
         // Handle relative changes
         if (str_starts_with($level, '+') || str_starts_with($level, '-')) {
-            $current = $spotify->getCurrentPlayback();
+            $current = $player->getCurrentPlayback();
             if (! $current || ! isset($current['device'])) {
                 return null;
             }

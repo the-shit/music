@@ -1,7 +1,7 @@
 <?php
 
 use App\Services\SpotifyAuthManager;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
@@ -14,26 +14,11 @@ beforeEach(function (): void {
     Config::set('spotify.client_id', 'test_client_id');
     Config::set('spotify.client_secret', 'test_client_secret');
 
-    $this->service = new SpotifyService;
-
     $mockAuth = Mockery::mock(SpotifyAuthManager::class)->makePartial();
     $mockAuth->shouldReceive('getAccessToken')->andReturn('valid_token');
     $mockAuth->shouldReceive('requireAuth')->andReturn(null);
 
-    $reflection = new ReflectionClass($this->service);
-    foreach (['auth', 'player', 'discovery'] as $prop) {
-        $r = $reflection->getProperty($prop);
-        $r->setAccessible(true);
-        $obj = $r->getValue($this->service);
-        if ($prop === 'auth') {
-            $r->setValue($this->service, $mockAuth);
-        } else {
-            $sub = new ReflectionClass($obj);
-            $subAuth = $sub->getProperty('auth');
-            $subAuth->setAccessible(true);
-            $subAuth->setValue($obj, $mockAuth);
-        }
-    }
+    $this->service = new SpotifyDiscoveryService($mockAuth);
 });
 
 describe('Discovery Methods', function (): void {

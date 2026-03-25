@@ -7,16 +7,17 @@ use App\Agents\IntentParserAgent;
 
 class SessionService
 {
-    private SpotifyService $spotify;
-
     private array $phases = [];
 
     private array $sessionPlan = [];
 
-    public function __construct(SpotifyService $spotify)
-    {
-        $this->spotify = $spotify;
-    }
+    public function __construct(
+        private SpotifyPlayerService $player,
+        private SpotifyDiscoveryService $discovery,
+        private IntentParserAgent $intentParser,
+        private CuratorAgent $curator,
+    ) {}
+
 
     /**
      * Plan a session from natural language input using AI agents.
@@ -28,8 +29,7 @@ class SessionService
             $prompt .= " Duration: {$durationMinutes} minutes.";
         }
 
-        $parser = new IntentParserAgent;
-        $response = $parser->prompt($prompt);
+        $response = $this->intentParser->prompt($prompt);
         /** @var array{phases: array<array{name: string, mood: string, duration_minutes: int, energy: float, valence: float, tempo: int, description: string}>, total_duration: int, playlist_name: string} $plan */
         $plan = $this->parseJson($response->text);
 
@@ -85,7 +85,7 @@ class SessionService
             $limit = min($limit, 30);
 
             $audioFeatures = $this->phaseToAudioFeatures($phase);
-            $tracks = $this->spotify->getSmartRecommendations($limit, null, $audioFeatures);
+            $tracks = $this->discovery->getSmartRecommendations($limit, null, $audioFeatures);
 
             $candidates[$i] = [
                 'phase' => $phase,
@@ -117,8 +117,7 @@ class SessionService
 
         $prompt .= 'Select the best tracks for each phase. Maintain energy flow between phases.';
 
-        $curator = new CuratorAgent;
-        $response = $curator->prompt($prompt);
+        $response = $this->curator->prompt($prompt);
 
         /** @var array{playlist_name: string, playlist_description: string, phases: array<array{name: string, track_uris: string[], dj_note: string}>} */
         return $this->parseJson($response->text);
@@ -134,7 +133,7 @@ class SessionService
         foreach ($curatedPlan['phases'] as $phase) {
             foreach ($phase['track_uris'] ?? [] as $uri) {
                 try {
-                    $this->spotify->addToQueue($uri);
+                    $this->player->addToQueue($uri);
                     $queued++;
                 } catch (\Exception $e) {
                     // Skip tracks that fail to queue (e.g., unavailable in region)
@@ -161,7 +160,7 @@ class SessionService
         foreach ($candidates as $group) {
             foreach ($group['tracks'] as $track) {
                 try {
-                    $this->spotify->addToQueue($track['uri']);
+                    $this->player->addToQueue($track['uri']);
                     $allTracks[] = $track;
                     $queued++;
                 } catch (\Exception $e) {

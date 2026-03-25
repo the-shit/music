@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -22,6 +25,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(SpotifyAuthManager::class);
+
+        $this->app->singleton(SpotifyPlayerService::class, function ($app) {
+            return new SpotifyPlayerService($app->make(SpotifyAuthManager::class));
+        });
+
+        $this->app->singleton(SpotifyDiscoveryService::class, function ($app) {
+            return new SpotifyDiscoveryService($app->make(SpotifyAuthManager::class));
+        });
     }
 }

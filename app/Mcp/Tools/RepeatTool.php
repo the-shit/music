@@ -3,7 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\HandlesAuthErrors;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -27,11 +27,11 @@ class RepeatTool extends Tool
         ];
     }
 
-    public function handle(Request $request, SpotifyService $spotify): Response
+    public function handle(Request $request, SpotifyPlayerService $player): Response
     {
-        return $this->withAuthHandling(function () use ($request, $spotify): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($request, $player): \Laravel\Mcp\Response {
             $mode = $request->get('mode');
-            $spotify->setRepeat($mode);
+            $player->setRepeat($mode);
 
             return Response::text("Repeat mode set to {$mode}.");
         });

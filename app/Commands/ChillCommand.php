@@ -3,7 +3,8 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -20,8 +21,15 @@ class ChillCommand extends Command
 
     protected $description = 'Queue chill relaxing music';
 
-    public function handle(SpotifyService $spotify): int
+    private SpotifyPlayerService $player;
+
+    private SpotifyDiscoveryService $discovery;
+
+    public function handle(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): int
     {
+        $this->player = $player;
+        $this->discovery = $discovery;
+
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
@@ -33,7 +41,7 @@ class ChillCommand extends Command
                 'soft jazz ambient relaxation',
             ];
 
-            $tracks = $this->gatherTracks($spotify, $queries, (int) $this->option('limit'));
+            $tracks = $this->gatherTracks($queries, (int) $this->option('limit'));
 
             if ($tracks === []) {
                 warning('No chill tracks found.');
@@ -41,7 +49,7 @@ class ChillCommand extends Command
                 return self::FAILURE;
             }
 
-            $queued = $this->queueTracks($spotify, $tracks);
+            $queued = $this->queueTracks($tracks);
 
             if ($this->option('json')) {
                 $this->line(json_encode([
@@ -68,7 +76,7 @@ class ChillCommand extends Command
         }
     }
 
-    private function gatherTracks(SpotifyService $spotify, array $queries, int $needed): array
+    private function gatherTracks(array $queries, int $needed): array
     {
         $tracks = [];
         $seen = [];
@@ -79,7 +87,7 @@ class ChillCommand extends Command
             }
 
             $perQuery = (int) ceil($needed / count($queries));
-            $results = $spotify->searchMultiple($query, 'track', $perQuery);
+            $results = $this->discovery->searchMultiple($query, 'track', $perQuery);
 
             foreach ($results as $track) {
                 if (! isset($seen[$track['uri']])) {
@@ -92,19 +100,19 @@ class ChillCommand extends Command
         return array_slice($tracks, 0, $needed);
     }
 
-    private function queueTracks(SpotifyService $spotify, array $tracks): array
+    private function queueTracks(array $tracks): array
     {
         // Build dedup set from current queue and recently played
         $excludeUris = [];
         try {
-            $queueData = $spotify->getQueue();
+            $queueData = $this->player->getQueue();
             foreach ($queueData['queue'] ?? [] as $item) {
                 $excludeUris[$item['uri'] ?? ''] = true;
             }
             if (isset($queueData['currently_playing']['uri'])) {
                 $excludeUris[$queueData['currently_playing']['uri']] = true;
             }
-            foreach ($spotify->getRecentlyPlayed(20) as $recent) {
+            foreach ($this->discovery->getRecentlyPlayed(20) as $recent) {
                 $excludeUris[$recent['uri']] = true;
             }
         } catch (\Exception) {
@@ -119,9 +127,9 @@ class ChillCommand extends Command
 
         foreach ($tracks as $i => $track) {
             if ($i === 0) {
-                $spotify->play($track['uri']);
+                $this->player->play($track['uri']);
             } else {
-                $spotify->addToQueue($track['uri']);
+                $this->player->addToQueue($track['uri']);
             }
             $queued[] = $track;
         }

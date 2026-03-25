@@ -1,12 +1,15 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyDiscoveryService;
 
 describe('PlaylistCreateCommand', function (): void {
 
     it('creates a private playlist by default', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('createPlaylist')
                 ->once()
                 ->with('My Playlist', '', false)
@@ -22,8 +25,10 @@ describe('PlaylistCreateCommand', function (): void {
     });
 
     it('creates a public playlist when flagged', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('createPlaylist')
                 ->once()
                 ->with('Public Jams', '', true)
@@ -39,8 +44,10 @@ describe('PlaylistCreateCommand', function (): void {
     });
 
     it('passes description to spotify', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('createPlaylist')
                 ->once()
                 ->with('Coding Music', 'Tracks for deep work', false)
@@ -58,8 +65,10 @@ describe('PlaylistCreateCommand', function (): void {
     });
 
     it('outputs json when requested', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('createPlaylist')
                 ->once()
                 ->andReturn([
@@ -75,8 +84,10 @@ describe('PlaylistCreateCommand', function (): void {
     });
 
     it('handles api failure', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('createPlaylist')
                 ->once()
                 ->andThrow(new \Exception('Unauthorized'));
@@ -87,8 +98,10 @@ describe('PlaylistCreateCommand', function (): void {
     });
 
     it('handles null result from api', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('createPlaylist')
                 ->once()
                 ->andReturn(null);
@@ -99,7 +112,7 @@ describe('PlaylistCreateCommand', function (): void {
     });
 
     it('requires configuration', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
         });
 

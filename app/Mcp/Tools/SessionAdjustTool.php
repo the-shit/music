@@ -4,7 +4,8 @@ namespace App\Mcp\Tools;
 
 use App\Agents\AdaptAgent;
 use App\Mcp\Concerns\HandlesAuthErrors;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -27,9 +28,9 @@ class SessionAdjustTool extends Tool
         ];
     }
 
-    public function handle(Request $request, SpotifyService $spotify): Response
+    public function handle(Request $request, SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): Response
     {
-        return $this->withAuthHandling(function () use ($request, $spotify): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($request, $player, $discovery): \Laravel\Mcp\Response {
             $state = $this->loadSessionState();
 
             if (! $state) {
@@ -40,7 +41,7 @@ class SessionAdjustTool extends Tool
             $elapsed = (int) ((time() - $state['started_at']) / 60);
             $remaining = max(0, ($state['plan']['total_duration'] ?? 60) - $elapsed);
 
-            $playback = $spotify->getCurrentPlayback();
+            $playback = $player->getCurrentPlayback();
             $nowPlaying = $playback
                 ? "{$playback['track']} by {$playback['artist']}"
                 : 'Unknown';
@@ -82,10 +83,10 @@ class SessionAdjustTool extends Tool
                     $audioFeatures['target_tempo'] = $phase['tempo'];
                 }
 
-                $tracks = $spotify->getSmartRecommendations(5, null, $audioFeatures);
+                $tracks = $discovery->getSmartRecommendations(5, null, $audioFeatures);
                 foreach ($tracks as $track) {
                     try {
-                        $spotify->addToQueue($track['uri']);
+                        $player->addToQueue($track['uri']);
                         $queued++;
                     } catch (\Exception $e) {
                         continue;

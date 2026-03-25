@@ -4,7 +4,8 @@ namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Commands\Concerns\ResolvesDevice;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -24,7 +25,7 @@ class PlayCommand extends Command
 
     protected $description = 'Play a specific song/artist/playlist (use "resume" to continue paused playback)';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -41,7 +42,7 @@ class PlayCommand extends Command
             return self::FAILURE;
         }
 
-        $resolved = $this->resolveDevice($spotify, $deviceName);
+        $resolved = $this->resolveDevice($player, $deviceName);
         $deviceId = $resolved['id'] ?? null;
 
         if ($deviceName && ! $deviceId) {
@@ -55,12 +56,12 @@ class PlayCommand extends Command
         }
 
         try {
-            $result = $spotify->search($query);
+            $result = $discovery->search($query);
 
             if ($result) {
                 if ($this->option('queue')) {
                     // Add to queue instead of playing
-                    $spotify->addToQueue($result['uri']);
+                    $player->addToQueue($result['uri']);
 
                     if ($this->option('json')) {
                         $this->line(json_encode([
@@ -100,7 +101,7 @@ class PlayCommand extends Command
                     }
                 } else {
                     // Play immediately
-                    $spotify->play($result['uri'], $deviceId);
+                    $player->play($result['uri'], $deviceId);
 
                     if ($this->option('json')) {
                         $this->line(json_encode([

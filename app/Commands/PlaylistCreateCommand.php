@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -22,7 +22,7 @@ class PlaylistCreateCommand extends Command
 
     protected $description = 'Create a new Spotify playlist';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyDiscoveryService $discovery): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -33,7 +33,7 @@ class PlaylistCreateCommand extends Command
         $public = (bool) $this->option('public');
 
         try {
-            $result = $spotify->createPlaylist($name, $description, $public);
+            $result = $discovery->createPlaylist($name, $description, $public);
         } catch (\Exception $e) {
             if ($this->option('json')) {
                 $this->line(json_encode(['error' => true, 'message' => $e->getMessage()]));

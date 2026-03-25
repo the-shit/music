@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -18,7 +18,7 @@ class SeekCommand extends Command
 
     protected $description = 'Seek to a position in the current track';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -26,9 +26,9 @@ class SeekCommand extends Command
 
         try {
             $input = $this->argument('position');
-            $positionMs = $this->parsePosition($spotify, $input);
+            $positionMs = $this->parsePosition($player, $input);
 
-            $spotify->seek($positionMs);
+            $player->seek($positionMs);
 
             $seconds = intdiv($positionMs, 1000);
             $formatted = sprintf('%d:%02d', intdiv($seconds, 60), $seconds % 60);
@@ -42,11 +42,11 @@ class SeekCommand extends Command
         }
     }
 
-    private function parsePosition(SpotifyService $spotify, string $input): int
+    private function parsePosition(SpotifyPlayerService $player, string $input): int
     {
         // Relative seek: +10 or -5 (seconds)
         if (preg_match('/^([+-])(\d+)$/', $input, $m)) {
-            $current = $spotify->getCurrentPlayback();
+            $current = $player->getCurrentPlayback();
             $currentMs = $current['progress_ms'] ?? 0;
             $deltaMs = (int) $m[2] * 1000;
 

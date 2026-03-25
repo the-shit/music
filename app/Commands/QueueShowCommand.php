@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -18,14 +18,14 @@ class QueueShowCommand extends Command
 
     protected $description = 'Show upcoming tracks in the queue';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
         }
 
         try {
-            $queueData = $spotify->getQueue();
+            $queueData = $player->getQueue();
             $current = $queueData['currently_playing'] ?? null;
             $queue = $queueData['queue'] ?? [];
 

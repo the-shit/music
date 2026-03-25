@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -20,7 +20,7 @@ class RecentCommand extends Command
 
     protected $description = 'Show recently played tracks';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyDiscoveryService $discovery): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -29,7 +29,7 @@ class RecentCommand extends Command
         $limit = (int) $this->option('limit');
 
         try {
-            $tracks = $spotify->getRecentlyPlayed($limit);
+            $tracks = $discovery->getRecentlyPlayed($limit);
 
             if ($this->option('json')) {
                 $this->line(json_encode($tracks));

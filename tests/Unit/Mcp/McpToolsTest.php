@@ -13,7 +13,8 @@ use App\Mcp\Tools\SearchTool;
 use App\Mcp\Tools\ShuffleTool;
 use App\Mcp\Tools\SkipTool;
 use App\Mcp\Tools\VolumeTool;
-use App\Services\SpotifyService;
+use App\Services\SpotifyDiscoveryService;
+use App\Services\SpotifyPlayerService;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -25,7 +26,7 @@ uses(TestCase::class);
 describe('HandlesAuthErrors', function (): void {
 
     it('returns clean error response when auth expires during pause', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('pause')->once()->andThrow(
                 new \Exception('Not authenticated. Run "spotify login" first.')
             );
@@ -37,7 +38,7 @@ describe('HandlesAuthErrors', function (): void {
     });
 
     it('returns clean error response when session expires during play', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('search')->once()->andThrow(
                 new \Exception('Session expired. Run "spotify login" to re-authenticate.')
             );
@@ -49,7 +50,7 @@ describe('HandlesAuthErrors', function (): void {
     });
 
     it('re-throws non-auth exceptions', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('pause')->once()->andThrow(
                 new \Exception('No Spotify devices available. Open Spotify on any device.')
             );
@@ -68,7 +69,7 @@ describe('HandlesAuthErrors', function (): void {
 describe('PauseTool', function (): void {
 
     it('returns success text when pause succeeds', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('pause')->once();
         });
 
@@ -78,14 +79,14 @@ describe('PauseTool', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, fn ($mock) => $mock->shouldReceive('pause'));
+        $this->mock(SpotifyPlayerService::class, fn ($mock) => $mock->shouldReceive('pause'));
 
         SpotifyServer::tool(PauseTool::class)
             ->assertName('pause');
     });
 
     it('has a description', function (): void {
-        $this->mock(SpotifyService::class, fn ($mock) => $mock->shouldReceive('pause'));
+        $this->mock(SpotifyPlayerService::class, fn ($mock) => $mock->shouldReceive('pause'));
 
         SpotifyServer::tool(PauseTool::class)
             ->assertDescription('Pause Spotify playback');
@@ -100,7 +101,7 @@ describe('PauseTool', function (): void {
 describe('ResumeTool', function (): void {
 
     it('returns success text when resume succeeds', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('resume')->once();
         });
 
@@ -110,14 +111,14 @@ describe('ResumeTool', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, fn ($mock) => $mock->shouldReceive('resume'));
+        $this->mock(SpotifyPlayerService::class, fn ($mock) => $mock->shouldReceive('resume'));
 
         SpotifyServer::tool(ResumeTool::class)
             ->assertName('resume');
     });
 
     it('has a description', function (): void {
-        $this->mock(SpotifyService::class, fn ($mock) => $mock->shouldReceive('resume'));
+        $this->mock(SpotifyPlayerService::class, fn ($mock) => $mock->shouldReceive('resume'));
 
         SpotifyServer::tool(ResumeTool::class)
             ->assertDescription('Resume Spotify playback from where it was paused');
@@ -132,7 +133,7 @@ describe('ResumeTool', function (): void {
 describe('SkipTool', function (): void {
 
     it('skips to the next track by default', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('next')->once();
         });
 
@@ -142,7 +143,7 @@ describe('SkipTool', function (): void {
     });
 
     it('skips to the next track when direction is omitted', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('next')->once();
         });
 
@@ -152,7 +153,7 @@ describe('SkipTool', function (): void {
     });
 
     it('skips to the previous track', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('previous')->once();
         });
 
@@ -162,7 +163,7 @@ describe('SkipTool', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, fn ($mock) => $mock->shouldReceive('next'));
+        $this->mock(SpotifyPlayerService::class, fn ($mock) => $mock->shouldReceive('next'));
 
         SpotifyServer::tool(SkipTool::class)
             ->assertName('skip');
@@ -177,7 +178,7 @@ describe('SkipTool', function (): void {
 describe('PlayTool', function (): void {
 
     it('plays a track immediately when found', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('search')
                 ->once()
                 ->with('Bohemian Rhapsody')
@@ -186,6 +187,8 @@ describe('PlayTool', function (): void {
                     'name' => 'Bohemian Rhapsody',
                     'artist' => 'Queen',
                 ]);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('play')
                 ->once()
                 ->with('spotify:track:abc123');
@@ -197,7 +200,7 @@ describe('PlayTool', function (): void {
     });
 
     it('adds to queue when queue flag is true', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('search')
                 ->once()
                 ->with('Bohemian Rhapsody')
@@ -206,6 +209,8 @@ describe('PlayTool', function (): void {
                     'name' => 'Bohemian Rhapsody',
                     'artist' => 'Queen',
                 ]);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('addToQueue')
                 ->once()
                 ->with('spotify:track:abc123');
@@ -217,7 +222,7 @@ describe('PlayTool', function (): void {
     });
 
     it('returns an error response when no results found', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('search')
                 ->once()
                 ->with('xyzzy nonexistent')
@@ -230,7 +235,7 @@ describe('PlayTool', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('search')->andReturn(null);
         });
 
@@ -247,7 +252,7 @@ describe('PlayTool', function (): void {
 describe('CurrentTool', function (): void {
 
     it('returns nothing-playing when no playback active', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn(null);
         });
 
@@ -257,7 +262,7 @@ describe('CurrentTool', function (): void {
     });
 
     it('returns formatted playback info when playing', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'name' => 'Stairway to Heaven',
                 'artist' => 'Led Zeppelin',
@@ -282,7 +287,7 @@ describe('CurrentTool', function (): void {
     });
 
     it('formats time correctly as minutes and seconds', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'name' => 'Song',
                 'artist' => 'Artist',
@@ -302,7 +307,7 @@ describe('CurrentTool', function (): void {
     });
 
     it('shows paused state when not playing', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'name' => 'Song',
                 'artist' => 'Artist',
@@ -323,7 +328,7 @@ describe('CurrentTool', function (): void {
     });
 
     it('shows unknown device when device name is missing', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'name' => 'Song',
                 'artist' => 'Artist',
@@ -343,7 +348,7 @@ describe('CurrentTool', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->andReturn(null);
         });
 
@@ -360,7 +365,7 @@ describe('CurrentTool', function (): void {
 describe('VolumeTool', function (): void {
 
     it('returns current volume when level is omitted', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'device' => ['volume_percent' => 72],
             ]);
@@ -372,7 +377,7 @@ describe('VolumeTool', function (): void {
     });
 
     it('reports could not determine volume when device has no volume_percent', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             // Returns playback with device but no volume_percent key
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
                 'device' => [],
@@ -385,7 +390,7 @@ describe('VolumeTool', function (): void {
     });
 
     it('sets volume to the given level', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setVolume')->once()->with(50);
         });
 
@@ -395,7 +400,7 @@ describe('VolumeTool', function (): void {
     });
 
     it('clamps volume to 0 minimum', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setVolume')->once()->with(0);
         });
 
@@ -405,7 +410,7 @@ describe('VolumeTool', function (): void {
     });
 
     it('clamps volume to 100 maximum', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setVolume')->once()->with(100);
         });
 
@@ -415,7 +420,7 @@ describe('VolumeTool', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')->andReturn(null);
         });
 
@@ -432,7 +437,7 @@ describe('VolumeTool', function (): void {
 describe('QueueAddTool', function (): void {
 
     it('adds a found track to the queue', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('search')
                 ->once()
                 ->with('Hotel California')
@@ -441,6 +446,8 @@ describe('QueueAddTool', function (): void {
                     'name' => 'Hotel California',
                     'artist' => 'Eagles',
                 ]);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('addToQueue')
                 ->once()
                 ->with('spotify:track:hotel');
@@ -452,7 +459,7 @@ describe('QueueAddTool', function (): void {
     });
 
     it('returns an error when no track is found', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('search')
                 ->once()
                 ->with('nothing here')
@@ -465,7 +472,7 @@ describe('QueueAddTool', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('search')->andReturn(null);
         });
 
@@ -482,7 +489,7 @@ describe('QueueAddTool', function (): void {
 describe('QueueShowTool', function (): void {
 
     it('shows empty queue message when queue is empty', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn(['queue' => []]);
         });
 
@@ -492,7 +499,7 @@ describe('QueueShowTool', function (): void {
     });
 
     it('shows empty queue message when getQueue returns empty array', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([]);
         });
 
@@ -502,7 +509,7 @@ describe('QueueShowTool', function (): void {
     });
 
     it('lists upcoming tracks with numbering', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
                 'queue' => [
@@ -520,7 +527,7 @@ describe('QueueShowTool', function (): void {
     });
 
     it('shows currently playing track when present', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => [
                     'name' => 'Now Song',
@@ -540,7 +547,7 @@ describe('QueueShowTool', function (): void {
     });
 
     it('handles tracks with missing artist gracefully', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
                 'queue' => [
@@ -560,7 +567,7 @@ describe('QueueShowTool', function (): void {
             $tracks[] = ['name' => "Track {$i}", 'artists' => [['name' => "Artist {$i}"]]];
         }
 
-        $this->mock(SpotifyService::class, function ($mock) use ($tracks): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock) use ($tracks): void {
             $mock->shouldReceive('getQueue')->once()->andReturn([
                 'currently_playing' => null,
                 'queue' => $tracks,
@@ -574,7 +581,7 @@ describe('QueueShowTool', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getQueue')->andReturn(['queue' => []]);
         });
 
@@ -591,7 +598,7 @@ describe('QueueShowTool', function (): void {
 describe('SearchTool', function (): void {
 
     it('returns formatted search results for tracks', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('searchMultiple')
                 ->once()
                 ->with('Beatles', 'track', 5)
@@ -609,7 +616,7 @@ describe('SearchTool', function (): void {
     });
 
     it('returns empty message when no results found', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('searchMultiple')
                 ->once()
                 ->with('xyzzy', 'track', 5)
@@ -622,7 +629,7 @@ describe('SearchTool', function (): void {
     });
 
     it('supports searching by type', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('searchMultiple')
                 ->once()
                 ->with('Led Zeppelin', 'artist', 5)
@@ -638,7 +645,7 @@ describe('SearchTool', function (): void {
     });
 
     it('respects custom limit clamped at 20', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('searchMultiple')
                 ->once()
                 ->with('test', 'track', 20)
@@ -650,7 +657,7 @@ describe('SearchTool', function (): void {
     });
 
     it('enforces minimum limit of 1', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('searchMultiple')
                 ->once()
                 ->with('test', 'track', 1)
@@ -662,7 +669,7 @@ describe('SearchTool', function (): void {
     });
 
     it('uses default limit of 5 when not specified', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('searchMultiple')
                 ->once()
                 ->with('test', 'track', 5)
@@ -674,7 +681,7 @@ describe('SearchTool', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('searchMultiple')->andReturn([]);
         });
 
@@ -691,7 +698,7 @@ describe('SearchTool', function (): void {
 describe('DevicesTool', function (): void {
 
     it('returns no devices message when devices list is empty', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([]);
         });
 
@@ -701,7 +708,7 @@ describe('DevicesTool', function (): void {
     });
 
     it('lists available devices with type and volume', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 [
                     'name' => 'MacBook Pro',
@@ -726,7 +733,7 @@ describe('DevicesTool', function (): void {
     });
 
     it('marks only the active device with (active) suffix', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 [
                     'name' => 'Speaker',
@@ -743,7 +750,7 @@ describe('DevicesTool', function (): void {
     });
 
     it('shows ? when volume is not available', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->once()->andReturn([
                 [
                     'name' => 'Chromecast',
@@ -759,7 +766,7 @@ describe('DevicesTool', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getDevices')->andReturn([]);
         });
 
@@ -776,7 +783,7 @@ describe('DevicesTool', function (): void {
 describe('ShuffleTool', function (): void {
 
     it('enables shuffle when enabled is true', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setShuffle')->once()->with(true);
         });
 
@@ -786,7 +793,7 @@ describe('ShuffleTool', function (): void {
     });
 
     it('disables shuffle when enabled is false', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setShuffle')->once()->with(false);
         });
 
@@ -796,7 +803,7 @@ describe('ShuffleTool', function (): void {
     });
 
     it('toggles shuffle off when currently on and no argument passed', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')
                 ->once()
                 ->andReturn(['shuffle_state' => true]);
@@ -809,7 +816,7 @@ describe('ShuffleTool', function (): void {
     });
 
     it('toggles shuffle on when currently off and no argument passed', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('getCurrentPlayback')
                 ->once()
                 ->andReturn(['shuffle_state' => false]);
@@ -822,7 +829,7 @@ describe('ShuffleTool', function (): void {
     });
 
     it('handles playback with no shuffle_state key during toggle', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             // Returns playback without shuffle_state → defaults to false → toggles to true
             $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([]);
             $mock->shouldReceive('setShuffle')->once()->with(true);
@@ -834,7 +841,7 @@ describe('ShuffleTool', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setShuffle')->withAnyArgs();
         });
 
@@ -851,7 +858,7 @@ describe('ShuffleTool', function (): void {
 describe('RepeatTool', function (): void {
 
     it('sets repeat mode to off', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setRepeat')->once()->with('off');
         });
 
@@ -861,7 +868,7 @@ describe('RepeatTool', function (): void {
     });
 
     it('sets repeat mode to track', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setRepeat')->once()->with('track');
         });
 
@@ -871,7 +878,7 @@ describe('RepeatTool', function (): void {
     });
 
     it('sets repeat mode to context', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setRepeat')->once()->with('context');
         });
 
@@ -881,7 +888,7 @@ describe('RepeatTool', function (): void {
     });
 
     it('has the correct MCP name', function (): void {
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('setRepeat')->withAnyArgs();
         });
 

@@ -3,7 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -19,7 +19,7 @@ class SkipCommand extends Command
 
     protected $description = 'Skip to next or previous track';
 
-    public function handle(SpotifyService $spotify): int
+    public function handle(SpotifyPlayerService $player): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -29,21 +29,21 @@ class SkipCommand extends Command
 
         try {
             // Get current track before skipping
-            $before = $spotify->getCurrentPlayback();
+            $before = $player->getCurrentPlayback();
 
             if ($direction === 'prev' || $direction === 'previous') {
-                $spotify->previous();
+                $player->previous();
                 $skippedDirection = 'previous';
                 $emoji = '⏮️';
             } else {
-                $spotify->next();
+                $player->next();
                 $skippedDirection = 'next';
                 $emoji = '⏭️';
             }
 
             // Show what's playing now
             sleep(1); // Give Spotify a moment to update
-            $current = $spotify->getCurrentPlayback();
+            $current = $player->getCurrentPlayback();
 
             if ($this->option('json')) {
                 $this->line(json_encode([

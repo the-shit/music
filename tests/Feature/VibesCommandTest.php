@@ -1,6 +1,7 @@
 <?php
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyDiscoveryService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Process;
 
@@ -52,8 +53,10 @@ describe('VibesCommand', function (): void {
             'git log *' => Process::result(output: $gitLog, exitCode: 0),
         ]);
 
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('getTracks')
                 ->once()
                 ->with(['4iV5W9uYEdYUVa79Axb7Rh'])
@@ -98,8 +101,10 @@ describe('VibesCommand', function (): void {
             'git log *' => Process::result(output: $gitLog, exitCode: 0),
         ]);
 
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->andReturn(true);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('getTracks')
                 ->once()
                 ->andReturn([]);
@@ -129,8 +134,10 @@ describe('VibesCommand', function (): void {
             'git log *' => Process::result(output: $gitLog, exitCode: 0),
         ]);
 
-        $this->mock(SpotifyService::class, function ($mock): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->andReturn(false);
+        });
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldNotReceive('getTracks');
             $mock->shouldReceive('getTracksViaOEmbed')->andReturn([]);
         });

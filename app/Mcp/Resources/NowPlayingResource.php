@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Resources;
 
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\MimeType;
@@ -16,9 +16,9 @@ use Laravel\Mcp\Server\Resource;
 #[MimeType('application/json')]
 class NowPlayingResource extends Resource
 {
-    public function handle(SpotifyService $spotify): Response
+    public function handle(SpotifyPlayerService $player): Response
     {
-        $playback = $spotify->getCurrentPlayback();
+        $playback = $player->getCurrentPlayback();
 
         if (! $playback) {
             return Response::text(json_encode(['playing' => false]));

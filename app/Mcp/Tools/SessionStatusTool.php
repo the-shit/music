@@ -3,7 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\HandlesAuthErrors;
-use App\Services\SpotifyService;
+use App\Services\SpotifyPlayerService;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -16,9 +16,9 @@ class SessionStatusTool extends Tool
 {
     use HandlesAuthErrors;
 
-    public function handle(Request $request, SpotifyService $spotify): Response
+    public function handle(Request $request, SpotifyPlayerService $player): Response
     {
-        return $this->withAuthHandling(function () use ($spotify): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($player): \Laravel\Mcp\Response {
             $state = $this->loadSessionState();
 
             if (! $state) {
@@ -29,7 +29,7 @@ class SessionStatusTool extends Tool
             $totalDuration = $state['plan']['total_duration'] ?? 0;
             $remaining = max(0, $totalDuration - $elapsed);
 
-            $playback = $spotify->getCurrentPlayback();
+            $playback = $player->getCurrentPlayback();
             $nowPlaying = $playback
                 ? "{$playback['track']} by {$playback['artist']}"
                 : 'Nothing playing';
