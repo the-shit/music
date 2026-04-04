@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Helpers\ConfigHelper;
+use App\Services;
 use Illuminate\Support\Facades\Http;
 use LaravelZero\Framework\Commands\Command;
 
@@ -46,6 +47,9 @@ class EventEmitCommand extends Command
 
         // Forward to webhook if configured
         $this->forwardToWebhook($eventData);
+
+        // Sink to Qdrant if configured
+        app(Services\QdrantEventSink::class)->sink($eventData);
 
         info("✅ Event emitted: spotify.{$event}");
 
