@@ -643,25 +643,41 @@ XML;
     {
         info('Healing daemon...');
 
-        // 1. Clear audio cache (preserve credentials)
+        // 1. Clear audio cache (preserve auth directories and credentials)
         $cachePath = $this->configDir.'/cache';
         if (is_dir($cachePath)) {
-            $oauthPath = $cachePath.'/oauth';
-            $savedOauth = [];
-            if (is_dir($oauthPath)) {
-                foreach (glob($oauthPath.'/*') as $file) {
-                    $savedOauth[basename($file)] = file_get_contents($file);
+            $preserveDirs = ['oauth', 'zeroconf'];
+            $preserved = [];
+
+            // Back up auth directories and credentials.json
+            foreach ($preserveDirs as $dir) {
+                $dirPath = $cachePath.'/'.$dir;
+                if (is_dir($dirPath)) {
+                    $backupPath = sys_get_temp_dir().'/spotifyd-heal-'.$dir.'-'.getmypid();
+                    shell_exec('cp -a '.escapeshellarg($dirPath).' '.escapeshellarg($backupPath).' 2>/dev/null');
+                    $preserved[$dir] = $backupPath;
                 }
             }
 
+            $credentialsPath = $cachePath.'/credentials.json';
+            $savedCredentials = file_exists($credentialsPath) ? file_get_contents($credentialsPath) : null;
+
             $this->clearDirectory($cachePath);
 
-            if ($savedOauth) {
-                @mkdir($oauthPath, 0755, true);
-                foreach ($savedOauth as $name => $contents) {
-                    file_put_contents($oauthPath.'/'.$name, $contents);
-                }
-                note('Preserved oauth credentials');
+            // Restore auth directories
+            foreach ($preserved as $dir => $backupPath) {
+                $restorePath = $cachePath.'/'.$dir;
+                shell_exec('cp -a '.escapeshellarg($backupPath).' '.escapeshellarg($restorePath).' 2>/dev/null');
+                shell_exec('rm -rf '.escapeshellarg($backupPath).' 2>/dev/null');
+            }
+
+            if ($savedCredentials) {
+                file_put_contents($credentialsPath, $savedCredentials);
+            }
+
+            $authCount = count($preserved) + ($savedCredentials ? 1 : 0);
+            if ($authCount > 0) {
+                note("Preserved {$authCount} auth artifact(s)");
             }
 
             info('Cleared audio cache');
