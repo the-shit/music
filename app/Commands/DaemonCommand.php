@@ -338,7 +338,8 @@ class DaemonCommand extends Command
                   "device_name = \"{$deviceName}\"\n".
                   "bitrate = 320\n".
                   "volume_normalisation = true\n".
-                  "cache_path = \"{$this->configDir}/cache\"\n";
+                  "cache_path = \"{$this->configDir}/cache\"\n".
+                  "credentials_cache = \"{$this->configDir}/cache/oauth\"\n";
 
         $audioDevice = $this->option('audio-device');
         if ($audioDevice) {
@@ -645,14 +646,22 @@ XML;
         // 1. Clear audio cache (preserve credentials)
         $cachePath = $this->configDir.'/cache';
         if (is_dir($cachePath)) {
-            $credentialsPath = $cachePath.'/credentials.json';
-            $savedCredentials = file_exists($credentialsPath) ? file_get_contents($credentialsPath) : null;
+            $oauthPath = $cachePath.'/oauth';
+            $savedOauth = [];
+            if (is_dir($oauthPath)) {
+                foreach (glob($oauthPath.'/*') as $file) {
+                    $savedOauth[basename($file)] = file_get_contents($file);
+                }
+            }
 
             $this->clearDirectory($cachePath);
 
-            if ($savedCredentials) {
-                file_put_contents($credentialsPath, $savedCredentials);
-                note('Preserved credentials.json');
+            if ($savedOauth) {
+                @mkdir($oauthPath, 0755, true);
+                foreach ($savedOauth as $name => $contents) {
+                    file_put_contents($oauthPath.'/'.$name, $contents);
+                }
+                note('Preserved oauth credentials');
             }
 
             info('Cleared audio cache');
