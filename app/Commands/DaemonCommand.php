@@ -338,7 +338,8 @@ class DaemonCommand extends Command
                   "device_name = \"{$deviceName}\"\n".
                   "bitrate = 320\n".
                   "volume_normalisation = true\n".
-                  "cache_path = \"{$this->configDir}/cache\"\n";
+                  "cache_path = \"{$this->configDir}/cache\"\n".
+                  "credentials_cache = \"{$this->configDir}/cache/oauth\"\n";
 
         $audioDevice = $this->option('audio-device');
         if ($audioDevice) {
