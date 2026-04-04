@@ -58,4 +58,21 @@ return [
     */
 
     'config_dir' => env('SPOTIFY_CONFIG_DIR', $configDir),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Qdrant Event Sink
+    |--------------------------------------------------------------------------
+    |
+    | When configured, track events are embedded and stored in Qdrant
+    | for semantic search over listening history.
+    |
+    */
+
+    'qdrant' => [
+        'url' => env('QDRANT_URL'),
+        'api_key' => env('QDRANT_API_KEY'),
+        'collection' => env('QDRANT_COLLECTION', 'music_events'),
+        'embedding_server' => env('QDRANT_EMBEDDING_SERVER'),
+    ],
 ];
