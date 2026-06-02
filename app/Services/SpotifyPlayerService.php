@@ -359,6 +359,37 @@ class SpotifyPlayerService
     }
 
     /**
+     * Get an artist's genres.
+     *
+     * WHY: this is the mood signal for the premium player. Spotify's
+     * /audio-features endpoint (the old mood source) now 403s for most apps, but
+     * GET /artists/{id} is NOT deprecated and returns a `genres` array we can map
+     * to a mood via App\Player\GenreMoodMap. The artist id comes from
+     * getCurrentPlayback()['artist_id'] (the now-playing track's primary artist).
+     *
+     * Read-only and best-effort: like getQueue()/getCurrentPlayback() it never
+     * throws on a missing token or failed request — it returns an empty array so
+     * the player degrades to the 'neutral' mood instead of crashing the loop.
+     *
+     * @return array<int, string>
+     */
+    public function getArtistGenres(string $artistId): array
+    {
+        if ($artistId === '' || ! $this->auth->getAccessToken()) {
+            return [];
+        }
+
+        $response = Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'artists/'.$artistId);
+
+        if ($response->successful()) {
+            return $response->json('genres') ?? [];
+        }
+
+        return [];
+    }
+
+    /**
      * Play a playlist
      */
     public function playPlaylist(string $playlistId, ?string $deviceId = null): bool
