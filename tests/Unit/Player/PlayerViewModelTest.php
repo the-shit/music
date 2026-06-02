@@ -56,6 +56,21 @@ describe('PlayerViewModel::fromPlayback mapping', function (): void {
         expect($vm->deviceName)->toBe('Living Room');
     });
 
+    it('maps the album art url and defaults the mood to neutral', function (): void {
+        $vm = PlayerViewModel::fromPlayback(playbackPayload());
+
+        // Art url comes straight from the payload; mood is NOT in the payload (it
+        // needs a separate genres call) so the pure mapping leaves it 'neutral'.
+        expect($vm->albumArtUrl)->toBe('https://example.test/art.jpg');
+        expect($vm->mood)->toBe('neutral');
+    });
+
+    it('leaves album art url null when the payload has none', function (): void {
+        $vm = PlayerViewModel::fromPlayback(playbackPayload(['album_art_url' => null]));
+
+        expect($vm->albumArtUrl)->toBeNull();
+    });
+
     it('reads volume and device name from the nested device object', function (): void {
         $vm = PlayerViewModel::fromPlayback(playbackPayload([
             'device' => ['name' => 'Phone', 'volume_percent' => 10],

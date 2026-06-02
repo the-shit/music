@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
+use App\Player\GenreMoodMap;
 use App\Player\PlayerRenderer;
 use App\Player\PlayerTheme;
 use App\Player\PlayerViewModel;
@@ -43,11 +44,13 @@ class PremiumPlayerCommand extends Command
     protected $description = '💎 Premium Spotify player (php-tui preview)';
 
     /**
-     * Rows reserved for the inline viewport. Sized to the renderer's content
-     * (2 borders + 5 info rows + 1 breathing spacer + 1 controls) so there's no
-     * dead vertical space below the panel.
+     * Rows reserved for the inline viewport. Tall enough for the two-column body:
+     * inner height = VIEWPORT_HEIGHT - 2 borders = 10, which the renderer uses as
+     * the SQUARE album-art height (art is ART_COLS=20 wide → 20×20px half-block).
+     * The info column's flexible spacer absorbs the extra rows. Keep in lockstep
+     * with PlayerRenderer::ART_COLS (= 2 × inner height) so the art stays square.
      */
-    private const VIEWPORT_HEIGHT = 9;
+    private const VIEWPORT_HEIGHT = 12;
 
     /** Throttle: how often we hit the Spotify API for fresh playback state. */
     private const REFRESH_SECONDS = 1.0;
@@ -64,7 +67,7 @@ class PremiumPlayerCommand extends Command
 
     private const NONE = 'none';
 
-    public function handle(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): int
+    public function handle(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery, GenreMoodMap $genreMoodMap): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -79,14 +82,14 @@ class PremiumPlayerCommand extends Command
             return self::FAILURE;
         }
 
-        return $this->runLoop($player, $discovery);
+        return $this->runLoop($player, $discovery, $genreMoodMap);
     }
 
     /**
      * The interactive render/input loop. Everything terminal-mutating is wrapped
      * so the terminal is ALWAYS restored, even on error or Ctrl+C.
      */
-    private function runLoop(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): int
+    private function runLoop(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery, GenreMoodMap $genreMoodMap): int
     {
         // HARD GUARD: php-tui's Terminal enables raw mode + a non-blocking stdin
         // event reader. Constructing it without a real interactive TTY (tests,
@@ -98,9 +101,14 @@ class PremiumPlayerCommand extends Command
             return self::SUCCESS;
         }
 
-        // Mood source is still an open question (audio-features is deprecated for
-        // many apps); the theme degrades gracefully on 'neutral' until it's wired.
-        $renderer = new PlayerRenderer(PlayerTheme::forMood('neutral'));
+        // Mood is resolved from the artist's genres (audio-features is deprecated),
+        // and ONLY on track change — never per frame. The renderer is rebuilt with
+        // the mood theme when (and only when) the resolved mood actually changes, so
+        // the whole surface (border/title/gauges) tints to the music.
+        $mood = 'neutral';
+        $renderer = new PlayerRenderer(PlayerTheme::forMood($mood));
+        $lastTrackKey = null;
+        $moodByArtist = []; // cache: artist_id → mood, so revisited tracks are free
 
         $terminal = Terminal::new();
 
@@ -121,8 +129,28 @@ class PremiumPlayerCommand extends Command
             while ($running) {
                 $now = microtime(true);
                 if ($vm === null || ($now - $lastFetch) >= self::REFRESH_SECONDS) {
-                    $vm = PlayerViewModel::fromPlayback($this->safePlayback($player));
+                    // Keep the raw payload: the VM is pure and doesn't carry the
+                    // artist_id we need to resolve mood.
+                    $payload = $this->safePlayback($player);
+                    $vm = PlayerViewModel::fromPlayback($payload);
                     $lastFetch = $now;
+
+                    // Resolve mood ONLY when the track changes (cheap key compare),
+                    // then rebuild the themed renderer only if the mood moved. The
+                    // no-playback path skips this entirely and keeps the last theme.
+                    if ($vm->hasPlayback) {
+                        $trackKey = $payload['uri'] ?? $payload['name'] ?? null;
+                        if ($trackKey !== $lastTrackKey) {
+                            $lastTrackKey = $trackKey;
+                            $resolved = $this->resolveMood($player, $genreMoodMap, $payload['artist_id'] ?? null, $moodByArtist);
+                            if ($resolved !== $mood) {
+                                $mood = $resolved;
+                                $renderer = new PlayerRenderer(PlayerTheme::forMood($mood));
+                            }
+                        }
+                        // Surface the mood on the VM too (title badge / consistency).
+                        $vm->mood = $mood;
+                    }
                 }
 
                 $display->draw($vm->hasPlayback ? $renderer->nowPlaying($vm) : $renderer->empty());
@@ -175,6 +203,36 @@ class PremiumPlayerCommand extends Command
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * Resolve the listening mood from the current artist's genres, cached per
+     * artist so the genres API is hit at most once per artist for the session.
+     *
+     * WHY guarded + cached: this is the only extra API call the player makes, and
+     * it must be cheap and crash-proof. Callers invoke it only on track change; a
+     * null/blank artist id or any API failure degrades to 'neutral' (the value the
+     * theme already renders gracefully), never an exception into the draw loop.
+     *
+     * @param  array<string, string>  $cache  artist_id → mood (mutated in place)
+     */
+    private function resolveMood(SpotifyPlayerService $player, GenreMoodMap $genreMoodMap, ?string $artistId, array &$cache): string
+    {
+        if ($artistId === null || $artistId === '') {
+            return 'neutral';
+        }
+
+        if (array_key_exists($artistId, $cache)) {
+            return $cache[$artistId];
+        }
+
+        try {
+            $mood = $genreMoodMap->resolveMood($player->getArtistGenres($artistId));
+        } catch (Throwable) {
+            $mood = 'neutral';
+        }
+
+        return $cache[$artistId] = $mood;
     }
 
     /**

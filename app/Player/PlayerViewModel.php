@@ -31,6 +31,15 @@ final class PlayerViewModel
         public ?string $deviceName,
         // False when nothing is playing / no active session — drives the empty state.
         public bool $hasPlayback,
+        // Listening mood (chill/hype/…), default 'neutral'. NOT derivable from the
+        // playback payload — resolving it needs a separate genres API call, so the
+        // loop sets it on track change (see PremiumPlayerCommand). Mutable + trailing
+        // with a safe default so the pure fromPlayback() mapping stays I/O-free and
+        // existing positional constructions keep working.
+        public string $mood = 'neutral',
+        // Album-art image URL for the art panel; null when the track has no art (or
+        // no playback) → the AlbumArtRenderer shows its calm placeholder.
+        public ?string $albumArtUrl = null,
     ) {}
 
     /**
@@ -82,6 +91,9 @@ final class PlayerViewModel
             repeat: (string) ($current['repeat_state'] ?? 'off'),
             deviceName: $deviceName,
             hasPlayback: true,
+            // mood stays at its 'neutral' default here; the loop overwrites it once
+            // it has resolved the artist's genres (kept out of this pure mapping).
+            albumArtUrl: isset($current['album_art_url']) ? (string) $current['album_art_url'] : null,
         );
     }
 

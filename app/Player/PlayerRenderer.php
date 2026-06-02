@@ -42,11 +42,29 @@ final class PlayerRenderer
     /**
      * Soft cap for free-text lines (track/artist/album). NOT layout math — it
      * only stops a 300-char title from swamping the surface before php-tui's
-     * own clipping kicks in. Generous so normal titles are never touched.
+     * own clipping kicks in. Sized to sit INSIDE the (art-narrowed) info column at
+     * a standard terminal width so the truncation ellipsis is visible rather than
+     * clipped off; still generous enough that normal titles are never touched.
      */
-    private const TEXT_WIDTH = 60;
+    private const TEXT_WIDTH = 48;
 
-    public function __construct(private readonly PlayerTheme $theme) {}
+    /**
+     * Width (cells) of the LEFT album-art column. Album art is a modest accent,
+     * not the centerpiece, so it takes a fixed slice and the info panel keeps the
+     * rest. MUST stay = 2 × (inline viewport inner height) so the half-block grid
+     * (pixel size = cols × rows*2) renders SQUARE art — see PremiumPlayerCommand's
+     * VIEWPORT_HEIGHT (12 → inner 10 → 20×20px). Tune the two together.
+     */
+    private const ART_COLS = 20;
+
+    private readonly AlbumArtRenderer $art;
+
+    public function __construct(private readonly PlayerTheme $theme, ?AlbumArtRenderer $art = null)
+    {
+        // Defaulted so existing call sites (and tests) construct with just a theme;
+        // the art renderer is dependency-free and degrades to a placeholder on its own.
+        $this->art = $art ?? new AlbumArtRenderer;
+    }
 
     /**
      * The full now-playing panel: a mood-framed Block containing track metadata,
@@ -69,7 +87,7 @@ final class PlayerRenderer
             $theme->icon('album').' '.$this->truncateDisplay($vm->album, self::TEXT_WIDTH)
         )->style($theme->dim());
 
-        $body = GridWidget::default()
+        $info = GridWidget::default()
             ->direction(Direction::Vertical)
             ->constraints(
                 Constraint::length(1),  // track title
@@ -77,8 +95,7 @@ final class PlayerRenderer
                 Constraint::length(1),  // album
                 Constraint::length(1),  // progress
                 Constraint::length(1),  // volume
-                Constraint::min(1),     // flexible spacer → breathing room above controls
-                Constraint::length(1),  // controls hint, pinned to the bottom
+                Constraint::min(1),     // flexible spacer → fills the rest of the column
             )
             ->widgets(
                 $track,
@@ -87,6 +104,36 @@ final class PlayerRenderer
                 $this->progressRow($vm),
                 $this->volumeRow($vm),
                 ParagraphWidget::fromString(''),
+            );
+
+        // Top region: a modest album-art accent on the LEFT, the now-playing info on
+        // the RIGHT. The art renderer rescales to whatever area the layout grants it,
+        // so the fixed ART_COLS slice is all the sizing it needs; a missing/failed
+        // art URL self-degrades to a calm placeholder, so this column is always safe.
+        $columns = GridWidget::default()
+            ->direction(Direction::Horizontal)
+            ->constraints(
+                Constraint::length(self::ART_COLS), // album art
+                Constraint::length(2),              // gutter between art and info
+                Constraint::min(1),                 // info takes the rest
+            )
+            ->widgets(
+                $this->art->render($vm->albumArtUrl ?? '', self::ART_COLS, (int) (self::ART_COLS / 2)),
+                ParagraphWidget::fromString(''),
+                $info,
+            );
+
+        // The controls hint spans the FULL panel width beneath both columns — the
+        // strip is long (every key + live shuffle/repeat state) and would clip in a
+        // narrow column. Full width keeps it a legible single line.
+        $body = GridWidget::default()
+            ->direction(Direction::Vertical)
+            ->constraints(
+                Constraint::min(1),     // art + info region
+                Constraint::length(1),  // controls hint, pinned full-width to the bottom
+            )
+            ->widgets(
+                $columns,
                 ParagraphWidget::fromString($this->controlsHint($vm))->style($theme->dim()),
             );
 
@@ -153,17 +200,27 @@ final class PlayerRenderer
      * "1:51 / 4:53" into garbage like "4 53". Keeping the time outside the bar
      * makes it always legible; the gauge passes an empty label so it draws a pure
      * fill. Ratio comes straight from the (tested) view model so bar and clock agree.
+     *
+     * WHY no leading ▶️/⏸️ glyph here: those are emoji + a variation selector, an
+     * AMBIGUOUS-width sequence. On the once-per-second progress line the terminal's
+     * width accounting drifts, so php-tui's cell diff fails to overwrite the old
+     * elapsed time and stale digits accumulate ("0:00" → "0:009/2:53"). Dropping the
+     * VS-16 emoji from this fast-updating line keeps every cell fixed-width, so the
+     * diff repaints cleanly. Play/pause state still reads from the gauge motion and
+     * the controls strip. A plain ASCII "▸"/"⏸"-free marker keeps a state cue with
+     * stable width.
      */
     private function progressRow(PlayerViewModel $vm): Widget
     {
-        $stateIcon = $vm->isPlaying ? $this->theme->icon('play') : $this->theme->icon('pause');
+        // ASCII-only, width-stable state cue (no variation selectors): see WHY above.
+        $stateCue = $vm->isPlaying ? '>' : '=';
 
         return GridWidget::default()
             ->direction(Direction::Horizontal)
-            // 16 cols fit "⏸ 188:88 / 188:88"-class labels without clipping; gauge takes the rest.
+            // 16 cols fit "> 188:88 / 188:88"-class labels without clipping; gauge takes the rest.
             ->constraints(Constraint::length(16), Constraint::length(1), Constraint::min(1))
             ->widgets(
-                ParagraphWidget::fromString($stateIcon.' '.$vm->progressLabel())->style($this->theme->accent()),
+                ParagraphWidget::fromString($stateCue.' '.$vm->progressLabel())->style($this->theme->accent()),
                 ParagraphWidget::fromString(''), // gutter between label and bar
                 GaugeWidget::default()
                     ->ratio($vm->progressFraction())
