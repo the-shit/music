@@ -782,7 +782,7 @@ XML;
             return null;
         }
 
-        $bytes = trim((string) shell_exec("du -sk ".escapeshellarg($path)." 2>/dev/null | cut -f1"));
+        $bytes = trim((string) shell_exec('du -sk '.escapeshellarg($path).' 2>/dev/null | cut -f1'));
 
         if ($bytes === '' || $bytes === '0') {
             return 0.0;
