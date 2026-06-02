@@ -88,6 +88,16 @@ class PremiumPlayerCommand extends Command
      */
     private function runLoop(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): int
     {
+        // HARD GUARD: php-tui's Terminal enables raw mode + a non-blocking stdin
+        // event reader. Constructing it without a real interactive TTY (tests,
+        // pipes, CI) can leave the shared terminal corrupted and take down the
+        // rest of a test suite (SIGHUP / exit 129). The handle() guards already
+        // cover this; this is belt-and-braces so NO path builds the Terminal in a
+        // non-TTY context.
+        if ($this->app->runningUnitTests() || ! defined('STDIN') || ! @stream_isatty(STDIN)) {
+            return self::SUCCESS;
+        }
+
         // Mood source is still an open question (audio-features is deprecated for
         // many apps); the theme degrades gracefully on 'neutral' until it's wired.
         $renderer = new PlayerRenderer(PlayerTheme::forMood('neutral'));
