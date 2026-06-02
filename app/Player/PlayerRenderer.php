@@ -56,8 +56,10 @@ final class PlayerRenderer
     {
         $theme = $this->theme;
 
+        // The track title is the hero line: bold AND mood-accent coloured so it
+        // clearly outranks the white artist and dim album beneath it.
         $track = ParagraphWidget::fromString($this->truncateDisplay($vm->title, self::TEXT_WIDTH))
-            ->style($theme->text()->addModifier(Modifier::BOLD));
+            ->style($theme->accent()->addModifier(Modifier::BOLD));
 
         $artist = ParagraphWidget::fromString(
             $theme->icon('artist').' '.$this->truncateDisplay($vm->artist, self::TEXT_WIDTH)
@@ -91,9 +93,32 @@ final class PlayerRenderer
         return BlockWidget::default()
             ->borders(Borders::ALL)
             ->borderStyle($theme->borderStyle())
-            ->titles(Title::fromString(' '.$theme->icon('music').' NOW PLAYING · '.$theme->moodBadge().' '))
+            ->titles(Title::fromString($this->nowPlayingTitle()))
             ->titleStyle($theme->heading())
             ->widget($body);
+    }
+
+    /**
+     * Build the now-playing title, mood-aware and never redundant.
+     *
+     * WHY: the neutral mood's badge IS the music note, so the old unconditional
+     * "{music} NOW PLAYING · {badge}" rendered "🎵 NOW PLAYING · 🎵". For neutral
+     * we drop the trailing badge entirely; for a real mood we lead with the mood
+     * icon and trail with its name → "😌 NOW PLAYING · chill".
+     */
+    private function nowPlayingTitle(): string
+    {
+        $theme = $this->theme;
+
+        if ($theme->mood() === 'neutral') {
+            return ' '.$theme->icon('music').' NOW PLAYING ';
+        }
+
+        // moodBadge() is "<moodIcon> <mood>"; take just the icon for the lead and
+        // mood() for the trailing name (mood icons/names never contain a space).
+        $moodIcon = explode(' ', $theme->moodBadge(), 2)[0];
+
+        return ' '.$moodIcon.' NOW PLAYING · '.$theme->mood().' ';
     }
 
     /**

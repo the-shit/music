@@ -72,6 +72,28 @@ describe('PlayerRenderer', function (): void {
         expect($off)->toContain('off')->toContain('Off');
     });
 
+    it('does not duplicate the music icon in the neutral title', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('neutral'));
+
+        // The title lives on the top border row; neutral must read "🎵 NOW PLAYING"
+        // with exactly one music note (regression: it used to trail a second 🎵).
+        $topRow = explode("\n", renderPremiumPlayer($renderer->nowPlaying(sampleViewModel())))[0];
+
+        expect($topRow)->toContain('NOW PLAYING')
+            ->and(substr_count($topRow, '🎵'))->toBe(1)
+            ->and($topRow)->not->toContain('·'); // no trailing badge separator for neutral
+    });
+
+    it('shows the mood icon and name in a non-neutral title', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        $topRow = explode("\n", renderPremiumPlayer($renderer->nowPlaying(sampleViewModel())))[0];
+
+        expect($topRow)->toContain('😌')
+            ->and($topRow)->toContain('NOW PLAYING · chill')
+            ->and(substr_count($topRow, '🎵'))->toBe(0); // no stray music note
+    });
+
     it('renders a calm empty state', function (): void {
         $renderer = new PlayerRenderer(PlayerTheme::forMood('neutral'));
 
