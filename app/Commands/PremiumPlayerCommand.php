@@ -40,8 +40,12 @@ class PremiumPlayerCommand extends Command
 
     protected $description = '💎 Premium Spotify player (php-tui preview)';
 
-    /** Rows reserved for the inline viewport — the rendered panel height. */
-    private const VIEWPORT_HEIGHT = 16;
+    /**
+     * Rows reserved for the inline viewport. Sized to the renderer's content
+     * (2 borders + 5 info rows + 1 breathing spacer + 1 controls) so there's no
+     * dead vertical space below the panel.
+     */
+    private const VIEWPORT_HEIGHT = 9;
 
     /** Throttle: how often we hit the Spotify API for fresh playback state. */
     private const REFRESH_SECONDS = 1.0;

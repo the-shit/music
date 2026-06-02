@@ -73,9 +73,10 @@ final class PlayerRenderer
                 Constraint::length(1),  // track title
                 Constraint::length(1),  // artist
                 Constraint::length(1),  // album
-                Constraint::length(1),  // progress gauge
-                Constraint::length(1),  // volume gauge
-                Constraint::min(1),     // controls hint — absorbs any slack
+                Constraint::length(1),  // progress
+                Constraint::length(1),  // volume
+                Constraint::min(1),     // flexible spacer → breathing room above controls
+                Constraint::length(1),  // controls hint, pinned to the bottom
             )
             ->widgets(
                 $track,
@@ -83,6 +84,7 @@ final class PlayerRenderer
                 $album,
                 $this->progressRow($vm),
                 $this->volumeRow($vm),
+                ParagraphWidget::fromString(''),
                 ParagraphWidget::fromString($this->controlsHint($vm))->style($theme->dim()),
             );
 
@@ -118,8 +120,14 @@ final class PlayerRenderer
     }
 
     /**
-     * Progress row: a state glyph (playing/paused) beside a real Gauge whose
-     * fill ratio and "elapsed / total" label both come from the view model.
+     * Progress row: state glyph + "elapsed / total" rendered as TEXT on the left,
+     * then a clean full-width Gauge whose fill = progressFraction().
+     *
+     * WHY the label is text, not the gauge's own label: GaugeRenderer paints the
+     * label INSIDE the bar and the block fill bleeds through the gap, mangling
+     * "1:51 / 4:53" into garbage like "4 53". Keeping the time outside the bar
+     * makes it always legible; the gauge passes an empty label so it draws a pure
+     * fill. Ratio comes straight from the (tested) view model so bar and clock agree.
      */
     private function progressRow(PlayerViewModel $vm): Widget
     {
@@ -127,19 +135,22 @@ final class PlayerRenderer
 
         return GridWidget::default()
             ->direction(Direction::Horizontal)
-            ->constraints(Constraint::length(3), Constraint::min(1))
+            // 16 cols fit "⏸ 188:88 / 188:88"-class labels without clipping; gauge takes the rest.
+            ->constraints(Constraint::length(16), Constraint::length(1), Constraint::min(1))
             ->widgets(
-                ParagraphWidget::fromString($stateIcon)->style($this->theme->accent()),
+                ParagraphWidget::fromString($stateIcon.' '.$vm->progressLabel())->style($this->theme->accent()),
+                ParagraphWidget::fromString(''), // gutter between label and bar
                 GaugeWidget::default()
                     ->ratio($vm->progressFraction())
-                    ->label(Span::fromString($vm->progressLabel()))
+                    ->label(Span::fromString('')) // empty → clean fill, no buried text
                     ->style($this->theme->gaugeStyle()),
             );
     }
 
     /**
-     * Volume row: speaker glyph beside a Gauge; label reads the percent (or n/a
-     * when no device reports a volume).
+     * Volume row: speaker + percent as TEXT on the left, then a SHORT fixed-width
+     * gauge — so the meter reads "🔊 89%  ▓▓▓▓▓░░" cleanly instead of a percent
+     * buried in a full-width fill. Label is "n/a" when no device reports a volume.
      */
     private function volumeRow(PlayerViewModel $vm): Widget
     {
@@ -147,13 +158,14 @@ final class PlayerRenderer
 
         return GridWidget::default()
             ->direction(Direction::Horizontal)
-            ->constraints(Constraint::length(3), Constraint::min(1))
+            ->constraints(Constraint::length(8), Constraint::length(22), Constraint::min(1))
             ->widgets(
-                ParagraphWidget::fromString($this->theme->icon('volume'))->style($this->theme->accent()),
+                ParagraphWidget::fromString($this->theme->icon('volume').' '.$label)->style($this->theme->accent()),
                 GaugeWidget::default()
                     ->ratio($vm->volumeFraction())
-                    ->label(Span::fromString($label))
+                    ->label(Span::fromString(''))
                     ->style($this->theme->volumeStyle()),
+                ParagraphWidget::fromString(''), // keep the gauge short; absorb the remaining width
             );
     }
 
@@ -165,14 +177,15 @@ final class PlayerRenderer
     {
         $theme = $this->theme;
 
-        return implode('   ', [
-            'space '.$theme->icon('play').'/'.$theme->icon('pause'),
-            'n '.$theme->icon('next'),
-            'p '.$theme->icon('prev'),
+        // Middot separators give the strip breathing room and clear grouping.
+        return implode('   ·   ', [
+            $theme->icon('play').'/'.$theme->icon('pause').' space',
+            $theme->icon('next').' n',
+            $theme->icon('prev').' p',
             $theme->icon('shuffle').' '.($vm->shuffle ? 'on' : 'off'),
             $theme->icon('repeat').' '.$vm->repeatLabel(),
-            '/ '.$theme->icon('search'),
-            'q quit',
+            $theme->icon('search').' /',
+            'quit q',
         ]);
     }
 }
