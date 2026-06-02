@@ -8,6 +8,7 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Player\PlayerRenderer;
 use App\Player\PlayerTheme;
 use App\Player\PlayerViewModel;
+use App\Services\SpotifyDiscoveryService;
 use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
 use PhpTui\Term\Actions;
@@ -15,6 +16,7 @@ use PhpTui\Term\Event\CharKeyEvent;
 use PhpTui\Term\Event\CodedKeyEvent;
 use PhpTui\Term\KeyCode;
 use PhpTui\Term\Terminal;
+use PhpTui\Tui\Display\Display;
 use PhpTui\Tui\DisplayBuilder;
 use Throwable;
 
@@ -58,9 +60,11 @@ class PremiumPlayerCommand extends Command
 
     private const REFRESH = 'refresh';
 
+    private const SEARCH = 'search';
+
     private const NONE = 'none';
 
-    public function handle(SpotifyPlayerService $player): int
+    public function handle(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -75,14 +79,14 @@ class PremiumPlayerCommand extends Command
             return self::FAILURE;
         }
 
-        return $this->runLoop($player);
+        return $this->runLoop($player, $discovery);
     }
 
     /**
      * The interactive render/input loop. Everything terminal-mutating is wrapped
      * so the terminal is ALWAYS restored, even on error or Ctrl+C.
      */
-    private function runLoop(SpotifyPlayerService $player): int
+    private function runLoop(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): int
     {
         // Mood source is still an open question (audio-features is deprecated for
         // many apps); the theme degrades gracefully on 'neutral' until it's wired.
@@ -121,6 +125,15 @@ class PremiumPlayerCommand extends Command
                     if ($outcome === self::QUIT) {
                         $running = false;
                         break;
+                    }
+
+                    if ($outcome === self::SEARCH) {
+                        // Search must suspend the TUI to prompt the user; the loop
+                        // owns the terminal/display, so it is driven from here.
+                        $this->runSearch($terminal, $display, $player, $discovery);
+                        $lastFetch = 0.0;
+
+                        break; // input was drained during the prompt; restart the tick
                     }
 
                     if ($outcome === self::REFRESH) {
@@ -184,6 +197,7 @@ class PremiumPlayerCommand extends Command
         try {
             return match ($char) {
                 'q' => self::QUIT,
+                '/' => self::SEARCH, // handled by the loop (needs to suspend the TUI)
                 ' ' => $this->togglePlayback($player, $vm),
                 'n' => $this->then(fn () => $player->next()),
                 'p' => $this->then(fn () => $player->previous()),
@@ -203,6 +217,62 @@ class PremiumPlayerCommand extends Command
         $vm->isPlaying ? $player->pause() : $player->resume();
 
         return self::REFRESH;
+    }
+
+    /**
+     * `/` search. Suspends the TUI so the prompt renders in a normal terminal,
+     * searches tracks, plays the top match, then resumes the live loop.
+     *
+     * WHY the try/finally: raw mode + hidden cursor + non-blocking STDIN must
+     * ALWAYS be restored — if the search throws (no device, network) or the user
+     * aborts, the finally puts the terminal back and forces a clean full redraw,
+     * so the loop never returns to a half-broken screen. Empty query / no results
+     * degrade to a brief status.
+     */
+    private function runSearch(Terminal $terminal, Display $display, SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): void
+    {
+        // Suspend the TUI: restore cooked mode + a visible cursor, and CRUCIALLY put
+        // STDIN back into blocking mode — php-tui's event reader sets STDIN
+        // non-blocking for its poll loop, which would make any prompt read return
+        // empty instantly. A minimal fgets() readline is used instead of a prompt
+        // library so we don't fight its own terminal/raw-mode handling mid-loop.
+        $terminal->disableRawMode();
+        $terminal->execute(Actions::cursorShow());
+        stream_set_blocking(STDIN, true);
+
+        try {
+            $this->output->write(PHP_EOL.'  🔍 Search tracks: ');
+            $query = trim((string) fgets(STDIN));
+
+            if ($query === '') {
+                return; // nothing entered — drop straight back into the player
+            }
+
+            $results = $discovery->searchMultiple($query, 'track', 10);
+
+            if ($results === []) {
+                $this->output->writeln('  No results for "'.$query.'"');
+                usleep(700_000); // let the message be read before the TUI repaints
+
+                return;
+            }
+
+            // Play the top match (search → play in one step keeps the loop simple).
+            $track = $results[0];
+            $player->play($track['uri']);
+            $this->output->writeln('  ▶️  '.($track['name'] ?? 'Unknown').' — '.($track['artist'] ?? 'Unknown'));
+            usleep(500_000);
+        } catch (Throwable $e) {
+            // No active device, rate limit, network blip — surface briefly, never crash.
+            $this->output->writeln('  ⚠️  Search unavailable: '.$e->getMessage());
+            usleep(700_000);
+        } finally {
+            // Restore the loop's non-blocking STDIN, re-enter the TUI, force a repaint.
+            stream_set_blocking(STDIN, false);
+            $terminal->enableRawMode();
+            $terminal->execute(Actions::cursorHide());
+            $display->clear();
+        }
     }
 
     /**
