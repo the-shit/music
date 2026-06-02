@@ -47,6 +47,17 @@ processes:
     restart_when_changed:
     - app/Commands/PlayerCommand.php
     env: {}
+  💎 Premium Player:
+    command: php spotify player:premium
+    working_dir: null
+    auto_start: false
+    auto_restart: false
+    restart_when_changed:
+    - app/Commands/PremiumPlayerCommand.php
+    - app/Player/PlayerRenderer.php
+    - app/Player/PlayerTheme.php
+    - app/Player/PlayerViewModel.php
+    env: {}
   🟢 Daemon:
     command: sh -c 'php spotify daemon start; while true; do php spotify daemon health --heal --json; sleep 30; done'
     working_dir: null
