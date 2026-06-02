@@ -343,7 +343,7 @@ class SpotifyPlayerService
                     'track' => $data['item']['name'],
                     'artist' => $data['item']['artists'][0]['name'] ?? 'Unknown',
                     'artist_id' => $data['item']['artists'][0]['id'] ?? null,
-                    'album' => $data['item']['.album']['name'] ?? 'Unknown',
+                    'album' => $data['item']['album']['name'] ?? 'Unknown',
                     'album_art_url' => $albumImages[0]['url'] ?? null,
                     'progress_ms' => $data['progress_ms'] ?? 0,
                     'duration_ms' => $data['item']['duration_ms'] ?? 0,
