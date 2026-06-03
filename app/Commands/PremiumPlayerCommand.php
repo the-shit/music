@@ -17,8 +17,8 @@ use PhpTui\Term\Event\CharKeyEvent;
 use PhpTui\Term\Event\CodedKeyEvent;
 use PhpTui\Term\KeyCode;
 use PhpTui\Term\Terminal;
-use PhpTui\Tui\Display\Display;
 use PhpTui\Tui\DisplayBuilder;
+use PhpTui\Tui\Widget\Widget;
 use Throwable;
 
 use function Laravel\Prompts\error;
@@ -57,6 +57,16 @@ class PremiumPlayerCommand extends Command
 
     /** Input poll cadence (~12fps) so keys feel responsive without busy-spinning. */
     private const POLL_MICROSECONDS = 80_000;
+
+    /** How many tracks the search palette requests + shows. */
+    private const SEARCH_LIMIT = 8;
+
+    /**
+     * Debounce before re-querying as the user types. WHY: the palette re-searches
+     * as the query changes, but firing an API call on every keystroke is wasteful
+     * and laggy; we wait for typing to settle this long first.
+     */
+    private const SEARCH_DEBOUNCE = 0.3;
 
     // Outcomes of handling a key — keeps the loop readable.
     private const QUIT = 'quit';
@@ -125,9 +135,25 @@ class PremiumPlayerCommand extends Command
         $lastFetch = 0.0;
         $vm = null;
 
+        // In-loop search state (the Raycast-style palette). It is drawn into the SAME
+        // inline viewport as the player — no TUI suspend, no fgets — and mutated by
+        // handleSearchEvent as the user types/navigates.
+        $search = [
+            'active' => false,
+            'query' => '',
+            'results' => [],
+            'selected' => 0,
+            'status' => '',
+            'dirty' => false,       // query changed since the last query → re-search
+            'lastQueried' => 0.0,
+        ];
+
         try {
             while ($running) {
                 $now = microtime(true);
+
+                // Keep playback state fresh even while the palette is open, so closing
+                // search drops straight back into a current now-playing panel.
                 if ($vm === null || ($now - $lastFetch) >= self::REFRESH_SECONDS) {
                     // Keep the raw payload: the VM is pure and doesn't carry the
                     // artist_id we need to resolve mood.
@@ -153,25 +179,38 @@ class PremiumPlayerCommand extends Command
                     }
                 }
 
-                $display->draw($vm->hasPlayback ? $renderer->nowPlaying($vm) : $renderer->empty());
+                // Debounced search refresh: re-query only once typing has settled, so a
+                // fast typist doesn't fire one API call per keystroke. Guarded so a
+                // failure leaves the palette open with no results, never crashes.
+                if ($search['active'] && $search['dirty'] && ($now - $search['lastQueried']) >= self::SEARCH_DEBOUNCE) {
+                    $search['results'] = $search['query'] === '' ? [] : $this->safeSearch($discovery, $search['query']);
+                    $search['selected'] = 0;
+                    $search['dirty'] = false;
+                    $search['lastQueried'] = $now;
+                }
 
-                // Drain all buffered input each tick (next() is non-blocking).
+                $display->draw($this->frame($renderer, $vm, $search));
+
+                // Drain all buffered input each tick (next() is non-blocking). Search
+                // mode and player mode consume keys differently.
                 $events = $terminal->events();
                 while (($event = $events->next()) !== null) {
-                    $outcome = $this->handleEvent($event, $player, $vm);
+                    if ($search['active']) {
+                        $outcome = $this->handleSearchEvent($event, $player, $search);
+                    } else {
+                        $outcome = $this->handleEvent($event, $player, $vm);
+
+                        // `/` opens the palette in-place (no suspend).
+                        if ($outcome === self::SEARCH) {
+                            $search = ['active' => true, 'query' => '', 'results' => [], 'selected' => 0, 'status' => '', 'dirty' => false, 'lastQueried' => 0.0];
+
+                            continue;
+                        }
+                    }
 
                     if ($outcome === self::QUIT) {
                         $running = false;
                         break;
-                    }
-
-                    if ($outcome === self::SEARCH) {
-                        // Search must suspend the TUI to prompt the user; the loop
-                        // owns the terminal/display, so it is driven from here.
-                        $this->runSearch($terminal, $display, $player, $discovery);
-                        $lastFetch = 0.0;
-
-                        break; // input was drained during the prompt; restart the tick
                     }
 
                     if ($outcome === self::REFRESH) {
@@ -265,7 +304,7 @@ class PremiumPlayerCommand extends Command
         try {
             return match ($char) {
                 'q' => self::QUIT,
-                '/' => self::SEARCH, // handled by the loop (needs to suspend the TUI)
+                '/' => self::SEARCH, // opens the in-loop search palette (no suspend)
                 ' ' => $this->togglePlayback($player, $vm),
                 'n' => $this->then(fn () => $player->next()),
                 'p' => $this->then(fn () => $player->previous()),
@@ -288,67 +327,148 @@ class PremiumPlayerCommand extends Command
     }
 
     /**
-     * `/` search. Suspends the TUI so the prompt renders in a normal terminal,
-     * searches tracks, plays the top match, then resumes the live loop.
+     * Choose what to draw this tick: the search palette when it's open, otherwise
+     * the now-playing panel (or the empty state). Both are drawn into the same
+     * inline viewport, so the palette reads as a centered modal over the player.
      *
-     * WHY the try/finally: raw mode + hidden cursor + non-blocking STDIN must
-     * ALWAYS be restored — if the search throws (no device, network) or the user
-     * aborts, the finally puts the terminal back and forces a clean full redraw,
-     * so the loop never returns to a half-broken screen. Empty query / no results
-     * degrade to a brief status.
+     * @param  array<string, mixed>  $search
      */
-    private function runSearch(Terminal $terminal, Display $display, SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): void
+    private function frame(PlayerRenderer $renderer, ?PlayerViewModel $vm, array $search): Widget
     {
-        // Suspend the TUI: restore cooked mode + a visible cursor, and CRUCIALLY put
-        // STDIN back into blocking mode — php-tui's event reader sets STDIN
-        // non-blocking for its poll loop, which would make any prompt read return
-        // empty instantly. A minimal fgets() readline is used instead of a prompt
-        // library so we don't fight its own terminal/raw-mode handling mid-loop.
-        $terminal->disableRawMode();
-        $terminal->execute(Actions::cursorShow());
-        stream_set_blocking(STDIN, true);
+        if ($search['active']) {
+            return $renderer->searchOverlay($search['query'], $search['results'], $search['selected'], $search['status']);
+        }
+
+        return ($vm !== null && $vm->hasPlayback) ? $renderer->nowPlaying($vm) : $renderer->empty();
+    }
+
+    /**
+     * Handle a keypress while the search palette is open. Mutates $search in place
+     * (query/results/selection/status/active) and returns a loop outcome.
+     *
+     * WHY in-loop, not a suspend: this is the whole point of the palette — the TUI
+     * stays live, keys edit the query and move the selection, and play happens
+     * without ever leaving raw mode. Backspace/DEL arrive as either a coded key or
+     * a control char depending on the terminal, so both are handled.
+     *
+     * @param  array<string, mixed>  $search
+     */
+    private function handleSearchEvent(object $event, SpotifyPlayerService $player, array &$search): string
+    {
+        if ($event instanceof CodedKeyEvent) {
+            return match ($event->code) {
+                KeyCode::Esc => $this->closeSearch($search),
+                KeyCode::Enter => $this->playSelected($player, $search),
+                KeyCode::Up => $this->moveSelection($search, -1),
+                KeyCode::Down => $this->moveSelection($search, 1),
+                KeyCode::Backspace => $this->backspaceQuery($search),
+                default => self::NONE,
+            };
+        }
+
+        if (! $event instanceof CharKeyEvent) {
+            return self::NONE;
+        }
+
+        $char = $event->char;
+
+        // Ctrl+C always quits the whole player, even from the palette.
+        if ($char === "\x03") {
+            return self::QUIT;
+        }
+
+        // Some terminals deliver Backspace as DEL (0x7f) / BS (0x08) chars.
+        if ($char === "\x7f" || $char === "\x08") {
+            return $this->backspaceQuery($search);
+        }
+
+        // Append printable input only; ignore stray control characters.
+        if ($char !== '' && ord($char[0]) >= 32) {
+            $search['query'] .= $char;
+            $search['status'] = '';
+            $search['dirty'] = true;
+        }
+
+        return self::NONE;
+    }
+
+    /**
+     * @param  array<string, mixed>  $search
+     */
+    private function closeSearch(array &$search): string
+    {
+        $search['active'] = false;
+
+        return self::NONE;
+    }
+
+    /**
+     * Move the highlighted row, clamped to the available results.
+     *
+     * @param  array<string, mixed>  $search
+     */
+    private function moveSelection(array &$search, int $delta): string
+    {
+        $last = max(0, count($search['results']) - 1);
+        $search['selected'] = max(0, min($last, $search['selected'] + $delta));
+
+        return self::NONE;
+    }
+
+    /**
+     * Drop the last (multibyte-safe) character from the query and re-search.
+     *
+     * @param  array<string, mixed>  $search
+     */
+    private function backspaceQuery(array &$search): string
+    {
+        if ($search['query'] !== '') {
+            $search['query'] = mb_substr($search['query'], 0, max(0, mb_strlen($search['query']) - 1));
+            $search['status'] = '';
+            $search['dirty'] = true;
+        }
+
+        return self::NONE;
+    }
+
+    /**
+     * Play the highlighted result and close the palette. A no-device/API failure
+     * keeps the palette open with an inline status instead of crashing the loop.
+     *
+     * @param  array<string, mixed>  $search
+     */
+    private function playSelected(SpotifyPlayerService $player, array &$search): string
+    {
+        $track = $search['results'][$search['selected']] ?? null;
+
+        if ($track === null || empty($track['uri'])) {
+            return self::NONE; // empty query / no results — nothing to play
+        }
 
         try {
-            // Clear the screen FIRST so the prompt opens on a clean terminal instead
-            // of printing on top of the still-rendered player panel — that overlap is
-            // what made the search line look stranded mid-panel. The TUI fully repaints
-            // via $display->clear() in the finally + the forced refetch on the next tick.
-            // (Interim UX fix; the proper centered php-tui search palette is the follow-up.)
-            $this->output->write("\033[2J\033[H");
-            $this->output->writeln('');
-            $this->output->writeln('  🔍  SEARCH');
-            $this->output->writeln('  '.str_repeat('─', 40));
-            $this->output->write('  Track: ');
-            $query = trim((string) fgets(STDIN));
-
-            if ($query === '') {
-                return; // nothing entered — drop straight back into the player
-            }
-
-            $results = $discovery->searchMultiple($query, 'track', 10);
-
-            if ($results === []) {
-                $this->output->writeln('  No results for "'.$query.'"');
-                usleep(700_000); // let the message be read before the TUI repaints
-
-                return;
-            }
-
-            // Play the top match (search → play in one step keeps the loop simple).
-            $track = $results[0];
             $player->play($track['uri']);
-            $this->output->writeln('  ▶️  '.($track['name'] ?? 'Unknown').' — '.($track['artist'] ?? 'Unknown'));
-            usleep(500_000);
-        } catch (Throwable $e) {
-            // No active device, rate limit, network blip — surface briefly, never crash.
-            $this->output->writeln('  ⚠️  Search unavailable: '.$e->getMessage());
-            usleep(700_000);
-        } finally {
-            // Restore the loop's non-blocking STDIN, re-enter the TUI, force a repaint.
-            stream_set_blocking(STDIN, false);
-            $terminal->enableRawMode();
-            $terminal->execute(Actions::cursorHide());
-            $display->clear();
+        } catch (Throwable) {
+            $search['status'] = '⚠️  No active device';
+
+            return self::NONE;
+        }
+
+        $search['active'] = false;
+
+        return self::REFRESH; // refetch now-playing so the panel reflects the new track
+    }
+
+    /**
+     * Search tracks without ever throwing — a failure leaves the palette empty.
+     *
+     * @return list<array{uri?: string, name?: string, artist?: string}>
+     */
+    private function safeSearch(SpotifyDiscoveryService $discovery, string $query): array
+    {
+        try {
+            return $discovery->searchMultiple($query, 'track', self::SEARCH_LIMIT);
+        } catch (Throwable) {
+            return [];
         }
     }
 

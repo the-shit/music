@@ -57,6 +57,9 @@ final class PlayerRenderer
      */
     private const ART_COLS = 20;
 
+    /** Max search results shown in the palette — fits the inline viewport height. */
+    private const SEARCH_RESULTS = 8;
+
     private readonly AlbumArtRenderer $art;
 
     public function __construct(private readonly PlayerTheme $theme, ?AlbumArtRenderer $art = null)
@@ -233,6 +236,86 @@ final class PlayerRenderer
             ->titles(Title::fromString(' '.$theme->icon('music').' NOW PLAYING '))
             ->titleStyle($theme->heading())
             ->widget($body);
+    }
+
+    /**
+     * The Raycast-style search palette: a centered, mood-framed modal with a live
+     * query line, a selectable results list, and a key hint footer.
+     *
+     * WHY this lives here (not in the command): it is pure composition over plain
+     * data (the query string, the result rows, the selected index), so it is
+     * unit-testable on a buffer exactly like nowPlaying(). The command owns only
+     * the in-loop key handling that mutates that data; this turns a snapshot of it
+     * into a widget. NO suspending the TUI, NO fgets — the palette is drawn in the
+     * same inline viewport as the player.
+     *
+     * @param  list<array{uri?: string, name?: string, artist?: string}>  $results
+     */
+    public function searchOverlay(string $query, array $results, int $selectedIndex, string $status = ''): Widget
+    {
+        $theme = $this->theme;
+
+        // Live query line with a block cursor so it reads as a focused input.
+        $lines = [
+            Line::fromSpans(
+                Span::styled('› ', $theme->accent()),
+                Span::styled($query, $theme->text()),
+                Span::styled('▌', $theme->accent()),
+            ),
+            Line::fromString(''),
+        ];
+
+        if ($query === '') {
+            // Empty query → just the input + a hint, no list (per the spec).
+            $lines[] = Line::fromSpans(Span::styled('Type to search tracks…', $theme->dim()));
+        } elseif ($results === []) {
+            $lines[] = Line::fromSpans(Span::styled('No matches', $theme->dim()));
+        } else {
+            // One row per result. The selected row gets a ▶ marker AND a reversed
+            // accent style — the marker so the selection survives a colour-stripped
+            // or non-truecolor terminal, the style so it pops where colour works.
+            foreach (array_slice($results, 0, self::SEARCH_RESULTS) as $i => $track) {
+                $label = $this->truncateDisplay(
+                    ($track['name'] ?? 'Unknown').'  —  '.($track['artist'] ?? 'Unknown'),
+                    self::TEXT_WIDTH,
+                );
+
+                $lines[] = $i === $selectedIndex
+                    ? Line::fromSpans(Span::styled('▶ '.$label, $theme->accent()->addModifier(Modifier::BOLD | Modifier::REVERSED)))
+                    : Line::fromSpans(Span::styled('  '.$label, $theme->text()));
+            }
+        }
+
+        // Footer: static key hints, plus any inline status (e.g. a no-device note).
+        $footer = '↑↓ select · ⏎ play · esc cancel';
+        if ($status !== '') {
+            $footer = $status.'   ·   '.$footer;
+        }
+        $lines[] = Line::fromString('');
+        $lines[] = Line::fromSpans(Span::styled($footer, $theme->dim()));
+
+        $palette = BlockWidget::default()
+            ->borders(Borders::ALL)
+            ->borderStyle($theme->borderStyle())
+            ->titles(Title::fromString(' '.$theme->icon('search').' Search '))
+            ->titleStyle($theme->heading())
+            ->widget(ParagraphWidget::fromLines(...$lines));
+
+        // Center horizontally at ~60% width; php-tui's layout engine owns the math.
+        // The palette fills the inline viewport's height, so it reads as a centered
+        // modal over the (replaced) player surface.
+        return GridWidget::default()
+            ->direction(Direction::Horizontal)
+            ->constraints(
+                Constraint::percentage(20),
+                Constraint::percentage(60),
+                Constraint::percentage(20),
+            )
+            ->widgets(
+                ParagraphWidget::fromString(''),
+                $palette,
+                ParagraphWidget::fromString(''),
+            );
     }
 
     /**

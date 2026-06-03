@@ -100,6 +100,39 @@ describe('PlayerRenderer', function (): void {
             ->toContain('1:30 / 3:00');
     });
 
+    it('renders the search palette with the query, results and a highlighted selection', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        $results = [
+            ['uri' => 'spotify:track:1', 'name' => 'Daylight', 'artist' => 'Taylor Swift'],
+            ['uri' => 'spotify:track:2', 'name' => 'Day N Nite', 'artist' => 'Kid Cudi'],
+        ];
+
+        // Second row selected → it must carry the ▶ marker (survives colour-strip).
+        $out = renderPremiumPlayer($renderer->searchOverlay('day', $results, 1));
+
+        expect($out)
+            ->toContain('Search')                 // palette title
+            ->toContain('day')                    // live query echoed
+            ->toContain('Daylight')               // result 1
+            ->toContain('Day N Nite')             // result 2
+            ->toContain('Taylor Swift')           // artist shown
+            ->toContain('▶ Day N Nite')           // selection marker on the chosen row
+            ->toContain('select')                 // footer hint
+            ->toContain('play');
+    });
+
+    it('shows only the input and a hint for an empty search query', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('hype'));
+
+        $out = renderPremiumPlayer($renderer->searchOverlay('', [], 0));
+
+        expect($out)
+            ->toContain('Search')
+            ->toContain('Type to search')         // empty-query hint, no list
+            ->not->toContain('▶');                // nothing selectable yet
+    });
+
     it('composes the now-playing panel with track, artist, progress and mood badge', function (): void {
         $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
 
