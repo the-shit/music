@@ -448,7 +448,9 @@ class PremiumPlayerCommand extends Command
         try {
             $player->play($track['uri']);
         } catch (Throwable) {
-            $search['status'] = '⚠️  No active device';
+            // Plain text, NO variation-selector emoji: ⚠️ is ambiguous-width and
+            // drifts the footer's cell accounting (same trap as the progress line).
+            $search['status'] = 'No active device';
 
             return self::NONE;
         }
