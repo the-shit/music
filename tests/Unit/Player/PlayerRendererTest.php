@@ -24,6 +24,21 @@ function renderPremiumPlayer(Widget $widget, int $width = 78, int $height = 16):
     return $backend->toString();
 }
 
+/**
+ * Render through the SAME inline viewport the live command uses
+ * (PremiumPlayerCommand::VIEWPORT_HEIGHT = 12), not the roomy fullscreen height the
+ * other tests use. WHY: an overlay that renders fine at h=16 could still clip its
+ * rows/footer to nothing in the cramped 12-row inline viewport, which would read as
+ * a no-op when the key is pressed. This pins the overlays' visibility at the real size.
+ */
+function renderPremiumPlayerInline(Widget $widget, int $width = 78, int $height = 12): string
+{
+    $backend = new DummyBackend($width, $height);
+    DisplayBuilder::default($backend)->inline($height)->build()->draw($widget);
+
+    return $backend->toString();
+}
+
 function sampleViewModel(array $overrides = []): PlayerViewModel
 {
     $d = array_merge([
@@ -190,6 +205,62 @@ describe('PlayerRenderer', function (): void {
             ->toContain('Playlists')
             ->toContain('No playlists found')
             ->not->toContain('▶');
+    });
+
+    it('renders the queue overlay with visible items at the real 12-row inline viewport', function (): void {
+        // Regression guard: the live player draws into inline(12); an overlay that
+        // clipped to nothing here would make `u` look like a no-op. Assert the items,
+        // selection marker AND footer all survive at the cramped real size.
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        $queue = [
+            ['name' => 'Dreams', 'uri' => 'spotify:track:1', 'artists' => [['name' => 'Fleetwood Mac']]],
+            ['name' => 'Black', 'uri' => 'spotify:track:2', 'artists' => [['name' => 'Pearl Jam']]],
+        ];
+
+        $out = renderPremiumPlayerInline($renderer->queueOverlay($queue, 1));
+
+        expect($out)
+            ->toContain('Up Next')
+            ->toContain('Dreams')
+            ->toContain('Fleetwood Mac')
+            ->toContain('▶ Black')          // selected row still visible
+            ->toContain('scroll')           // footer pinned, not clipped off
+            ->toContain('close');
+    });
+
+    it('renders the playlist overlay with visible items at the real 12-row inline viewport', function (): void {
+        // Same regression guard for `l`: visible at inline(12), footer not clipped.
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('hype'));
+
+        $playlists = [
+            ['id' => 'p1', 'name' => 'Focus Flow', 'tracks' => ['total' => 42]],
+            ['id' => 'p2', 'name' => 'Road Trip', 'tracks' => ['total' => 17]],
+        ];
+
+        $out = renderPremiumPlayerInline($renderer->playlistOverlay($playlists, 0));
+
+        expect($out)
+            ->toContain('Playlists')
+            ->toContain('▶ Focus Flow')     // selected row visible
+            ->toContain('42 tracks')
+            ->toContain('Road Trip')
+            ->toContain('play')             // footer pinned, not clipped off
+            ->toContain('cancel');
+    });
+
+    it('shows a visible empty-state in each overlay at the 12-row inline viewport', function (): void {
+        // An overlay that rendered BLANK on empty data would also read as a no-op.
+        // Pin the empty states as visible at the real size.
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('neutral'));
+
+        expect(renderPremiumPlayerInline($renderer->queueOverlay([], 0)))
+            ->toContain('Up Next')
+            ->toContain('Queue is empty');
+
+        expect(renderPremiumPlayerInline($renderer->playlistOverlay([], 0)))
+            ->toContain('Playlists')
+            ->toContain('No playlists found');
     });
 
     it('windows a long queue so the selection stays visible without overflowing', function (): void {

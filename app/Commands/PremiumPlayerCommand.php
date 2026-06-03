@@ -142,6 +142,20 @@ class PremiumPlayerCommand extends Command
         $lastFetch = 0.0;
         $vm = null;
 
+        // Which surface we drew last tick: 'panel' | 'search' | 'queue' | 'playlist'.
+        // WHY: php-tui's inline renderer only repaints cells that DIFFER from the
+        // previous frame. The controls strip carries variation-selector emoji
+        // (▶️/⏸️/⏭️/…) whose terminal width is AMBIGUOUS — the exact trap already
+        // documented on the progress line and the status footer. When a centered
+        // overlay is drawn over the panel and then closed, the cell-width accounting
+        // between the overlay frame and the panel frame drifts, so the diff misses
+        // cells and leftover overlay glyphs (the modal border + "↑↓ … esc" footer)
+        // survive on the controls row. Forcing a full clear ON the surface change
+        // resets the back buffer so the next draw repaints EVERY cell — overlays now
+        // open AND close cleanly, with no residue. The clear is one frame, only on a
+        // transition, so it costs nothing in the steady state.
+        $lastSurface = null;
+
         // In-loop search state (the Raycast-style palette). It is drawn into the SAME
         // inline viewport as the player — no TUI suspend, no fgets — and mutated by
         // handleSearchEvent as the user types/navigates.
@@ -203,6 +217,14 @@ class PremiumPlayerCommand extends Command
                     $search['selected'] = 0;
                     $search['dirty'] = false;
                     $search['lastQueried'] = $now;
+                }
+
+                // Force a full repaint when the surface changes (panel ↔ any overlay)
+                // so a closing overlay never leaves residue behind — see $lastSurface.
+                $surface = $this->currentSurface($search, $queue, $playlist);
+                if ($surface !== $lastSurface) {
+                    $display->clear();
+                    $lastSurface = $surface;
                 }
 
                 $display->draw($this->frame($renderer, $vm, $search, $queue, $playlist));
@@ -387,6 +409,26 @@ class PremiumPlayerCommand extends Command
         }
 
         return ($vm !== null && $vm->hasPlayback) ? $renderer->nowPlaying($vm) : $renderer->empty();
+    }
+
+    /**
+     * Name the surface being drawn this tick: the now-playing 'panel' or whichever
+     * overlay is open. The loop compares this tick-to-tick and forces a full clear
+     * across a change so a closing overlay never leaves residue — see $lastSurface
+     * in runLoop() for the WHY. At most one overlay is ever active at a time.
+     *
+     * @param  array<string, mixed>  $search
+     * @param  array<string, mixed>  $queue
+     * @param  array<string, mixed>  $playlist
+     */
+    private function currentSurface(array $search, array $queue, array $playlist): string
+    {
+        return match (true) {
+            $search['active'] => 'search',
+            $queue['active'] => 'queue',
+            $playlist['active'] => 'playlist',
+            default => 'panel',
+        };
     }
 
     /**

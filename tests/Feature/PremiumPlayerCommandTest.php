@@ -1,5 +1,6 @@
 <?php
 
+use App\Commands\PremiumPlayerCommand;
 use App\Services\SpotifyAuthManager;
 
 /**
@@ -30,6 +31,28 @@ describe('PremiumPlayerCommand', function (): void {
             ->expectsOutputToContain('❌ Player requires an interactive terminal')
             ->expectsOutputToContain('💡 Run without piping or in a proper terminal')
             ->assertExitCode(1);
+    });
+
+    /**
+     * The loop forces a full repaint whenever the drawn surface changes (panel ↔
+     * overlay), which is what stops a closing overlay from leaving residue on the
+     * controls strip. currentSurface() is the signal it diffs on, so pin its mapping.
+     */
+    it('names the active surface so the loop can clear across transitions', function (): void {
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'currentSurface');
+        $surface = fn (array $s, array $q, array $p): string => $method->invoke($command, $s, $q, $p);
+
+        $off = ['active' => false];
+        $on = ['active' => true];
+
+        // No overlay open → the now-playing panel.
+        expect($surface($off, $off, $off))->toBe('panel');
+
+        // Each overlay reports its own name; search wins the precedence when checked.
+        expect($surface($on, $off, $off))->toBe('search');
+        expect($surface($off, $on, $off))->toBe('queue');
+        expect($surface($off, $off, $on))->toBe('playlist');
     });
 
 });
