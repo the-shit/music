@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Commands\Concerns\RendersPlayback;
 use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyDiscoveryService;
 use App\Services\SpotifyPlayerService;
@@ -15,6 +16,7 @@ use function Laravel\Prompts\warning;
 
 class PlayerCommand extends Command
 {
+    use RendersPlayback;
     use RequiresSpotifyConfig;
 
     protected $signature = 'player';
@@ -105,26 +107,29 @@ class PlayerCommand extends Command
     {
         $this->newLine();
         $this->line('┌─────────────────────────────────────────────────┐');
-        $this->line('│ 🎵 Now Playing                                  │');
+        // Pad to display width first, then wrap in style tags — tags render as
+        // zero-width ANSI, so padding must be measured on the bare text.
+        $this->line('│ <fg=cyan;options=bold>'.$this->padRight('🎵 Now Playing', 47).'</> │');
         $this->line('├─────────────────────────────────────────────────┤');
 
         // Track info
-        $track = substr($current['name'], 0, 40);
-        $artist = substr($current['artist'], 0, 40);
-        $album = substr($current['album'], 0, 40);
+        $track = mb_substr($current['name'], 0, 40);
+        $artist = mb_substr($current['artist'], 0, 40);
+        $album = mb_substr($current['album'], 0, 40);
 
-        $this->line(sprintf('│ %-47s │', $track));
-        $this->line(sprintf('│ %s %-46s │', '👤', $artist));
-        $this->line(sprintf('│ %s %-46s │', '💿', $album));
+        // Track title is the primary datum — bold it so it anchors the box.
+        $this->line('│ <options=bold>'.$this->padRight($track, 47).'</> │');
+        $this->line('│ '.$this->padRight('👤 '.$artist, 47).' │');
+        $this->line('│ '.$this->padRight('💿 '.$album, 47).' │');
 
         // Progress bar
         $progress = $this->formatProgress($current['progress_ms'], $current['duration_ms']);
-        $this->line(sprintf('│ %-47s │', $progress));
+        $this->line('│ '.$this->padRight($progress, 47).' │');
 
         // Volume if available
         if (isset($current['device']['volume_percent'])) {
             $volume = $this->formatVolume($current['device']['volume_percent']);
-            $this->line(sprintf('│ %-47s │', $volume));
+            $this->line('│ '.$this->padRight($volume, 47).' │');
         }
 
         // Playback modes
@@ -133,70 +138,11 @@ class PlayerCommand extends Command
             $current['repeat_state'] ?? 'off'
         );
         if ($modes !== '' && $modes !== '0') {
-            $this->line(sprintf('│ %-47s │', $modes));
+            $this->line('│ '.$this->padRight($modes, 47).' │');
         }
 
         $this->line('└─────────────────────────────────────────────────┘');
         $this->newLine();
-    }
-
-    private function formatProgress(int $progressMs, int $durationMs): string
-    {
-        $progressSec = floor($progressMs / 1000);
-        $durationSec = floor($durationMs / 1000);
-
-        $progressMin = floor($progressSec / 60);
-        $progressSec %= 60;
-
-        $durationMin = floor($durationSec / 60);
-        $durationSec %= 60;
-
-        $percentage = $durationMs > 0 ? ($progressMs / $durationMs) : 0;
-        $barLength = 30;
-        $filled = floor($percentage * $barLength);
-
-        $bar = str_repeat('━', (int) $filled).'●'.str_repeat('━', (int) ($barLength - $filled - 1));
-
-        return sprintf(
-            '%s %s %d:%02d/%d:%02d',
-            $progressMs < $durationMs ? '▶️' : '⏸️',
-            $bar,
-            $progressMin, $progressSec,
-            $durationMin, $durationSec
-        );
-    }
-
-    private function formatVolume(int $volume): string
-    {
-        $icon = match (true) {
-            $volume === 0 => '🔇',
-            $volume <= 33 => '🔈',
-            $volume <= 66 => '🔉',
-            default => '🔊'
-        };
-
-        $barLength = 20;
-        $filled = floor($volume * $barLength / 100);
-        $bar = str_repeat('▓', (int) $filled).str_repeat('░', (int) ($barLength - $filled));
-
-        return sprintf('%s %s %d%%', $icon, $bar, $volume);
-    }
-
-    private function formatPlaybackModes(bool $shuffle, string $repeat): string
-    {
-        $modes = [];
-
-        if ($shuffle) {
-            $modes[] = '🔀 Shuffle';
-        }
-
-        if ($repeat !== 'off') {
-            $repeatIcon = $repeat === 'track' ? '🔂' : '🔁';
-            $repeatText = $repeat === 'track' ? 'Repeat Track' : 'Repeat All';
-            $modes[] = $repeatIcon.' '.$repeatText;
-        }
-
-        return $modes !== [] ? implode('  ', $modes) : '';
     }
 
     private function getControlOptions(bool $isPlaying): array
@@ -503,13 +449,5 @@ class PlayerCommand extends Command
         };
 
         info($message);
-    }
-
-    private function clearScreen(): void
-    {
-        // Clear screen for better display (works on Unix-like systems)
-        if (PHP_OS_FAMILY !== 'Windows') {
-            system('clear');
-        }
     }
 }

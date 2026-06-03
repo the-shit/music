@@ -18,7 +18,6 @@ class SessionService
         private CuratorAgent $curator,
     ) {}
 
-
     /**
      * Plan a session from natural language input using AI agents.
      */

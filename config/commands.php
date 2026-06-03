@@ -1,5 +1,20 @@
 <?php
 
+/*
+| Dev/test commands that ship in the binary but are hidden from the command
+| list in the production distribution. "Production" = the built phar users
+| download (Phar::running() is only truthy inside a packaged phar); running
+| `php spotify ...` from source always shows everything. Set APP_ENV=production
+| to force the production surface while testing locally.
+*/
+$inDistribution = \Phar::running(false) !== '' || env('APP_ENV') === 'production';
+
+$devHidden = $inDistribution ? [
+    App\Commands\WebhookTestCommand::class,
+    App\Commands\ServeCommand::class,
+    App\Commands\EventEmitCommand::class,
+] : [];
+
 return [
 
     /*
@@ -68,6 +83,7 @@ return [
         Laravel\Mcp\Console\Commands\MakePromptCommand::class,
         Laravel\Mcp\Console\Commands\MakeResourceCommand::class,
         Laravel\Mcp\Console\Commands\InspectorCommand::class,
+        ...$devHidden,
     ],
 
     /*

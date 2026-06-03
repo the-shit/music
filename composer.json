@@ -65,6 +65,28 @@
             ]
         }
     },
+    "scripts": {
+        "test": "pest",
+        "test:coverage": "pest --coverage",
+        "lint": "pint --dirty",
+        "lint:check": "pint --test",
+        "analyse": "phpstan analyse --no-progress",
+        "refactor": "rector",
+        "refactor:check": "rector --dry-run",
+        "quality": [
+            "@lint",
+            "@analyse",
+            "@test"
+        ]
+    },
+    "scripts-descriptions": {
+        "test": "Run the Pest test suite",
+        "lint": "Format code with Laravel Pint",
+        "lint:check": "Check formatting without writing changes",
+        "analyse": "Run PHPStan static analysis",
+        "refactor": "Apply Rector refactorings",
+        "quality": "Run lint, static analysis, and tests in sequence"
+    },
     "minimum-stability": "stable",
     "prefer-stable": true,
     "bin": [

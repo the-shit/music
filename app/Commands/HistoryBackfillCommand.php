@@ -68,7 +68,7 @@ class HistoryBackfillCommand extends Command
                 $this->line("  {$data['artist']} — {$data['track']} ({$event['event']})");
             }
             if ($count > 10) {
-                $this->line("  ... and ".($count - 10)." more");
+                $this->line('  ... and '.($count - 10).' more');
             }
             warning('Dry run — no events written');
 
