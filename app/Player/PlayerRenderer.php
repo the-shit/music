@@ -256,20 +256,19 @@ final class PlayerRenderer
         $theme = $this->theme;
 
         // Live query line with a block cursor so it reads as a focused input.
-        $lines = [
-            Line::fromSpans(
-                Span::styled('› ', $theme->accent()),
-                Span::styled($query, $theme->text()),
-                Span::styled('▌', $theme->accent()),
-            ),
-            Line::fromString(''),
-        ];
+        $input = ParagraphWidget::fromLines(Line::fromSpans(
+            Span::styled('› ', $theme->accent()),
+            Span::styled($query, $theme->text()),
+            Span::styled('▌', $theme->accent()),
+        ));
 
+        // Body: the results list, or a hint/no-matches line.
+        $bodyLines = [];
         if ($query === '') {
             // Empty query → just the input + a hint, no list (per the spec).
-            $lines[] = Line::fromSpans(Span::styled('Type to search tracks…', $theme->dim()));
+            $bodyLines[] = Line::fromSpans(Span::styled('Type to search tracks…', $theme->dim()));
         } elseif ($results === []) {
-            $lines[] = Line::fromSpans(Span::styled('No matches', $theme->dim()));
+            $bodyLines[] = Line::fromSpans(Span::styled('No matches', $theme->dim()));
         } else {
             // One row per result. The selected row gets a ▶ marker AND a reversed
             // accent style — the marker so the selection survives a colour-stripped
@@ -280,7 +279,7 @@ final class PlayerRenderer
                     self::TEXT_WIDTH,
                 );
 
-                $lines[] = $i === $selectedIndex
+                $bodyLines[] = $i === $selectedIndex
                     ? Line::fromSpans(Span::styled('▶ '.$label, $theme->accent()->addModifier(Modifier::BOLD | Modifier::REVERSED)))
                     : Line::fromSpans(Span::styled('  '.$label, $theme->text()));
             }
@@ -291,15 +290,30 @@ final class PlayerRenderer
         if ($status !== '') {
             $footer = $status.'   ·   '.$footer;
         }
-        $lines[] = Line::fromString('');
-        $lines[] = Line::fromSpans(Span::styled($footer, $theme->dim()));
+
+        // WHY a Grid (not one Paragraph): with a full 8-row result list the footer
+        // would be pushed past the modal's bottom and clipped — taking any inline
+        // status with it. Pinning input (top) and footer (bottom) as fixed rows and
+        // giving the list the flexible middle keeps the hint/status ALWAYS visible.
+        $contents = GridWidget::default()
+            ->direction(Direction::Vertical)
+            ->constraints(
+                Constraint::length(1), // query input
+                Constraint::min(1),    // results / hint
+                Constraint::length(1), // footer (pinned to the bottom)
+            )
+            ->widgets(
+                $input,
+                ParagraphWidget::fromLines(...($bodyLines === [] ? [Line::fromString('')] : $bodyLines)),
+                ParagraphWidget::fromLines(Line::fromSpans(Span::styled($footer, $theme->dim()))),
+            );
 
         $palette = BlockWidget::default()
             ->borders(Borders::ALL)
             ->borderStyle($theme->borderStyle())
             ->titles(Title::fromString(' '.$theme->icon('search').' Search '))
             ->titleStyle($theme->heading())
-            ->widget(ParagraphWidget::fromLines(...$lines));
+            ->widget($contents);
 
         // Center horizontally at ~60% width; php-tui's layout engine owns the math.
         // The palette fills the inline viewport's height, so it reads as a centered
