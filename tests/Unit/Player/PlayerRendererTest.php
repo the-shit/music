@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Player\AlbumArtRenderer;
 use App\Player\PlayerRenderer;
 use App\Player\PlayerTheme;
 use App\Player\PlayerViewModel;
@@ -37,15 +38,67 @@ function sampleViewModel(array $overrides = []): PlayerViewModel
         'repeat' => 'context',
         'deviceName' => 'Living Room',
         'hasPlayback' => true,
+        'mood' => 'neutral',
+        'albumArtUrl' => null,
     ], $overrides);
 
     return new PlayerViewModel(
         $d['title'], $d['artist'], $d['album'], $d['isPlaying'], $d['progressMs'],
         $d['durationMs'], $d['volume'], $d['shuffle'], $d['repeat'], $d['deviceName'], $d['hasPlayback'],
+        $d['mood'], $d['albumArtUrl'],
     );
 }
 
+/**
+ * Seed AlbumArtRenderer's per-URL decode cache with a fake matrix so hasArt()
+ * reports a cover WITHOUT any network/GD — lets us drive the two-column layout
+ * deterministically in a pure unit test.
+ */
+function rendererWithSeededArt(string $mood, string $url): PlayerRenderer
+{
+    $cache = new ReflectionProperty(AlbumArtRenderer::class, 'cache');
+    $cache->setValue(null, [$url => [[[10, 20, 30], [40, 50, 60]], [[70, 80, 90], [100, 110, 120]]]]);
+
+    return new PlayerRenderer(PlayerTheme::forMood($mood), new AlbumArtRenderer);
+}
+
 describe('PlayerRenderer', function (): void {
+
+    beforeEach(function (): void {
+        // Clear the static decode cache so art-presence is controlled per test.
+        (new ReflectionProperty(AlbumArtRenderer::class, 'cache'))->setValue(null, []);
+    });
+
+    it('falls back to a clean single-column panel (no art block) when there is no cover', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        // sampleViewModel has albumArtUrl=null → hasArt() is false → single column.
+        $out = renderPremiumPlayer($renderer->nowPlaying(sampleViewModel()));
+
+        // The whole point of the fix: NO half-block art glyphs filling dead space,
+        // and NO placeholder music-note tile — just the clean info panel.
+        expect($out)
+            ->not->toContain('▀')
+            ->and($out)->not->toContain('▄')
+            ->and($out)->toContain('Bohemian Rhapsody')
+            ->and($out)->toContain('1:30 / 3:00')
+            ->and($out)->toContain('60%');
+    });
+
+    it('uses the two-column art layout when a real cover is available', function (): void {
+        $url = 'https://i.scdn.co/image/seeded';
+        $renderer = rendererWithSeededArt('chill', $url);
+
+        $out = renderPremiumPlayer($renderer->nowPlaying(sampleViewModel(['albumArtUrl' => $url])));
+
+        // Art column now paints half-block glyphs AND the info is still all present.
+        $hasArt = (bool) preg_match('/[▀▄█]/u', $out);
+        expect($hasArt)->toBeTrue();
+        expect($out)
+            ->toContain('Bohemian Rhapsody')
+            ->toContain('Queen')
+            ->toContain('1:30 / 3:00');
+    });
 
     it('composes the now-playing panel with track, artist, progress and mood badge', function (): void {
         $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));

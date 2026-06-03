@@ -87,6 +87,60 @@ final class PlayerRenderer
             $theme->icon('album').' '.$this->truncateDisplay($vm->album, self::TEXT_WIDTH)
         )->style($theme->dim());
 
+        $controls = ParagraphWidget::fromString($this->controlsHint($vm))->style($theme->dim());
+
+        // LAYOUT IS CONDITIONAL ON REAL ART. Album art is an accent, not scaffolding:
+        // when there is a genuine, decodable cover we split into two columns; when
+        // there is NOT (no/empty url, or a fetch/decode failure) we render the clean
+        // single-column panel instead of a dead placeholder block. Asking hasArt()
+        // first also primes the decode cache that render() reuses — one fetch, not two.
+        $body = $this->art->hasArt($vm->albumArtUrl)
+            ? $this->twoColumnBody($vm, $track, $artist, $album, $controls)
+            : $this->singleColumnBody($vm, $track, $artist, $album, $controls);
+
+        return BlockWidget::default()
+            ->borders(Borders::ALL)
+            ->borderStyle($theme->borderStyle())
+            ->titles(Title::fromString($this->nowPlayingTitle()))
+            ->titleStyle($theme->heading())
+            ->widget($body);
+    }
+
+    /**
+     * The clean single-column now-playing body — metadata, gauges, and the controls
+     * strip stacked full-width. The default when there is no album art.
+     */
+    private function singleColumnBody(PlayerViewModel $vm, Widget $track, Widget $artist, Widget $album, Widget $controls): Widget
+    {
+        return GridWidget::default()
+            ->direction(Direction::Vertical)
+            ->constraints(
+                Constraint::length(1),  // track title
+                Constraint::length(1),  // artist
+                Constraint::length(1),  // album
+                Constraint::length(1),  // progress
+                Constraint::length(1),  // volume
+                Constraint::min(1),     // flexible spacer → breathing room above controls
+                Constraint::length(1),  // controls hint, pinned to the bottom
+            )
+            ->widgets(
+                $track,
+                $artist,
+                $album,
+                $this->progressRow($vm),
+                $this->volumeRow($vm),
+                ParagraphWidget::fromString(''),
+                $controls,
+            );
+    }
+
+    /**
+     * The two-column body — a modest album-art accent on the LEFT, the now-playing
+     * info on the RIGHT, and the controls strip spanning FULL width beneath both
+     * (it is long and would clip in the narrow info column). Only used when hasArt().
+     */
+    private function twoColumnBody(PlayerViewModel $vm, Widget $track, Widget $artist, Widget $album, Widget $controls): Widget
+    {
         $info = GridWidget::default()
             ->direction(Direction::Vertical)
             ->constraints(
@@ -106,10 +160,10 @@ final class PlayerRenderer
                 ParagraphWidget::fromString(''),
             );
 
-        // Top region: a modest album-art accent on the LEFT, the now-playing info on
-        // the RIGHT. The art renderer rescales to whatever area the layout grants it,
-        // so the fixed ART_COLS slice is all the sizing it needs; a missing/failed
-        // art URL self-degrades to a calm placeholder, so this column is always safe.
+        // The art renderer rescales to whatever area the layout grants it, so the
+        // fixed ART_COLS slice is all the sizing it needs. hasArt() already proved
+        // the cover decodes, so render() here returns real art (cache hit), never
+        // the placeholder.
         $columns = GridWidget::default()
             ->direction(Direction::Horizontal)
             ->constraints(
@@ -123,10 +177,7 @@ final class PlayerRenderer
                 $info,
             );
 
-        // The controls hint spans the FULL panel width beneath both columns — the
-        // strip is long (every key + live shuffle/repeat state) and would clip in a
-        // narrow column. Full width keeps it a legible single line.
-        $body = GridWidget::default()
+        return GridWidget::default()
             ->direction(Direction::Vertical)
             ->constraints(
                 Constraint::min(1),     // art + info region
@@ -134,15 +185,8 @@ final class PlayerRenderer
             )
             ->widgets(
                 $columns,
-                ParagraphWidget::fromString($this->controlsHint($vm))->style($theme->dim()),
+                $controls,
             );
-
-        return BlockWidget::default()
-            ->borders(Borders::ALL)
-            ->borderStyle($theme->borderStyle())
-            ->titles(Title::fromString($this->nowPlayingTitle()))
-            ->titleStyle($theme->heading())
-            ->widget($body);
     }
 
     /**

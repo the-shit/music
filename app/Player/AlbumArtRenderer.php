@@ -113,6 +113,20 @@ final class AlbumArtRenderer
     }
 
     /**
+     * Whether a real, successfully-decoded cover is available for this URL.
+     *
+     * WHY: lets the caller (PlayerRenderer) decide LAYOUT before drawing — show the
+     * two-column art|info panel only when there is genuine art, and fall back to the
+     * clean single-column panel otherwise, rather than rendering a dead placeholder
+     * block. Cheap and side-effect-free for repeated calls: it shares decode()'s
+     * per-URL cache, so asking here and then render()ing costs one fetch, not two.
+     */
+    public function hasArt(?string $imageUrl): bool
+    {
+        return $imageUrl !== null && $imageUrl !== '' && $this->decode($imageUrl) !== null;
+    }
+
+    /**
      * Fetch + decode the art into a capped RGB matrix, caching the result by URL.
      *
      * @return list<list<array{int, int, int}>>|null null on any failure
