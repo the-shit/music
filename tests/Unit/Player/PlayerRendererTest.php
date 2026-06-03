@@ -122,6 +122,95 @@ describe('PlayerRenderer', function (): void {
             ->toContain('play');
     });
 
+    it('renders the queue overlay with up-next tracks and a highlighted row', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        $queue = [
+            ['name' => 'Dreams', 'uri' => 'spotify:track:1', 'artists' => [['name' => 'Fleetwood Mac']]],
+            ['name' => 'Black', 'uri' => 'spotify:track:2', 'artists' => [['name' => 'Pearl Jam']]],
+        ];
+
+        // Second row selected → it carries the ▶ marker (survives colour-strip).
+        $out = renderPremiumPlayer($renderer->queueOverlay($queue, 1));
+
+        expect($out)
+            ->toContain('Up Next')            // overlay title
+            ->toContain('Dreams')             // track 1
+            ->toContain('Fleetwood Mac')      // artist 1
+            ->toContain('Black')              // track 2
+            ->toContain('▶ Black')            // selection marker on the chosen row
+            ->toContain('scroll')             // footer hint
+            ->toContain('close');             // read-only: no "play"
+    });
+
+    it('shows an empty-queue message when there are no up-next tracks', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('neutral'));
+
+        $out = renderPremiumPlayer($renderer->queueOverlay([], 0));
+
+        expect($out)
+            ->toContain('Up Next')
+            ->toContain('Queue is empty')
+            ->not->toContain('▶');
+    });
+
+    it('renders the playlist overlay with names, track counts and a selection', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('hype'));
+
+        $playlists = [
+            ['id' => 'p1', 'name' => 'Focus Flow', 'tracks' => ['total' => 42]],
+            ['id' => 'p2', 'name' => 'Road Trip', 'tracks' => ['total' => 17]],
+        ];
+
+        $out = renderPremiumPlayer($renderer->playlistOverlay($playlists, 0));
+
+        expect($out)
+            ->toContain('Playlists')          // overlay title
+            ->toContain('Focus Flow')         // playlist 1 name
+            ->toContain('42 tracks')          // playlist 1 count
+            ->toContain('Road Trip')          // playlist 2 name
+            ->toContain('17 tracks')
+            ->toContain('▶ Focus Flow')       // selection marker on row 0
+            ->toContain('play')               // footer hint (playable, unlike queue)
+            ->toContain('cancel');
+    });
+
+    it('surfaces an inline status and an empty-state in the playlist overlay', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        // Inline status (e.g. a failed play) is shown without closing the overlay.
+        $withStatus = renderPremiumPlayer(
+            $renderer->playlistOverlay([['id' => 'p1', 'name' => 'Mix', 'tracks' => ['total' => 5]]], 0, 'No active device')
+        );
+        expect($withStatus)->toContain('No active device')->toContain('Mix');
+
+        // No playlists → a calm empty message, nothing selectable.
+        $empty = renderPremiumPlayer($renderer->playlistOverlay([], 0));
+        expect($empty)
+            ->toContain('Playlists')
+            ->toContain('No playlists found')
+            ->not->toContain('▶');
+    });
+
+    it('windows a long queue so the selection stays visible without overflowing', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        // 30 tracks, far more than the 8-row window; select deep into the list.
+        $queue = [];
+        for ($i = 1; $i <= 30; $i++) {
+            $queue[] = ['name' => "Track {$i}", 'uri' => "spotify:track:{$i}", 'artists' => [['name' => "Artist {$i}"]]];
+        }
+
+        $out = renderPremiumPlayer($renderer->queueOverlay($queue, 20));
+
+        // The selected row is rendered (window scrolled to it), while rows far
+        // outside the window (the very first track) are not.
+        expect($out)
+            ->toContain('▶ Track 21')   // selected index 20 → "Track 21"
+            ->not->toContain('Track 1 ')
+            ->and(substr_count($out, '▶'))->toBe(1); // exactly one highlighted row
+    });
+
     it('shows only the input and a hint for an empty search query', function (): void {
         $renderer = new PlayerRenderer(PlayerTheme::forMood('hype'));
 

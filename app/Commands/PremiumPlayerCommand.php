@@ -61,6 +61,9 @@ class PremiumPlayerCommand extends Command
     /** How many tracks the search palette requests + shows. */
     private const SEARCH_LIMIT = 8;
 
+    /** How many playlists the picker overlay requests. */
+    private const PLAYLIST_LIMIT = 20;
+
     /**
      * Debounce before re-querying as the user types. WHY: the palette re-searches
      * as the query changes, but firing an API call on every keystroke is wasteful
@@ -74,6 +77,10 @@ class PremiumPlayerCommand extends Command
     private const REFRESH = 'refresh';
 
     private const SEARCH = 'search';
+
+    private const QUEUE = 'queue';
+
+    private const PLAYLIST = 'playlist';
 
     private const NONE = 'none';
 
@@ -148,6 +155,15 @@ class PremiumPlayerCommand extends Command
             'lastQueried' => 0.0,
         ];
 
+        // Read-only "up next" overlay state. Items are the raw Spotify queue tracks,
+        // snapshotted when the overlay opens (the queue rarely shifts under us in the
+        // few seconds it's open, and a per-frame refetch would hammer the API).
+        $queue = ['active' => false, 'items' => [], 'selected' => 0];
+
+        // Playlist picker overlay state. 'status' carries an inline note (e.g. a
+        // no-device failure) without closing the overlay, mirroring the palette.
+        $playlist = ['active' => false, 'items' => [], 'selected' => 0, 'status' => ''];
+
         try {
             while ($running) {
                 $now = microtime(true);
@@ -189,20 +205,38 @@ class PremiumPlayerCommand extends Command
                     $search['lastQueried'] = $now;
                 }
 
-                $display->draw($this->frame($renderer, $vm, $search));
+                $display->draw($this->frame($renderer, $vm, $search, $queue, $playlist));
 
-                // Drain all buffered input each tick (next() is non-blocking). Search
-                // mode and player mode consume keys differently.
+                // Drain all buffered input each tick (next() is non-blocking). Each
+                // overlay consumes keys differently; only one is ever active at a time.
                 $events = $terminal->events();
                 while (($event = $events->next()) !== null) {
                     if ($search['active']) {
                         $outcome = $this->handleSearchEvent($event, $player, $search);
+                    } elseif ($queue['active']) {
+                        $outcome = $this->handleQueueEvent($event, $queue);
+                    } elseif ($playlist['active']) {
+                        $outcome = $this->handlePlaylistEvent($event, $player, $playlist);
                     } else {
                         $outcome = $this->handleEvent($event, $player, $vm);
 
                         // `/` opens the palette in-place (no suspend).
                         if ($outcome === self::SEARCH) {
                             $search = ['active' => true, 'query' => '', 'results' => [], 'selected' => 0, 'status' => '', 'dirty' => false, 'lastQueried' => 0.0];
+
+                            continue;
+                        }
+
+                        // `u` opens the read-only up-next queue; snapshot it now.
+                        if ($outcome === self::QUEUE) {
+                            $queue = ['active' => true, 'items' => $this->safeQueue($player), 'selected' => 0];
+
+                            continue;
+                        }
+
+                        // `l` opens the playlist picker; snapshot the playlists now.
+                        if ($outcome === self::PLAYLIST) {
+                            $playlist = ['active' => true, 'items' => $this->safePlaylists($discovery), 'selected' => 0, 'status' => ''];
 
                             continue;
                         }
@@ -305,6 +339,8 @@ class PremiumPlayerCommand extends Command
             return match ($char) {
                 'q' => self::QUIT,
                 '/' => self::SEARCH, // opens the in-loop search palette (no suspend)
+                'u' => self::QUEUE, // 'u' for up-next, since 'q' is quit
+                'l' => self::PLAYLIST, // opens the playlist picker overlay
                 ' ' => $this->togglePlayback($player, $vm),
                 'n' => $this->then(fn () => $player->next()),
                 'p' => $this->then(fn () => $player->previous()),
@@ -327,16 +363,27 @@ class PremiumPlayerCommand extends Command
     }
 
     /**
-     * Choose what to draw this tick: the search palette when it's open, otherwise
-     * the now-playing panel (or the empty state). Both are drawn into the same
-     * inline viewport, so the palette reads as a centered modal over the player.
+     * Choose what to draw this tick: whichever overlay is open (search, queue, or
+     * playlist), otherwise the now-playing panel (or the empty state). All are drawn
+     * into the same inline viewport, so an overlay reads as a centered modal over
+     * the player. At most one overlay is ever active at a time.
      *
      * @param  array<string, mixed>  $search
+     * @param  array<string, mixed>  $queue
+     * @param  array<string, mixed>  $playlist
      */
-    private function frame(PlayerRenderer $renderer, ?PlayerViewModel $vm, array $search): Widget
+    private function frame(PlayerRenderer $renderer, ?PlayerViewModel $vm, array $search, array $queue, array $playlist): Widget
     {
         if ($search['active']) {
             return $renderer->searchOverlay($search['query'], $search['results'], $search['selected'], $search['status']);
+        }
+
+        if ($queue['active']) {
+            return $renderer->queueOverlay($queue['items'], $queue['selected']);
+        }
+
+        if ($playlist['active']) {
+            return $renderer->playlistOverlay($playlist['items'], $playlist['selected'], $playlist['status']);
         }
 
         return ($vm !== null && $vm->hasPlayback) ? $renderer->nowPlaying($vm) : $renderer->empty();
@@ -469,6 +516,150 @@ class PremiumPlayerCommand extends Command
     {
         try {
             return $discovery->searchMultiple($query, 'track', self::SEARCH_LIMIT);
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * Handle a keypress while the read-only queue overlay is open: ↑↓ scroll the
+     * highlighted row, esc closes, Ctrl+C still quits the whole player. There is no
+     * ⏎ action — the queue is a view, not a picker.
+     *
+     * @param  array<string, mixed>  $queue
+     */
+    private function handleQueueEvent(object $event, array &$queue): string
+    {
+        if ($event instanceof CodedKeyEvent) {
+            return match ($event->code) {
+                KeyCode::Esc => $this->closeOverlay($queue),
+                KeyCode::Up => $this->scrollOverlay($queue, -1),
+                KeyCode::Down => $this->scrollOverlay($queue, 1),
+                default => self::NONE,
+            };
+        }
+
+        // Ctrl+C always quits the whole player, even from an overlay.
+        if ($event instanceof CharKeyEvent && $event->char === "\x03") {
+            return self::QUIT;
+        }
+
+        return self::NONE;
+    }
+
+    /**
+     * Handle a keypress while the playlist picker is open: ↑↓ select, ⏎ plays the
+     * highlighted playlist (and closes), esc cancels, Ctrl+C quits. A no-device/API
+     * failure on play keeps the overlay open with an inline status instead of
+     * crashing the loop — same contract as the search palette's playSelected().
+     *
+     * @param  array<string, mixed>  $playlist
+     */
+    private function handlePlaylistEvent(object $event, SpotifyPlayerService $player, array &$playlist): string
+    {
+        if ($event instanceof CodedKeyEvent) {
+            return match ($event->code) {
+                KeyCode::Esc => $this->closeOverlay($playlist),
+                KeyCode::Enter => $this->playSelectedPlaylist($player, $playlist),
+                KeyCode::Up => $this->scrollOverlay($playlist, -1),
+                KeyCode::Down => $this->scrollOverlay($playlist, 1),
+                default => self::NONE,
+            };
+        }
+
+        if ($event instanceof CharKeyEvent && $event->char === "\x03") {
+            return self::QUIT;
+        }
+
+        return self::NONE;
+    }
+
+    /**
+     * Close an overlay (search/queue/playlist share the 'active' flag convention).
+     *
+     * @param  array<string, mixed>  $state
+     */
+    private function closeOverlay(array &$state): string
+    {
+        $state['active'] = false;
+
+        return self::NONE;
+    }
+
+    /**
+     * Move the highlighted row in a list overlay, clamped to the available items.
+     *
+     * @param  array<string, mixed>  $state
+     */
+    private function scrollOverlay(array &$state, int $delta): string
+    {
+        $last = max(0, count($state['items']) - 1);
+        $state['selected'] = max(0, min($last, $state['selected'] + $delta));
+
+        return self::NONE;
+    }
+
+    /**
+     * Play the highlighted playlist and close the picker. A no-device/API failure
+     * keeps it open with an inline status (never crashes the loop).
+     *
+     * @param  array<string, mixed>  $playlist
+     */
+    private function playSelectedPlaylist(SpotifyPlayerService $player, array &$playlist): string
+    {
+        $selected = $playlist['items'][$playlist['selected']] ?? null;
+
+        if ($selected === null || empty($selected['id'])) {
+            return self::NONE; // no playlists / nothing highlighted
+        }
+
+        try {
+            // playPlaylist takes the playlist ID (not a URI) and returns false on a
+            // soft failure (no token/device); guard the hard failures too.
+            $ok = $player->playPlaylist($selected['id']);
+        } catch (Throwable) {
+            $ok = false;
+        }
+
+        if (! $ok) {
+            $playlist['status'] = 'No active device';
+
+            return self::NONE;
+        }
+
+        $playlist['active'] = false;
+
+        return self::REFRESH; // refetch now-playing so the panel reflects the playlist
+    }
+
+    /**
+     * Fetch the up-next queue without ever throwing — a failure shows an empty
+     * overlay rather than killing the loop. Returns just the queued tracks (the
+     * raw Spotify track shape); currently-playing is already on the main panel.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function safeQueue(SpotifyPlayerService $player): array
+    {
+        try {
+            $queue = $player->getQueue();
+
+            return array_values(is_array($queue['queue'] ?? null) ? $queue['queue'] : []);
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * Fetch the user's playlists without ever throwing — a failure shows an empty
+     * picker rather than crashing the loop.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function safePlaylists(SpotifyDiscoveryService $discovery): array
+    {
+        try {
+            return array_values($discovery->getPlaylists(self::PLAYLIST_LIMIT));
         } catch (Throwable) {
             return [];
         }

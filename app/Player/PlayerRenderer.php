@@ -308,16 +308,155 @@ final class PlayerRenderer
                 ParagraphWidget::fromLines(Line::fromSpans(Span::styled($footer, $theme->dim()))),
             );
 
-        $palette = BlockWidget::default()
+        return $this->centeredModal(' '.$theme->icon('search').' Search ', $contents);
+    }
+
+    /**
+     * Read-only "up next" overlay: a centered modal listing the queued tracks
+     * (track — artist), the highlighted row scrollable with ↑↓, esc to close.
+     *
+     * WHY a sibling of searchOverlay (not folded into it): same centered-modal
+     * shell, but the data is the raw Spotify queue shape and the interaction is
+     * navigate-only — there is no query line and ⏎ does nothing. Keeping it a
+     * distinct, pure method means it is buffer-testable exactly like the palette,
+     * and the command's loop just hands it the queue snapshot + selection.
+     *
+     * Long queues scroll: only a fixed window of rows is shown, kept around the
+     * selection, so the modal never overflows the inline viewport.
+     *
+     * @param  list<array{name?: string, uri?: string, artists?: list<array{name?: string}>}>  $queue
+     */
+    public function queueOverlay(array $queue, int $selectedIndex): Widget
+    {
+        $theme = $this->theme;
+
+        // "track  —  artist" per row, from the raw Spotify track shape.
+        $labels = array_map(
+            fn (array $track): string => $this->truncateDisplay(
+                ($track['name'] ?? 'Unknown').'  —  '.($track['artists'][0]['name'] ?? 'Unknown'),
+                self::TEXT_WIDTH,
+            ),
+            array_values($queue),
+        );
+
+        $bodyLines = $labels === []
+            ? [Line::fromSpans(Span::styled('Queue is empty', $theme->dim()))]
+            : $this->windowedSelectableList($labels, $selectedIndex);
+
+        $contents = $this->listContents($bodyLines, '↑↓ scroll · esc close');
+
+        return $this->centeredModal(' '.$theme->icon('queue').' Up Next ', $contents);
+    }
+
+    /**
+     * Playlist picker overlay: a centered modal listing the user's playlists
+     * (name + track count), ↑↓ to select, ⏎ to play, esc to cancel. An inline
+     * status (e.g. a no-device note) is surfaced in the footer like the palette's.
+     *
+     * WHY here, same reasoning as queueOverlay/searchOverlay: pure composition over
+     * the playlist snapshot + selection + status, so it is unit-testable on a
+     * buffer; the command owns the key handling that turns ⏎ into a playPlaylist().
+     *
+     * @param  list<array{id?: string, name?: string, tracks?: array{total?: int}}>  $playlists
+     */
+    public function playlistOverlay(array $playlists, int $selectedIndex, string $status = ''): Widget
+    {
+        $theme = $this->theme;
+
+        // "name  (N tracks)" per row, from the raw Spotify playlist shape.
+        $labels = array_map(
+            fn (array $playlist): string => $this->truncateDisplay(
+                ($playlist['name'] ?? 'Untitled').'  ('.($playlist['tracks']['total'] ?? 0).' tracks)',
+                self::TEXT_WIDTH,
+            ),
+            array_values($playlists),
+        );
+
+        $bodyLines = $labels === []
+            ? [Line::fromSpans(Span::styled('No playlists found', $theme->dim()))]
+            : $this->windowedSelectableList($labels, $selectedIndex);
+
+        // Footer mirrors the palette: static hints, prefixed with any inline status.
+        $footer = '↑↓ select · ⏎ play · esc cancel';
+        if ($status !== '') {
+            $footer = $status.'   ·   '.$footer;
+        }
+
+        $contents = $this->listContents($bodyLines, $footer);
+
+        return $this->centeredModal(' '.$theme->icon('playlist').' Playlists ', $contents);
+    }
+
+    /**
+     * Wrap body lines + a footer hint in the standard list layout: a flexible
+     * list region above a footer pinned to the bottom row. Same structure the
+     * search palette uses, so a full list never pushes the footer/status out of
+     * the modal (the bug the palette's Grid was introduced to fix).
+     *
+     * @param  list<Line>  $bodyLines
+     */
+    private function listContents(array $bodyLines, string $footer): Widget
+    {
+        return GridWidget::default()
+            ->direction(Direction::Vertical)
+            ->constraints(
+                Constraint::min(1),    // list / empty hint
+                Constraint::length(1), // footer pinned to the bottom
+            )
+            ->widgets(
+                ParagraphWidget::fromLines(...($bodyLines === [] ? [Line::fromString('')] : $bodyLines)),
+                ParagraphWidget::fromLines(Line::fromSpans(Span::styled($footer, $this->theme->dim()))),
+            );
+    }
+
+    /**
+     * Turn flat row labels into selectable Lines, showing only a fixed-height
+     * window kept around the selection so long lists scroll instead of overflowing.
+     * The selected row gets a ▶ marker AND a reversed accent style — the marker so
+     * the selection survives a colour-stripped terminal, the style so it pops where
+     * colour works (identical treatment to the search palette's rows).
+     *
+     * @param  list<string>  $labels
+     * @return list<Line>
+     */
+    private function windowedSelectableList(array $labels, int $selectedIndex): array
+    {
+        $count = count($labels);
+
+        // Window start: clamp so the selection stays visible and we never read past
+        // the end. Short lists (≤ window) show in full from the top.
+        $start = $count <= self::SEARCH_RESULTS
+            ? 0
+            : max(0, min($selectedIndex - intdiv(self::SEARCH_RESULTS, 2), $count - self::SEARCH_RESULTS));
+
+        $lines = [];
+        foreach (array_slice($labels, $start, self::SEARCH_RESULTS, true) as $i => $label) {
+            $lines[] = $i === $selectedIndex
+                ? Line::fromSpans(Span::styled('▶ '.$label, $this->theme->accent()->addModifier(Modifier::BOLD | Modifier::REVERSED)))
+                : Line::fromSpans(Span::styled('  '.$label, $this->theme->text()));
+        }
+
+        return $lines;
+    }
+
+    /**
+     * The shared centered-modal shell: a mood-framed Block (titled) floated in the
+     * middle ~60% of the width, blank gutters either side. php-tui's layout engine
+     * owns the centering math; the modal fills the inline viewport's height, so it
+     * reads as a centered overlay over the (replaced) player surface. Reused by the
+     * search palette and the queue/playlist overlays so they stay visually identical.
+     */
+    private function centeredModal(string $title, Widget $contents): Widget
+    {
+        $theme = $this->theme;
+
+        $modal = BlockWidget::default()
             ->borders(Borders::ALL)
             ->borderStyle($theme->borderStyle())
-            ->titles(Title::fromString(' '.$theme->icon('search').' Search '))
+            ->titles(Title::fromString($title))
             ->titleStyle($theme->heading())
             ->widget($contents);
 
-        // Center horizontally at ~60% width; php-tui's layout engine owns the math.
-        // The palette fills the inline viewport's height, so it reads as a centered
-        // modal over the (replaced) player surface.
         return GridWidget::default()
             ->direction(Direction::Horizontal)
             ->constraints(
@@ -327,7 +466,7 @@ final class PlayerRenderer
             )
             ->widgets(
                 ParagraphWidget::fromString(''),
-                $palette,
+                $modal,
                 ParagraphWidget::fromString(''),
             );
     }
@@ -408,6 +547,8 @@ final class PlayerRenderer
             $theme->icon('shuffle').' '.($vm->shuffle ? 'on' : 'off'),
             $theme->icon('repeat').' '.$vm->repeatLabel(),
             $theme->icon('search').' /',
+            $theme->icon('queue').' u',
+            $theme->icon('playlist').' l',
             'quit q',
         ]);
     }
