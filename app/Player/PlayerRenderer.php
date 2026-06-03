@@ -90,7 +90,10 @@ final class PlayerRenderer
             $theme->icon('album').' '.$this->truncateDisplay($vm->album, self::TEXT_WIDTH)
         )->style($theme->dim());
 
-        $controls = ParagraphWidget::fromString($this->controlsHint($vm))->style($theme->dim());
+        // The key legend is static (no live state, no VS-16 emoji) so it stays
+        // readable and width-stable; live shuffle/repeat state lives in statusRow()
+        // near the gauges instead — see controlsLines()/statusRow().
+        $controls = ParagraphWidget::fromLines(...$this->controlsLines());
 
         // LAYOUT IS CONDITIONAL ON REAL ART. Album art is an accent, not scaffolding:
         // when there is a genuine, decodable cover we split into two columns; when
@@ -123,8 +126,9 @@ final class PlayerRenderer
                 Constraint::length(1),  // album
                 Constraint::length(1),  // progress
                 Constraint::length(1),  // volume
+                Constraint::length(1),  // shuffle/repeat status line, beneath the gauges
                 Constraint::min(1),     // flexible spacer → breathing room above controls
-                Constraint::length(1),  // controls hint, pinned to the bottom
+                Constraint::length(2),  // two-line key legend, pinned to the bottom
             )
             ->widgets(
                 $track,
@@ -132,6 +136,7 @@ final class PlayerRenderer
                 $album,
                 $this->progressRow($vm),
                 $this->volumeRow($vm),
+                $this->statusRow($vm),
                 ParagraphWidget::fromString(''),
                 $controls,
             );
@@ -152,6 +157,7 @@ final class PlayerRenderer
                 Constraint::length(1),  // album
                 Constraint::length(1),  // progress
                 Constraint::length(1),  // volume
+                Constraint::length(1),  // shuffle/repeat status line, beneath the gauges
                 Constraint::min(1),     // flexible spacer → fills the rest of the column
             )
             ->widgets(
@@ -160,6 +166,7 @@ final class PlayerRenderer
                 $album,
                 $this->progressRow($vm),
                 $this->volumeRow($vm),
+                $this->statusRow($vm),
                 ParagraphWidget::fromString(''),
             );
 
@@ -184,7 +191,7 @@ final class PlayerRenderer
             ->direction(Direction::Vertical)
             ->constraints(
                 Constraint::min(1),     // art + info region
-                Constraint::length(1),  // controls hint, pinned full-width to the bottom
+                Constraint::length(2),  // two-line key legend, pinned full-width to the bottom
             )
             ->widgets(
                 $columns,
@@ -532,24 +539,84 @@ final class PlayerRenderer
     }
 
     /**
-     * Single-line key-binding hint strip, surfacing live shuffle/repeat state so
-     * the controls double as a status readout.
+     * The key legend, as two grouped `key action` lines.
+     *
+     * WHY two grouped lines, not one dense strip: the audit's core "can't see the
+     * keys" complaint was a single line that crammed 9 items AND mixed key-hints
+     * with live state (🔀 off / 🔁 Off), so it was ambiguous which token was the
+     * key, the action, or the state. The fix splits concerns three ways — transport
+     * controls on line 1, panel/overlay actions on line 2, and live shuffle/repeat
+     * state moved out entirely to statusRow(). Each binding reads as "<key> <action>"
+     * with the key in the mood accent (so it pops) and the action dim.
+     *
+     * WHY no emoji here: the old strip used variation-selector glyphs (▶️🔀🔁⏭️⏮️)
+     * whose terminal width is AMBIGUOUS and reads wide/ragged — the same VS-16 trap
+     * documented on the progress line. Plain ASCII keys stay width-stable and align.
+     *
+     * @return list<Line>
      */
-    private function controlsHint(PlayerViewModel $vm): string
+    private function controlsLines(): array
+    {
+        // Line 1: transport. Line 2: panels/overlays + quit. Grouping makes the
+        // strip scannable and keeps each line inside a standard terminal width.
+        return [
+            $this->legendLine([
+                ['space', 'play/pause'],
+                ['n', 'next'],
+                ['p', 'prev'],
+                ['s', 'shuffle'],
+                ['r', 'repeat'],
+            ]),
+            $this->legendLine([
+                ['/', 'search'],
+                ['u', 'queue'],
+                ['l', 'playlists'],
+                ['q', 'quit'],
+            ]),
+        ];
+    }
+
+    /**
+     * Compose one legend line from `[key, action]` pairs: accent key + dim action,
+     * separated by a dim middot for breathing room.
+     *
+     * @param  list<array{0: string, 1: string}>  $pairs
+     */
+    private function legendLine(array $pairs): Line
+    {
+        $theme = $this->theme;
+        $sep = Span::styled('  ·  ', $theme->dim());
+
+        $spans = [];
+        foreach ($pairs as $i => [$key, $action]) {
+            if ($i > 0) {
+                $spans[] = $sep;
+            }
+            $spans[] = Span::styled($key, $theme->accent());
+            $spans[] = Span::styled(' '.$action, $theme->dim());
+        }
+
+        return Line::fromSpans(...$spans);
+    }
+
+    /**
+     * Compact shuffle/repeat status line, sat just beneath the gauges.
+     *
+     * WHY separate from the key legend: live state and key-hints are different
+     * kinds of information — interleaving them (the old "🔀 off · 🔁 Off" inside the
+     * key strip) was the audit's readability snag. Here each mode reads as a dim
+     * label + an accent value ("shuffle on · repeat All"), width-stable text only,
+     * so it scans as a status readout rather than another binding.
+     */
+    private function statusRow(PlayerViewModel $vm): Widget
     {
         $theme = $this->theme;
 
-        // Middot separators give the strip breathing room and clear grouping.
-        return implode('   ·   ', [
-            $theme->icon('play').'/'.$theme->icon('pause').' space',
-            $theme->icon('next').' n',
-            $theme->icon('prev').' p',
-            $theme->icon('shuffle').' '.($vm->shuffle ? 'on' : 'off'),
-            $theme->icon('repeat').' '.$vm->repeatLabel(),
-            $theme->icon('search').' /',
-            $theme->icon('queue').' u',
-            $theme->icon('playlist').' l',
-            'quit q',
-        ]);
+        return ParagraphWidget::fromLines(Line::fromSpans(
+            Span::styled('shuffle ', $theme->dim()),
+            Span::styled($vm->shuffle ? 'on' : 'off', $theme->accent()),
+            Span::styled('   ·   repeat ', $theme->dim()),
+            Span::styled($vm->repeatLabel(), $theme->accent()),
+        ));
     }
 }

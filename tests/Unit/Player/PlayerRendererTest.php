@@ -308,14 +308,51 @@ describe('PlayerRenderer', function (): void {
             ->toContain('60%');                // volume gauge label
     });
 
-    it('surfaces live shuffle and repeat state in the controls hint', function (): void {
+    it('surfaces live shuffle and repeat state in a separate status line', function (): void {
         $renderer = new PlayerRenderer(PlayerTheme::forMood('hype'));
 
         $on = renderPremiumPlayer($renderer->nowPlaying(sampleViewModel(['shuffle' => true, 'repeat' => 'track'])));
-        expect($on)->toContain('on')->toContain('Track')->toContain('hype'); // mood-aware
+        expect($on)
+            ->toContain('shuffle on')      // status line, not the key legend
+            ->toContain('repeat Track')
+            ->toContain('hype');           // mood-aware
 
         $off = renderPremiumPlayer($renderer->nowPlaying(sampleViewModel(['shuffle' => false, 'repeat' => 'off'])));
-        expect($off)->toContain('off')->toContain('Off');
+        expect($off)
+            ->toContain('shuffle off')
+            ->toContain('repeat Off');
+    });
+
+    it('renders a readable key legend with no state and no wide emoji, at the inline viewport', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        // Real 12-row inline viewport — the size the live player draws into.
+        $out = renderPremiumPlayerInline($renderer->nowPlaying(sampleViewModel()));
+
+        // Every binding is present as a readable `key action` pair…
+        expect($out)
+            ->toContain('play/pause')
+            ->toContain('next')
+            ->toContain('prev')
+            ->toContain('search')
+            ->toContain('queue')
+            ->toContain('playlists')
+            ->toContain('shuffle')
+            ->toContain('repeat')
+            ->toContain('quit');
+
+        // …and the variation-selector emoji that made the old strip read wide are
+        // GONE from the now-playing surface (legend + status are plain text).
+        expect($out)
+            ->not->toContain('▶️')
+            ->and($out)->not->toContain('⏸️')
+            ->and($out)->not->toContain('⏭️')
+            ->and($out)->not->toContain('⏮️')
+            ->and($out)->not->toContain('🔀')
+            ->and($out)->not->toContain('🔁');
+
+        // The live state lives on its own status line, separate from the legend.
+        expect($out)->toContain('shuffle on')->toContain('repeat All');
     });
 
     it('does not duplicate the music icon in the neutral title', function (): void {
