@@ -309,7 +309,16 @@ class PremiumPlayerCommand extends Command
         stream_set_blocking(STDIN, true);
 
         try {
-            $this->output->write(PHP_EOL.'  🔍 Search tracks: ');
+            // Clear the screen FIRST so the prompt opens on a clean terminal instead
+            // of printing on top of the still-rendered player panel — that overlap is
+            // what made the search line look stranded mid-panel. The TUI fully repaints
+            // via $display->clear() in the finally + the forced refetch on the next tick.
+            // (Interim UX fix; the proper centered php-tui search palette is the follow-up.)
+            $this->output->write("\033[2J\033[H");
+            $this->output->writeln('');
+            $this->output->writeln('  🔍  SEARCH');
+            $this->output->writeln('  '.str_repeat('─', 40));
+            $this->output->write('  Track: ');
             $query = trim((string) fgets(STDIN));
 
             if ($query === '') {
