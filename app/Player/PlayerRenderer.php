@@ -118,19 +118,27 @@ final class PlayerRenderer
      */
     private function singleColumnBody(PlayerViewModel $vm, Widget $track, Widget $artist, Widget $album, Widget $controls): Widget
     {
+        // WHY a spacer ABOVE and BELOW the content (not just a trailing one): the
+        // metadata block is shorter than the viewport, so a single trailing spacer
+        // dumped all the slack into one dead gap between the gauges and the legend
+        // (the audit's "blank middle"). Equal flexible spacers top and bottom instead
+        // CENTRE the block vertically between the title border and the pinned legend,
+        // so the leftover rows read as balanced padding rather than dead space.
         return GridWidget::default()
             ->direction(Direction::Vertical)
             ->constraints(
+                Constraint::min(1),     // top breathing room → centres the block
                 Constraint::length(1),  // track title
                 Constraint::length(1),  // artist
                 Constraint::length(1),  // album
                 Constraint::length(1),  // progress
                 Constraint::length(1),  // volume
                 Constraint::length(1),  // shuffle/repeat status line, beneath the gauges
-                Constraint::min(1),     // flexible spacer → breathing room above controls
+                Constraint::min(1),     // bottom breathing room above the legend
                 Constraint::length(2),  // two-line key legend, pinned to the bottom
             )
             ->widgets(
+                ParagraphWidget::fromString(''),
                 $track,
                 $artist,
                 $album,
@@ -149,18 +157,24 @@ final class PlayerRenderer
      */
     private function twoColumnBody(PlayerViewModel $vm, Widget $track, Widget $artist, Widget $album, Widget $controls): Widget
     {
+        // Centre the info block vertically against the taller album-art column:
+        // equal flexible spacers top and bottom so the metadata sits at the art's
+        // mid-line instead of top-aligned with a blank tail (the audit's "art column
+        // taller than info → blank middle"). Balances the two columns.
         $info = GridWidget::default()
             ->direction(Direction::Vertical)
             ->constraints(
+                Constraint::min(1),     // top breathing room → centres against the art
                 Constraint::length(1),  // track title
                 Constraint::length(1),  // artist
                 Constraint::length(1),  // album
                 Constraint::length(1),  // progress
                 Constraint::length(1),  // volume
                 Constraint::length(1),  // shuffle/repeat status line, beneath the gauges
-                Constraint::min(1),     // flexible spacer → fills the rest of the column
+                Constraint::min(1),     // bottom breathing room
             )
             ->widgets(
+                ParagraphWidget::fromString(''),
                 $track,
                 $artist,
                 $album,

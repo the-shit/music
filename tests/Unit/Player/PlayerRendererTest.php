@@ -325,6 +325,35 @@ describe('PlayerRenderer', function (): void {
             ->not->toContain('▶');                // nothing selectable yet
     });
 
+    it('balances the now-playing panel with no dead block of blank rows at the inline viewport', function (): void {
+        // The audit's "blank middle": a single trailing spacer dumped all the slack
+        // into one dead gap. Centring splits it into isolated top/bottom padding, so
+        // the panel interior must have NO run of 2+ consecutive blank rows.
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        $out = renderPremiumPlayerInline($renderer->nowPlaying(sampleViewModel()));
+
+        $rows = explode("\n", rtrim($out, "\n"));
+        // Drop the top/bottom border rows; keep the panel interior.
+        $interior = array_slice($rows, 1, max(0, count($rows) - 2));
+        // A row is "blank" once the │ side borders are stripped and only space remains.
+        $blank = array_map(
+            fn (string $r): bool => trim(str_replace('│', '', $r)) === '',
+            $interior,
+        );
+
+        $maxRun = 0;
+        $run = 0;
+        foreach ($blank as $isBlank) {
+            $run = $isBlank ? $run + 1 : 0;
+            $maxRun = max($maxRun, $run);
+        }
+
+        expect($maxRun)->toBeLessThanOrEqual(1)         // no 2+ row dead gap
+            ->and($out)->toContain('Bohemian Rhapsody') // content intact
+            ->and($out)->toContain('quit');             // legend still pinned in view
+    });
+
     it('composes the now-playing panel with track, artist, progress and mood badge', function (): void {
         $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
 
