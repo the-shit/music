@@ -262,6 +262,26 @@ describe('PlayerRenderer', function (): void {
             ->toContain('close');
     });
 
+    it('advertises the search-from-queue and skip actions in the queue footer at the 12-row viewport', function (): void {
+        // The queue overlay is an EDITOR now: `/` layers the search palette over
+        // the queue (add tracks in context) and `n` skips the current track. Both
+        // hints must survive — un-clipped — at the real inline(12) size; a hint
+        // the footer can't show may as well not exist.
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        $queue = [
+            ['name' => 'Dreams', 'uri' => 'spotify:track:1', 'artists' => [['name' => 'Fleetwood Mac']]],
+            ['name' => 'Black', 'uri' => 'spotify:track:2', 'artists' => [['name' => 'Pearl Jam']]],
+        ];
+
+        $out = renderPremiumPlayerInline($renderer->queueOverlay($queue, 0));
+
+        expect($out)
+            ->toContain('/ search')         // open the palette over the queue
+            ->toContain('n skip')           // skip the current track
+            ->toContain('esc close');       // the END of the footer — nothing clipped
+    });
+
     it('renders the playlist overlay with visible items at the real 12-row inline viewport', function (): void {
         // Same regression guard for `l`: visible at inline(12), footer not clipped.
         $renderer = new PlayerRenderer(PlayerTheme::forMood('hype'));
