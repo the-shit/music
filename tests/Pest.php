@@ -66,6 +66,31 @@ if (! function_exists('mb_strimwidth')) {
 uses(Tests\TestCase::class)->in('Feature', 'Unit/Agents');
 
 /*
+| Terminal & process safety net for the whole suite.
+|
+| Laravel Prompts' spin() forks a spinner child and, in its destructor, kills it
+| with posix_kill(pid, SIGHUP) but NEVER reaps it. Across a full suite these
+| zombies accumulate until fork() fails — at which point the destructor runs
+| posix_kill(-1, SIGHUP), broadcasting SIGHUP to the whole process group and
+| killing the test runner mid-suite (exit 129) at a non-deterministic point.
+| Reaping the children after every test keeps the process table clean.
+|
+| The stty restore is belt-and-braces in case a command (e.g. the php-tui
+| player) ever leaves the terminal in raw mode / the alternate screen.
+*/
+uses()->afterEach(function (): void {
+    if (function_exists('pcntl_waitpid')) {
+        while (@pcntl_waitpid(-1, $status, WNOHANG) > 0) {
+            // reap any finished spinner-fork children
+        }
+    }
+
+    if (PHP_OS_FAMILY !== 'Windows') {
+        @exec('stty sane 2>/dev/null');
+    }
+})->in('Feature', 'Unit');
+
+/*
 |--------------------------------------------------------------------------
 | Laravel Prompts spin() — deterministic full suite (no SIGHUP hang)
 |--------------------------------------------------------------------------

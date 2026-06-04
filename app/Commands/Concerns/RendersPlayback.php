@@ -2,6 +2,8 @@
 
 namespace App\Commands\Concerns;
 
+use PhpTui\Tui\Color\AnsiColor;
+
 /**
  * Reusable terminal-rendering helpers for playback displays.
  *
@@ -10,6 +12,97 @@ namespace App\Commands\Concerns;
  */
 trait RendersPlayback
 {
+    /**
+     * Classify a "mood" from a track's audio features (energy/valence), mapping
+     * onto the same vocabulary as config('autopilot.mood_presets'). Returns
+     * 'neutral' when features are unavailable (e.g. the audio-features endpoint
+     * is deprecated/403 for the app) so theming degrades gracefully.
+     *
+     * @param  array{energy?: float, valence?: float, instrumentalness?: float}|null  $features
+     */
+    protected function classifyMood(?array $features): string
+    {
+        if ($features === null || ! isset($features['energy'], $features['valence'])) {
+            return 'neutral';
+        }
+
+        $energy = (float) $features['energy'];
+        $valence = (float) $features['valence'];
+        $instrumental = (float) ($features['instrumentalness'] ?? 0);
+
+        return match (true) {
+            $energy >= 0.85 && $valence >= 0.7 => 'party',
+            $energy >= 0.75 => 'hype',
+            $energy <= 0.4 && $valence <= 0.35 => 'melancholy',
+            $energy <= 0.4 => 'chill',
+            $energy <= 0.6 && $instrumental >= 0.5 => 'focus',
+            $valence >= 0.7 => 'upbeat',
+            default => 'flow',
+        };
+    }
+
+    /**
+     * Accent colour for a mood — the ambient tint applied across the player
+     * surface (border, title, progress fill).
+     */
+    protected function moodColor(string $mood): AnsiColor
+    {
+        return match ($mood) {
+            'chill' => AnsiColor::Cyan,
+            'flow' => AnsiColor::Green,
+            'focus' => AnsiColor::Blue,
+            'hype' => AnsiColor::Red,
+            'party' => AnsiColor::Magenta,
+            'upbeat' => AnsiColor::LightYellow,
+            'melancholy' => AnsiColor::LightBlue,
+            'ambient' => AnsiColor::Gray,
+            'workout' => AnsiColor::LightRed,
+            'sleep' => AnsiColor::Blue,
+            default => AnsiColor::Cyan,
+        };
+    }
+
+    /**
+     * Icon + name badge shown in the now-playing title, e.g. "😌 chill".
+     */
+    protected function moodLabel(string $mood): string
+    {
+        $icon = match ($mood) {
+            'chill' => '😌',
+            'flow' => '🌊',
+            'focus' => '🎯',
+            'hype' => '🔥',
+            'party' => '🎉',
+            'upbeat' => '☀️',
+            'melancholy' => '🌧️',
+            'ambient' => '🌌',
+            'workout' => '💪',
+            'sleep' => '🌙',
+            default => '🎵',
+        };
+
+        return $mood === 'neutral' ? $icon : $icon.' '.$mood;
+    }
+
+    /**
+     * Truncate to a display width (mb_strwidth-based), appending an ellipsis
+     * when clipped. Used for track/artist/album lines.
+     */
+    protected function truncateDisplay(string $text, int $width): string
+    {
+        if (mb_strwidth($text) <= $width) {
+            return $text;
+        }
+
+        $ellipsis = '…';
+        $target = max(0, $width - 1);
+        while (mb_strwidth($text) > $target && $text !== '') {
+            $text = mb_substr($text, 0, -1);
+        }
+
+        return rtrim($text).$ellipsis;
+    }
+
     protected function formatProgress(int $progressMs, int $durationMs): string
     {
         $progressSec = floor($progressMs / 1000);
