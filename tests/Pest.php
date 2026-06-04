@@ -67,6 +67,32 @@ uses(Tests\TestCase::class)->in('Feature', 'Unit/Agents');
 
 /*
 |--------------------------------------------------------------------------
+| Laravel Prompts spin() — no-fork in tests (deterministic suite)
+|--------------------------------------------------------------------------
+|
+| Laravel\Prompts\Spinner::spin() forks a spinner child whenever both
+| pcntl_fork() and posix_kill() exist, then in its destructor kills that
+| child with posix_kill($pid, SIGHUP) but never reaps it. Across a full
+| suite the zombies accumulate until fork() itself fails and returns -1 —
+| at which point the destructor runs posix_kill(-1, SIGHUP), broadcasting
+| SIGHUP to the whole process group and killing the test runner mid-suite
+| (the intermittent exit-129 hang).
+|
+| spin() is the one prompt that bypasses Prompt::interactive()/fallbackWhen()
+| entirely — it only consults function_exists('pcntl_fork'). Since
+| disable_functions is PHP_INI_SYSTEM it cannot be flipped from PHP at
+| runtime, so the suite is launched with `-d disable_functions=pcntl_fork`
+| (see the "test"/"test:coverage" scripts in composer.json). With pcntl_fork
+| unavailable, spin() takes its synchronous renderStatically() path: the
+| callback runs inline, no child is forked, and the SIGHUP that killed the
+| runner is never sent. posix_kill stays enabled for the daemon tests.
+|
+| tests/Feature/PromptsNoForkTest.php guards this: it fails loudly if the
+| suite is ever run without the flag, so the fix can't silently regress.
+*/
+
+/*
+|--------------------------------------------------------------------------
 | Expectations
 |--------------------------------------------------------------------------
 |
