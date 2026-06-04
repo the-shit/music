@@ -360,6 +360,82 @@ describe('PlayerRenderer', function (): void {
             ->and(substr_count($out, '▶'))->toBe(1); // exactly one highlighted row
     });
 
+    it('renders the lyrics overlay with visible lines at the real 12-row inline viewport', function (): void {
+        // Same regression guard as the other overlays: the live player draws into
+        // inline(12); lyrics that clipped to nothing would make `y` read as a no-op.
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        $lines = ['Is this the real life?', 'Is this just fantasy?', 'Caught in a landslide'];
+
+        $out = renderPremiumPlayerInline($renderer->lyricsOverlay('Bohemian Rhapsody', $lines, 0));
+
+        expect($out)
+            ->toContain('Lyrics')                    // overlay title
+            ->toContain('Bohemian Rhapsody')         // self-identifying track label
+            ->toContain('Is this the real life?')    // lyric lines visible
+            ->toContain('Caught in a landslide')
+            ->toContain('scroll')                    // footer hint pinned, not clipped
+            ->toContain('esc close')                 // the END of the footer survives
+            ->not->toContain('▶ ');                  // read-only: no selection marker
+    });
+
+    it('windows long lyrics from the scroll offset with a position cue', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        // 20 lines, 8-row window, scrolled to offset 5 → lines 6–13 visible.
+        $lines = array_map(fn (int $i): string => "Lyric line {$i}", range(1, 20));
+
+        $out = renderPremiumPlayer($renderer->lyricsOverlay('Song', $lines, 5));
+
+        expect($out)
+            ->toContain('Lyric line 6')      // window starts at the offset
+            ->toContain('Lyric line 13')     // …and shows a full page
+            ->not->toContain('Lyric line 1 ') // above the window
+            ->not->toContain('Lyric line 14') // below the window
+            ->toContain('6–13 / 20');        // position cue in the footer
+    });
+
+    it('clamps an overshooting lyrics scroll to the last full page', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        // A stale offset (e.g. after a track change) far past the end must window
+        // the LAST page, not render blank.
+        $lines = array_map(fn (int $i): string => "Lyric line {$i}", range(1, 10));
+
+        $out = renderPremiumPlayer($renderer->lyricsOverlay('Song', $lines, 99));
+
+        expect($out)
+            ->toContain('Lyric line 3')      // last page = lines 3–10
+            ->toContain('Lyric line 10')
+            ->not->toContain('Lyric line 2 ');
+    });
+
+    it('shows a calm no-lyrics state for null and empty lines at the inline viewport', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('neutral'));
+
+        // null = no match / network failure / instrumental — all the same calm state.
+        $null = renderPremiumPlayerInline($renderer->lyricsOverlay('Song', null, 0));
+        expect($null)
+            ->toContain('Lyrics')
+            ->toContain('No lyrics found')
+            ->toContain('esc close');
+
+        $empty = renderPremiumPlayerInline($renderer->lyricsOverlay(null, [], 0));
+        expect($empty)->toContain('No lyrics found');
+    });
+
+    it('advertises the lyrics key in the now-playing legend', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        // `y lyrics` must be readable at the real 12-row inline viewport, with the
+        // legend's END (`q quit`) not clipped off by the new entry.
+        $out = renderPremiumPlayerInline($renderer->nowPlaying(sampleViewModel()));
+
+        expect($out)
+            ->toContain('y lyrics')
+            ->toContain('q quit');
+    });
+
     it('shows only the input and a hint for an empty search query', function (): void {
         $renderer = new PlayerRenderer(PlayerTheme::forMood('hype'));
 

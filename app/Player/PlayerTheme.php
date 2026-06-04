@@ -177,6 +177,7 @@ final class PlayerTheme
             'search' => '🔍',
             'queue' => '📋',
             'playlist' => '📚',
+            'lyrics' => '📝',
             'device' => '📱',
             'music' => '🎵',
             'artist' => '👤',

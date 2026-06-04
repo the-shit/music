@@ -61,6 +61,14 @@ final class PlayerRenderer
     private const SEARCH_RESULTS = 8;
 
     /**
+     * Visible lyric lines per page in the lyrics overlay — same row budget as the
+     * other modals so the footer survives the 12-row inline viewport. PUBLIC so
+     * the command can clamp its scroll offset to the identical window without
+     * duplicating (and inevitably de-syncing) the constant.
+     */
+    public const LYRICS_ROWS = 8;
+
+    /**
      * Fixed cell width of the progress meter. Fixed (not flexible) because we render
      * the bar's TRACK ourselves — see progressBar() — which needs a known length.
      * Sits comfortably inside the art-narrowed info column beside the time label.
@@ -441,6 +449,61 @@ final class PlayerRenderer
     }
 
     /**
+     * Lyrics overlay: a centered modal showing the current track's lyrics, a
+     * LYRICS_ROWS window at a time, scrolled with ↑↓ from the given line offset.
+     *
+     * WHY scroll-not-select (unlike the sibling overlays): lyrics are prose to
+     * READ, not rows to act on — there is no per-line action, so the ▶ selection
+     * marker would be noise. The window slides over the lines instead, and the
+     * footer carries a "from–to / total" position cue so a long lyric sheet
+     * doesn't feel bottomless. Null/empty lines (no match, network failure,
+     * instrumental) render the calm "No lyrics found" state — same contract as
+     * the other overlays' empty states, never a crash.
+     *
+     * @param  list<string>|null  $lines  null = no lyrics available for this track
+     */
+    public function lyricsOverlay(?string $trackLabel, ?array $lines, int $scroll, string $status = ''): Widget
+    {
+        $theme = $this->theme;
+
+        if ($lines === null || $lines === []) {
+            $bodyLines = [Line::fromSpans(Span::styled('No lyrics found', $theme->dim()))];
+            $position = '';
+        } else {
+            $count = count($lines);
+
+            // Clamp defensively: the command clamps too, but a stale offset after
+            // a track change must window safely rather than render past the end.
+            $start = max(0, min($scroll, max(0, $count - self::LYRICS_ROWS)));
+
+            $bodyLines = array_map(
+                fn (string $line): Line => Line::fromSpans(
+                    Span::styled($this->truncateDisplay($line, self::TEXT_WIDTH), $theme->text())
+                ),
+                array_slice($lines, $start, self::LYRICS_ROWS),
+            );
+
+            // Position cue only when there is actually more than one page.
+            $position = $count > self::LYRICS_ROWS
+                ? ($start + 1).'–'.min($count, $start + self::LYRICS_ROWS).' / '.$count
+                : '';
+        }
+
+        // Unified footer shape; the scroll position rides the status slot (an
+        // explicit status — e.g. a fetch note — takes precedence when present).
+        $footer = $this->modalFooter('↑↓ scroll · esc close', $status !== '' ? $status : $position);
+
+        $contents = $this->listContents($bodyLines, $footer);
+
+        // Title carries the track so the sheet is self-identifying: "📝 Lyrics — Song".
+        $title = ' '.$theme->icon('lyrics').' Lyrics'
+            .($trackLabel !== null && $trackLabel !== '' ? ' — '.$this->truncateDisplay($trackLabel, 32) : '')
+            .' ';
+
+        return $this->centeredModal($title, $contents);
+    }
+
+    /**
      * Compose a modal footer: the static key hints, prefixed with any inline status
      * (a no-device note, a "+ queued" confirm). One helper so the search palette,
      * queue overlay and playlist picker render the status/hints identically — the
@@ -651,6 +714,7 @@ final class PlayerRenderer
                 ['u', 'queue'],
                 ['l', 'playlists'],
                 ['t', 'theme'],
+                ['y', 'lyrics'], // 'y' because 'l' (the natural mnemonic) is taken by playlists
                 ['q', 'quit'],
             ]),
         ];

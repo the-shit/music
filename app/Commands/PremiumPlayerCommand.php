@@ -6,6 +6,7 @@ namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Player\GenreMoodMap;
+use App\Player\LyricsProvider;
 use App\Player\PlayerRenderer;
 use App\Player\PlayerTheme;
 use App\Player\PlayerViewModel;
@@ -84,9 +85,11 @@ class PremiumPlayerCommand extends Command
 
     private const CYCLE_THEME = 'cycle-theme';
 
+    private const LYRICS = 'lyrics';
+
     private const NONE = 'none';
 
-    public function handle(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery, GenreMoodMap $genreMoodMap): int
+    public function handle(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery, GenreMoodMap $genreMoodMap, LyricsProvider $lyricsProvider): int
     {
         if (! $this->ensureConfigured()) {
             return self::FAILURE;
@@ -101,14 +104,14 @@ class PremiumPlayerCommand extends Command
             return self::FAILURE;
         }
 
-        return $this->runLoop($player, $discovery, $genreMoodMap);
+        return $this->runLoop($player, $discovery, $genreMoodMap, $lyricsProvider);
     }
 
     /**
      * The interactive render/input loop. Everything terminal-mutating is wrapped
      * so the terminal is ALWAYS restored, even on error or Ctrl+C.
      */
-    private function runLoop(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery, GenreMoodMap $genreMoodMap): int
+    private function runLoop(SpotifyPlayerService $player, SpotifyDiscoveryService $discovery, GenreMoodMap $genreMoodMap, LyricsProvider $lyricsProvider): int
     {
         // HARD GUARD: php-tui's Terminal enables raw mode + a non-blocking stdin
         // event reader. Constructing it without a real interactive TTY (tests,
@@ -190,6 +193,12 @@ class PremiumPlayerCommand extends Command
         // no-device failure) without closing the overlay, mirroring the palette.
         $playlist = ['active' => false, 'items' => [], 'selected' => 0, 'status' => ''];
 
+        // Lyrics overlay state. 'lines' is the LyricsProvider result for the track
+        // the overlay was opened on (null = no lyrics), snapshotted ON OPEN — the
+        // provider caches per track, so reopening is free, and fetching once means
+        // the loop never does lyrics I/O per frame. 'scroll' is the top visible line.
+        $lyrics = ['active' => false, 'track' => null, 'lines' => null, 'scroll' => 0];
+
         try {
             while ($running) {
                 $now = microtime(true);
@@ -244,13 +253,13 @@ class PremiumPlayerCommand extends Command
 
                 // Force a full repaint when the surface changes (panel ↔ any overlay)
                 // so a closing overlay never leaves residue behind — see $lastSurface.
-                $surface = $this->currentSurface($search, $queue, $playlist);
+                $surface = $this->currentSurface($search, $queue, $playlist, $lyrics);
                 if ($surface !== $lastSurface) {
                     $display->clear();
                     $lastSurface = $surface;
                 }
 
-                $display->draw($this->frame($renderer, $vm, $search, $queue, $playlist));
+                $display->draw($this->frame($renderer, $vm, $search, $queue, $playlist, $lyrics));
 
                 // Drain all buffered input each tick (next() is non-blocking). Each
                 // overlay consumes keys differently; only one is ever active at a time.
@@ -282,6 +291,8 @@ class PremiumPlayerCommand extends Command
                         }
                     } elseif ($playlist['active']) {
                         $outcome = $this->handlePlaylistEvent($event, $player, $playlist);
+                    } elseif ($lyrics['active']) {
+                        $outcome = $this->handleLyricsEvent($event, $lyrics);
                     } else {
                         $outcome = $this->handleEvent($event, $player, $vm);
 
@@ -319,6 +330,19 @@ class PremiumPlayerCommand extends Command
                             if ($vm !== null && $vm->hasPlayback) {
                                 $vm->mood = $themeOverride ?? $mood;
                             }
+
+                            continue;
+                        }
+
+                        // `y` opens the lyrics overlay for the CURRENT track; fetch
+                        // (or cache-hit) the lyrics now, once, never per frame.
+                        if ($outcome === self::LYRICS) {
+                            $lyrics = [
+                                'active' => true,
+                                'track' => ($vm !== null && $vm->hasPlayback) ? $vm->title : null,
+                                'lines' => $this->safeLyrics($lyricsProvider, $vm),
+                                'scroll' => 0,
+                            ];
 
                             continue;
                         }
@@ -424,6 +448,7 @@ class PremiumPlayerCommand extends Command
                 'u' => self::QUEUE, // 'u' for up-next, since 'q' is quit
                 'l' => self::PLAYLIST, // opens the playlist picker overlay
                 't' => self::CYCLE_THEME, // cycles the manual mood theme (Auto → chill → …)
+                'y' => self::LYRICS, // lyrics overlay ('y' since 'l' is playlists)
                 ' ' => $this->togglePlayback($player, $vm),
                 'n' => $this->then(fn () => $player->next()),
                 'p' => $this->then(fn () => $player->previous()),
@@ -446,16 +471,17 @@ class PremiumPlayerCommand extends Command
     }
 
     /**
-     * Choose what to draw this tick: whichever overlay is open (search, queue, or
-     * playlist), otherwise the now-playing panel (or the empty state). All are drawn
-     * into the same inline viewport, so an overlay reads as a centered modal over
-     * the player. At most one overlay is ever active at a time.
+     * Choose what to draw this tick: whichever overlay is open (search, queue,
+     * playlist, or lyrics), otherwise the now-playing panel (or the empty state).
+     * All are drawn into the same inline viewport, so an overlay reads as a
+     * centered modal over the player. At most one overlay is ever active at a time.
      *
      * @param  array<string, mixed>  $search
      * @param  array<string, mixed>  $queue
      * @param  array<string, mixed>  $playlist
+     * @param  array<string, mixed>  $lyrics
      */
-    private function frame(PlayerRenderer $renderer, ?PlayerViewModel $vm, array $search, array $queue, array $playlist): Widget
+    private function frame(PlayerRenderer $renderer, ?PlayerViewModel $vm, array $search, array $queue, array $playlist, array $lyrics): Widget
     {
         if ($search['active']) {
             return $renderer->searchOverlay($search['query'], $search['results'], $search['selected'], $search['status']);
@@ -467,6 +493,10 @@ class PremiumPlayerCommand extends Command
 
         if ($playlist['active']) {
             return $renderer->playlistOverlay($playlist['items'], $playlist['selected'], $playlist['status']);
+        }
+
+        if ($lyrics['active']) {
+            return $renderer->lyricsOverlay($lyrics['track'], $lyrics['lines'], $lyrics['scroll']);
         }
 
         return ($vm !== null && $vm->hasPlayback) ? $renderer->nowPlaying($vm) : $renderer->empty();
@@ -481,13 +511,15 @@ class PremiumPlayerCommand extends Command
      * @param  array<string, mixed>  $search
      * @param  array<string, mixed>  $queue
      * @param  array<string, mixed>  $playlist
+     * @param  array<string, mixed>  $lyrics
      */
-    private function currentSurface(array $search, array $queue, array $playlist): string
+    private function currentSurface(array $search, array $queue, array $playlist, array $lyrics): string
     {
         return match (true) {
             $search['active'] => 'search',
             $queue['active'] => 'queue',
             $playlist['active'] => 'playlist',
+            $lyrics['active'] => 'lyrics',
             default => 'panel',
         };
     }
@@ -783,6 +815,74 @@ class PremiumPlayerCommand extends Command
         }
 
         return self::NONE;
+    }
+
+    /**
+     * Handle a keypress while the lyrics overlay is open: ↑↓ scroll the visible
+     * window over the lyric lines, esc closes, Ctrl+C still quits the whole
+     * player. No per-line action — lyrics are read, not selected — so this is
+     * the simplest of the overlay handlers. Pure state mutation, NO API calls:
+     * the lines were snapshotted when the overlay opened.
+     *
+     * @param  array<string, mixed>  $lyrics
+     */
+    private function handleLyricsEvent(object $event, array &$lyrics): string
+    {
+        if ($event instanceof CodedKeyEvent) {
+            return match ($event->code) {
+                KeyCode::Esc => $this->closeOverlay($lyrics),
+                KeyCode::Up => $this->scrollLyrics($lyrics, -1),
+                KeyCode::Down => $this->scrollLyrics($lyrics, 1),
+                default => self::NONE,
+            };
+        }
+
+        if ($event instanceof CharKeyEvent && $event->char === "\x03") {
+            return self::QUIT;
+        }
+
+        return self::NONE;
+    }
+
+    /**
+     * Slide the lyrics window, clamped so the last page stays full — the offset
+     * never scrolls past (line count − visible rows), using the renderer's OWN
+     * window constant so the clamp and the rendered slice can't drift apart.
+     *
+     * @param  array<string, mixed>  $lyrics
+     */
+    private function scrollLyrics(array &$lyrics, int $delta): string
+    {
+        $count = is_array($lyrics['lines']) ? count($lyrics['lines']) : 0;
+        $maxScroll = max(0, $count - PlayerRenderer::LYRICS_ROWS);
+        $lyrics['scroll'] = max(0, min($maxScroll, $lyrics['scroll'] + $delta));
+
+        return self::NONE;
+    }
+
+    /**
+     * Fetch the current track's lyrics without ever throwing — no playback, no
+     * match, or any provider failure all collapse to null, which the overlay
+     * renders as the calm "No lyrics found" state. lrclib matches on duration
+     * in SECONDS when known (the VM carries ms).
+     *
+     * @return list<string>|null
+     */
+    private function safeLyrics(LyricsProvider $provider, ?PlayerViewModel $vm): ?array
+    {
+        if ($vm === null || ! $vm->hasPlayback) {
+            return null;
+        }
+
+        try {
+            return $provider->lines(
+                $vm->artist,
+                $vm->title,
+                $vm->durationMs > 0 ? intdiv($vm->durationMs, 1000) : null,
+            );
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**
