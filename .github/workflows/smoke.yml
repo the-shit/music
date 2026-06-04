@@ -28,7 +28,10 @@ jobs:
         run: php spotify list
 
       - name: Test suite passes
-        run: vendor/bin/pest --no-coverage
+        # -d disable_functions=pcntl_fork forces Laravel Prompts' spin() onto its
+        # synchronous path so it never forks an unreaped spinner child (the
+        # source of the intermittent SIGHUP / exit-129 hang). See tests/Pest.php.
+        run: php -d disable_functions=pcntl_fork vendor/bin/pest --no-coverage
 
       - name: Static analysis passes
         run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress

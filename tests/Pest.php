@@ -67,28 +67,39 @@ uses(Tests\TestCase::class)->in('Feature', 'Unit/Agents');
 
 /*
 |--------------------------------------------------------------------------
-| Laravel Prompts spin() — no-fork in tests (deterministic suite)
+| Laravel Prompts spin() — deterministic full suite (no SIGHUP hang)
 |--------------------------------------------------------------------------
 |
 | Laravel\Prompts\Spinner::spin() forks a spinner child whenever both
-| pcntl_fork() and posix_kill() exist, then in its destructor kills that
-| child with posix_kill($pid, SIGHUP) but never reaps it. Across a full
-| suite the zombies accumulate until fork() itself fails and returns -1 —
-| at which point the destructor runs posix_kill(-1, SIGHUP), broadcasting
-| SIGHUP to the whole process group and killing the test runner mid-suite
-| (the intermittent exit-129 hang).
+| pcntl_fork() and posix_kill() exist, kills that child from its destructor
+| with posix_kill($pid, SIGHUP), but never reaps it. Across a full suite the
+| zombies accumulate until fork() itself fails and returns -1 — at which point
+| the destructor runs posix_kill(-1, SIGHUP), broadcasting SIGHUP to the whole
+| process group and killing the test runner mid-suite (the intermittent
+| exit-129 hang).
 |
-| spin() is the one prompt that bypasses Prompt::interactive()/fallbackWhen()
-| entirely — it only consults function_exists('pcntl_fork'). Since
-| disable_functions is PHP_INI_SYSTEM it cannot be flipped from PHP at
-| runtime, so the suite is launched with `-d disable_functions=pcntl_fork`
-| (see the "test"/"test:coverage" scripts in composer.json). With pcntl_fork
-| unavailable, spin() takes its synchronous renderStatically() path: the
-| callback runs inline, no child is forked, and the SIGHUP that killed the
-| runner is never sent. posix_kill stays enabled for the daemon tests.
+| The fix is to stop spin() forking. spin() bypasses
+| Prompt::interactive()/fallbackWhen() entirely — it branches only on
+| function_exists('pcntl_fork') — so the only switch is the function's
+| availability. disable_functions is PHP_INI_SYSTEM and cannot be flipped from
+| PHP at runtime (no ini_set, no phpunit <ini>, and the prompts helper is
+| already autoloaded before this file runs, so it can't be shadowed either).
+| The suite is therefore launched with `-d disable_functions=pcntl_fork`:
 |
-| tests/Feature/PromptsNoForkTest.php guards this: it fails loudly if the
-| suite is ever run without the flag, so the fix can't silently regress.
+|   - composer.json "test" / "test:coverage" scripts
+|   - .github/workflows/smoke.yml test step
+|
+| With pcntl_fork unavailable spin() takes its synchronous renderStatically()
+| path: the callback runs inline, nothing forks, and the fatal SIGHUP is never
+| sent. Only pcntl_fork is disabled — posix_kill stays available for the daemon
+| tests that assert on it. (Reaping spinner children after each test was tried
+| and does NOT prevent the hang: a heavy test outpaces an afterEach hook, and
+| the Spinner restores pcntl_async_signals to off after every call, defeating a
+| SIGCHLD auto-reaper. Removing the fork is the only reliable fix.)
+|
+| Always run the suite via `composer test`. tests/Feature/PromptsNoForkTest.php
+| pins the behaviour that matters: spin() runs its callback inline and returns
+| its value.
 */
 
 /*
