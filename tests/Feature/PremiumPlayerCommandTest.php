@@ -157,6 +157,87 @@ describe('PremiumPlayerCommand', function (): void {
     });
 
     /**
+     * The queue overlay is an editor now: `/` layers the search palette over the
+     * queue (the loop reads the 'search' outcome and opens the palette with
+     * returnTo=queue, leaving the queue state intact underneath).
+     */
+    it('returns the search outcome on / from the queue overlay without closing it', function (): void {
+        $player = Mockery::mock(SpotifyPlayerService::class);
+
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'handleQueueEvent');
+
+        $queue = [
+            'active' => true,
+            'selected' => 0,
+            'status' => '',
+            'items' => [['uri' => 'spotify:track:abc']],
+        ];
+        $args = [\PhpTui\Term\Event\CharKeyEvent::new('/'), $player, &$queue];
+        $outcome = $method->invokeArgs($command, $args);
+
+        expect($outcome)->toBe('search')
+            ->and($queue['active'])->toBeTrue(); // queue stays underneath the palette
+    });
+
+    /**
+     * `n` from the queue overlay skips the current track. The queue shifts when
+     * its head starts playing, so the handler re-snapshots the items in place
+     * (selection clamped) and keeps the overlay open.
+     */
+    it('skips the current track on n and re-snapshots the queue in place', function (): void {
+        $player = Mockery::mock(SpotifyPlayerService::class);
+        $player->shouldReceive('next')->once();
+        $player->shouldReceive('getQueue')->once()->andReturn([
+            'queue' => [['uri' => 'spotify:track:next', 'name' => 'Next Up']],
+        ]);
+
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'handleQueueEvent');
+
+        $queue = [
+            'active' => true,
+            'selected' => 1, // beyond the post-skip length → must clamp to 0
+            'status' => 'stale note',
+            'items' => [
+                ['uri' => 'spotify:track:a'],
+                ['uri' => 'spotify:track:b'],
+            ],
+        ];
+        $args = [\PhpTui\Term\Event\CharKeyEvent::new('n'), $player, &$queue];
+        $outcome = $method->invokeArgs($command, $args);
+
+        expect($outcome)->toBe('refresh')                       // panel refetches now-playing
+            ->and($queue['active'])->toBeTrue()                 // overlay stays open
+            ->and($queue['items'])->toHaveCount(1)              // fresh snapshot, not the stale pair
+            ->and($queue['items'][0]['uri'])->toBe('spotify:track:next')
+            ->and($queue['selected'])->toBe(0)                  // clamped to the new length
+            ->and($queue['status'])->toBe('');                  // stale status cleared
+    });
+
+    it('keeps the queue overlay open with an inline status when the skip fails', function (): void {
+        $player = Mockery::mock(SpotifyPlayerService::class);
+        $player->shouldReceive('next')->once()->andThrow(new Exception('No active device'));
+
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'handleQueueEvent');
+
+        $queue = [
+            'active' => true,
+            'selected' => 0,
+            'status' => '',
+            'items' => [['uri' => 'spotify:track:abc']],
+        ];
+        $args = [\PhpTui\Term\Event\CharKeyEvent::new('n'), $player, &$queue];
+        $outcome = $method->invokeArgs($command, $args);
+
+        expect($outcome)->toBe('none')
+            ->and($queue['active'])->toBeTrue()
+            ->and($queue['status'])->toBe('No active device')
+            ->and($queue['items'])->toHaveCount(1); // snapshot untouched on failure
+    });
+
+    /**
      * The now-playing panel gained an "up next" peek, resolved on track change from
      * the queue. peekUpNext() formats the next track as "Title — Artist" (or null).
      */
