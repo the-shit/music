@@ -134,7 +134,21 @@ describe('PlayerRenderer', function (): void {
             ->toContain('Taylor Swift')           // artist shown
             ->toContain('▶ Day N Nite')           // selection marker on the chosen row
             ->toContain('select')                 // footer hint
-            ->toContain('play');
+            ->toContain('play')
+            ->toContain('queue');                 // add-to-queue action (a queue)
+    });
+
+    it('advertises the add-to-queue action and shows a queued confirm at the inline viewport', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+        $results = [['uri' => 'spotify:track:1', 'name' => 'Daylight', 'artist' => 'Taylor Swift']];
+
+        // Default footer advertises both the ⏎ play and `a` queue actions.
+        $out = renderPremiumPlayerInline($renderer->searchOverlay('day', $results, 0));
+        expect($out)->toContain('play')->toContain('queue');
+
+        // After `a`, a brief inline confirm is shown (status arg); palette stays up.
+        $confirm = renderPremiumPlayerInline($renderer->searchOverlay('day', $results, 0, '+ queued'));
+        expect($confirm)->toContain('+ queued')->toContain('Daylight');
     });
 
     it('renders the queue overlay with up-next tracks and a highlighted row', function (): void {

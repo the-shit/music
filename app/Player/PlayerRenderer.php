@@ -292,8 +292,10 @@ final class PlayerRenderer
             }
         }
 
-        // Footer: static key hints, plus any inline status (e.g. a no-device note).
-        $footer = '↑↓ select · ⏎ play · esc cancel';
+        // Footer: static key hints, plus any inline status (e.g. a no-device note
+        // or a "+ queued" confirm). Two actions on the selected result now — ⏎ plays
+        // it now, `a` adds it to the queue.
+        $footer = '↑↓ select · ⏎ play · a queue · esc cancel';
         if ($status !== '') {
             $footer = $status.'   ·   '.$footer;
         }

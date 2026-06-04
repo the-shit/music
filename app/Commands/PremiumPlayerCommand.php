@@ -473,6 +473,17 @@ class PremiumPlayerCommand extends Command
             return $this->backspaceQuery($search);
         }
 
+        // `a` is a dedicated ACTION key here (add the highlighted result to the
+        // queue), per the footer "a queue" — so it is intercepted BEFORE the
+        // printable-append below and never lands in the query. WHY this trade-off:
+        // play-now (⏎) and add-to-queue both needed a binding on the selected row,
+        // and a single-letter action reads cleanly in the footer; the cost is that
+        // a literal 'a' can't be typed into the query (a future iteration could move
+        // this to Tab if that ever matters).
+        if ($char === 'a') {
+            return $this->queueSelected($player, $search);
+        }
+
         // Append printable input only; ignore stray control characters.
         if ($char !== '' && ord($char[0]) >= 32) {
             $search['query'] .= $char;
@@ -549,6 +560,38 @@ class PremiumPlayerCommand extends Command
         $search['active'] = false;
 
         return self::REFRESH; // refetch now-playing so the panel reflects the new track
+    }
+
+    /**
+     * Add the highlighted result to the playback queue and KEEP the palette open
+     * (so the user can queue several in a row), surfacing a brief inline confirm.
+     * A no-device/API failure shows an inline status instead of crashing the loop —
+     * same contract as playSelected().
+     *
+     * @param  array<string, mixed>  $search
+     */
+    private function queueSelected(SpotifyPlayerService $player, array &$search): string
+    {
+        $track = $search['results'][$search['selected']] ?? null;
+
+        if ($track === null || empty($track['uri'])) {
+            return self::NONE; // empty query / no results — nothing to queue
+        }
+
+        try {
+            $player->addToQueue($track['uri']);
+        } catch (Throwable) {
+            $search['status'] = 'No active device';
+
+            return self::NONE;
+        }
+
+        // Brief inline confirm. ASCII '+' (NOT the ➕ emoji) keeps the footer
+        // width-stable — the same ambiguous-width trap deliberately avoided on the
+        // progress line and the no-device status. Cleared as soon as the user types.
+        $search['status'] = '+ queued';
+
+        return self::NONE;
     }
 
     /**

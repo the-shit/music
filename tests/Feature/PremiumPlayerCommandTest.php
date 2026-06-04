@@ -106,4 +106,54 @@ describe('PremiumPlayerCommand', function (): void {
             ->and($queue['status'])->toBe('No active device');
     });
 
+    /**
+     * The search palette gained a second action: `a` adds the highlighted result to
+     * the queue and KEEPS the palette open (so several can be queued), with a brief
+     * inline confirm. Drive the handler directly, like the queue tests above.
+     */
+    it('adds the highlighted result to the queue and keeps the search palette open', function (): void {
+        $player = Mockery::mock(SpotifyPlayerService::class);
+        $player->shouldReceive('addToQueue')->once()->with('spotify:track:abc');
+
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'queueSelected');
+
+        $search = [
+            'active' => true,
+            'selected' => 1,
+            'status' => '',
+            'results' => [
+                ['uri' => 'spotify:track:zzz'],
+                ['uri' => 'spotify:track:abc'],
+            ],
+        ];
+        $args = [$player, &$search];
+        $outcome = $method->invokeArgs($command, $args);
+
+        expect($outcome)->toBe('none')
+            ->and($search['active'])->toBeTrue()       // stays open to queue more
+            ->and($search['status'])->toBe('+ queued');
+    });
+
+    it('surfaces a status when add-to-queue fails and keeps the search palette open', function (): void {
+        $player = Mockery::mock(SpotifyPlayerService::class);
+        $player->shouldReceive('addToQueue')->once()->andThrow(new Exception('No active device'));
+
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'queueSelected');
+
+        $search = [
+            'active' => true,
+            'selected' => 0,
+            'status' => '',
+            'results' => [['uri' => 'spotify:track:abc']],
+        ];
+        $args = [$player, &$search];
+        $outcome = $method->invokeArgs($command, $args);
+
+        expect($outcome)->toBe('none')
+            ->and($search['active'])->toBeTrue()
+            ->and($search['status'])->toBe('No active device');
+    });
+
 });
