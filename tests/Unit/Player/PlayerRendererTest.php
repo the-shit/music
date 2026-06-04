@@ -554,6 +554,7 @@ describe('PlayerRenderer', function (): void {
             ->toContain('search')
             ->toContain('queue')
             ->toContain('playlists')
+            ->toContain('theme')
             ->toContain('shuffle')
             ->toContain('repeat')
             ->toContain('quit');

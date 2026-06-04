@@ -83,6 +83,8 @@ class PremiumPlayerCommand extends Command
 
     private const PLAYLIST = 'playlist';
 
+    private const CYCLE_THEME = 'cycle-theme';
+
     private const LYRICS = 'lyrics';
 
     private const NONE = 'none';
@@ -126,6 +128,12 @@ class PremiumPlayerCommand extends Command
         // the mood theme when (and only when) the resolved mood actually changes, so
         // the whole surface (border/title/gauges) tints to the music.
         $mood = 'neutral';
+        // Manual theme override, cycled with `t` (null = Auto, follow the detected
+        // mood). Kept SEPARATE from $mood so auto-detection keeps tracking the
+        // music underneath — clearing the override (cycling back to Auto) lands on
+        // the current track's real mood, not a stale one. The effective theme mood
+        // is always ($themeOverride ?? $mood).
+        $themeOverride = null;
         $renderer = new PlayerRenderer(PlayerTheme::forMood($mood));
         $lastTrackKey = null;
         $moodByArtist = []; // cache: artist_id → mood, so revisited tracks are free
@@ -214,15 +222,21 @@ class PremiumPlayerCommand extends Command
                             $resolved = $this->resolveMood($player, $genreMoodMap, $payload['artist_id'] ?? null, $moodByArtist);
                             if ($resolved !== $mood) {
                                 $mood = $resolved;
-                                $renderer = new PlayerRenderer(PlayerTheme::forMood($mood));
+                                // A manual override (`t`) wins over auto-detection: keep
+                                // tracking $mood underneath, but only re-theme the surface
+                                // when the user hasn't pinned a vibe.
+                                if ($themeOverride === null) {
+                                    $renderer = new PlayerRenderer(PlayerTheme::forMood($mood));
+                                }
                             }
                             // Refresh the up-next peek on the SAME cadence as mood — once
                             // per track change, never per frame (one extra queue call, not
                             // one per second; guarded so a miss just hides the peek).
                             $upNext = $this->peekUpNext($player);
                         }
-                        // Surface the mood + up-next peek on the VM (title badge / status).
-                        $vm->mood = $mood;
+                        // Surface the EFFECTIVE mood + up-next peek on the VM (title
+                        // badge / status) — the override, when pinned, is what shows.
+                        $vm->mood = $themeOverride ?? $mood;
                         $vm->upNext = $upNext;
                     }
                 }
@@ -299,6 +313,23 @@ class PremiumPlayerCommand extends Command
                         // `l` opens the playlist picker; snapshot the playlists now.
                         if ($outcome === self::PLAYLIST) {
                             $playlist = ['active' => true, 'items' => $this->safePlaylists($discovery), 'selected' => 0, 'status' => ''];
+
+                            continue;
+                        }
+
+                        // `t` cycles the manual theme: Auto → chill → … → sleep → Auto.
+                        // Handled HERE (not in runControl) because the override and the
+                        // renderer are loop locals; runControl only names the outcome.
+                        // Rebuild immediately so the surface re-tints this frame, and
+                        // surface the effective mood on the VM so the heading badge
+                        // gives instant feedback. Landing back on Auto re-applies the
+                        // auto-detected mood that kept tracking underneath.
+                        if ($outcome === self::CYCLE_THEME) {
+                            $themeOverride = PlayerTheme::nextOverride($themeOverride);
+                            $renderer = new PlayerRenderer(PlayerTheme::forMood($themeOverride ?? $mood));
+                            if ($vm !== null && $vm->hasPlayback) {
+                                $vm->mood = $themeOverride ?? $mood;
+                            }
 
                             continue;
                         }
@@ -416,6 +447,7 @@ class PremiumPlayerCommand extends Command
                 '/' => self::SEARCH, // opens the in-loop search palette (no suspend)
                 'u' => self::QUEUE, // 'u' for up-next, since 'q' is quit
                 'l' => self::PLAYLIST, // opens the playlist picker overlay
+                't' => self::CYCLE_THEME, // cycles the manual mood theme (Auto → chill → …)
                 'y' => self::LYRICS, // lyrics overlay ('y' since 'l' is playlists)
                 ' ' => $this->togglePlayback($player, $vm),
                 'n' => $this->then(fn () => $player->next()),

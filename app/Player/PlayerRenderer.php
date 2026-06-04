@@ -713,6 +713,7 @@ final class PlayerRenderer
                 ['/', 'search'],
                 ['u', 'queue'],
                 ['l', 'playlists'],
+                ['t', 'theme'],
                 ['y', 'lyrics'], // 'y' because 'l' (the natural mnemonic) is taken by playlists
                 ['q', 'quit'],
             ]),
