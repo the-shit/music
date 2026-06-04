@@ -66,8 +66,8 @@
         }
     },
     "scripts": {
-        "test": "pest",
-        "test:coverage": "pest --coverage",
+        "test": "@php -d disable_functions=pcntl_fork vendor/bin/pest",
+        "test:coverage": "@php -d disable_functions=pcntl_fork vendor/bin/pest --coverage",
         "lint": "pint --dirty",
         "lint:check": "pint --test",
         "analyse": "phpstan analyse --no-progress",
@@ -80,7 +80,7 @@
         ]
     },
     "scripts-descriptions": {
-        "test": "Run the Pest test suite",
+        "test": "Run the Pest test suite (pcntl_fork disabled so Laravel Prompts' spin() runs synchronously — see tests/Pest.php)",
         "lint": "Format code with Laravel Pint",
         "lint:check": "Check formatting without writing changes",
         "analyse": "Run PHPStan static analysis",
