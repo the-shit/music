@@ -107,6 +107,6 @@ final class LyricsProvider
         // breaks) but trim the trailing whitespace lrclib sometimes pads with.
         $lines = preg_split('/\R/u', trim($plain)) ?: [];
 
-        return array_values(array_map(rtrim(...), $lines));
+        return array_map(rtrim(...), $lines);
     }
 }
