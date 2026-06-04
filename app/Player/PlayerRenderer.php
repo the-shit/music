@@ -60,6 +60,13 @@ final class PlayerRenderer
     /** Max search results shown in the palette — fits the inline viewport height. */
     private const SEARCH_RESULTS = 8;
 
+    /**
+     * Fixed cell width of the progress meter. Fixed (not flexible) because we render
+     * the bar's TRACK ourselves — see progressBar() — which needs a known length.
+     * Sits comfortably inside the art-narrowed info column beside the time label.
+     */
+    private const PROGRESS_BAR_WIDTH = 24;
+
     private readonly AlbumArtRenderer $art;
 
     public function __construct(private readonly PlayerTheme $theme, ?AlbumArtRenderer $art = null)
@@ -503,41 +510,58 @@ final class PlayerRenderer
     }
 
     /**
-     * Progress row: state glyph + "elapsed / total" rendered as TEXT on the left,
-     * then a clean full-width Gauge whose fill = progressFraction().
+     * Progress row: a play/pause cue + "elapsed / total" as TEXT on the left, then a
+     * progress bar that ALWAYS shows its full track (empty + filled).
      *
-     * WHY the label is text, not the gauge's own label: GaugeRenderer paints the
-     * label INSIDE the bar and the block fill bleeds through the gap, mangling
-     * "1:51 / 4:53" into garbage like "4 53". Keeping the time outside the bar
-     * makes it always legible; the gauge passes an empty label so it draws a pure
-     * fill. Ratio comes straight from the (tested) view model so bar and clock agree.
-     *
-     * WHY no leading ▶️/⏸️ glyph here: those are emoji + a variation selector, an
-     * AMBIGUOUS-width sequence. On the once-per-second progress line the terminal's
-     * width accounting drifts, so php-tui's cell diff fails to overwrite the old
-     * elapsed time and stale digits accumulate ("0:00" → "0:009/2:53"). Dropping the
-     * VS-16 emoji from this fast-updating line keeps every cell fixed-width, so the
-     * diff repaints cleanly. Play/pause state still reads from the gauge motion and
-     * the controls strip. A plain ASCII "▸"/"⏸"-free marker keeps a state cue with
-     * stable width.
+     * WHY a clearer cue than the old "="/">" : those read as cryptic punctuation. ▶
+     * (play) and ‖ (pause) are universally legible. Crucially they are the
+     * TEXT-presentation glyphs (U+25B6 / U+2016), NOT the emoji ▶️/⏸️ — no variation
+     * selector, width-1 in both php-tui and the terminal. That matters because this
+     * line repaints every second; the old VS-16 emoji had ambiguous width, so the
+     * cell diff drifted and stale digits accumulated ("0:00" → "0:009/2:53"). Plain
+     * width-1 glyphs keep every cell aligned, so the per-second redraw stays clean.
      */
     private function progressRow(PlayerViewModel $vm): Widget
     {
-        // ASCII-only, width-stable state cue (no variation selectors): see WHY above.
-        $stateCue = $vm->isPlaying ? '>' : '=';
+        // Width-stable, NON-emoji state cue (see WHY above): ▶ playing / ‖ paused.
+        $cue = $vm->isPlaying ? '▶' : '‖';
 
         return GridWidget::default()
             ->direction(Direction::Horizontal)
-            // 16 cols fit "> 188:88 / 188:88"-class labels without clipping; gauge takes the rest.
-            ->constraints(Constraint::length(16), Constraint::length(1), Constraint::min(1))
+            // 16 cols fit "▶ 188:88 / 188:88"-class labels; then the fixed-width bar.
+            ->constraints(
+                Constraint::length(16),
+                Constraint::length(1),
+                Constraint::length(self::PROGRESS_BAR_WIDTH),
+                Constraint::min(1),
+            )
             ->widgets(
-                ParagraphWidget::fromString($stateCue.' '.$vm->progressLabel())->style($this->theme->accent()),
+                ParagraphWidget::fromString($cue.' '.$vm->progressLabel())->style($this->theme->accent()),
                 ParagraphWidget::fromString(''), // gutter between label and bar
-                GaugeWidget::default()
-                    ->ratio($vm->progressFraction())
-                    ->label(Span::fromString('')) // empty → clean fill, no buried text
-                    ->style($this->theme->gaugeStyle()),
+                $this->progressBar($vm->progressFraction()),
+                ParagraphWidget::fromString(''), // absorb the remaining width
             );
+    }
+
+    /**
+     * A progress bar that renders its TRACK as well as its fill: a dim ░ run for the
+     * empty portion and an accent █ run for the played portion.
+     *
+     * WHY hand-built instead of GaugeWidget: php-tui's Gauge paints ONLY the filled
+     * cells and leaves the remainder as bare background, so at 0% there is no visible
+     * bar at all — the audit's "no bar at 0%" complaint. Drawing the track ourselves
+     * keeps the bar's full extent visible at every ratio (0%, mid, 100%). █ and ░ are
+     * width-1 block glyphs, so the per-second redraw stays cell-aligned.
+     */
+    private function progressBar(float $fraction): Widget
+    {
+        $width = self::PROGRESS_BAR_WIDTH;
+        $filled = max(0, min($width, (int) round($fraction * $width)));
+
+        return ParagraphWidget::fromLines(Line::fromSpans(
+            Span::styled(str_repeat('█', $filled), $this->theme->gaugeStyle()),
+            Span::styled(str_repeat('░', $width - $filled), $this->theme->dim()),
+        ));
     }
 
     /**

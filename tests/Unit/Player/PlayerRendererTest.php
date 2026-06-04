@@ -459,6 +459,31 @@ describe('PlayerRenderer', function (): void {
         expect($out)->toContain('…');
     });
 
+    it('always renders a visible progress track with a width-stable play/pause cue', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        // At 0% the bar must STILL show its dim track (░), not vanish — the audit's
+        // "no bar at 0%". Paused → the ‖ cue (text glyph, NOT the ⏸️ emoji).
+        $zero = renderPremiumPlayerInline($renderer->nowPlaying(sampleViewModel([
+            'isPlaying' => false, 'progressMs' => 0, 'durationMs' => 240_000,
+        ])));
+        expect($zero)
+            ->toContain('░')              // empty track visible at 0%
+            ->toContain('‖')              // paused cue
+            ->toContain('0:00 / 4:00')
+            ->not->toContain('▶️')         // no VS-16 emoji on the per-second line
+            ->and($zero)->not->toContain('⏸️');
+
+        // While playing: a filled run (█) and the ▶ play cue (text glyph, not ▶️).
+        $mid = renderPremiumPlayerInline($renderer->nowPlaying(sampleViewModel([
+            'isPlaying' => true, 'progressMs' => 120_000, 'durationMs' => 240_000,
+        ])));
+        expect($mid)
+            ->toContain('█')
+            ->toContain('▶')
+            ->toContain('2:00 / 4:00');
+    });
+
     it('handles zero duration and null volume without error', function (): void {
         $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
 
