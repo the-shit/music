@@ -4,6 +4,7 @@ namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyDiscoveryService;
+use App\Support\CommitSoundtrack;
 use Illuminate\Support\Facades\Process;
 use LaravelZero\Framework\Commands\Command;
 
@@ -23,10 +24,10 @@ class VibesCommand extends Command
 
     protected $description = 'Generate a page showing commits grouped by the song playing when they were written';
 
-    public function handle(SpotifyDiscoveryService $discovery): int
+    public function handle(SpotifyDiscoveryService $discovery, CommitSoundtrack $soundtrack): int
     {
         $commits = spin(
-            fn (): array => $this->parseGitLog(),
+            fn (): array => $soundtrack->commits(),
             'Parsing git history...'
         );
 
@@ -36,7 +37,7 @@ class VibesCommand extends Command
             return self::SUCCESS;
         }
 
-        $grouped = $this->groupByTrack($commits);
+        $grouped = $soundtrack->groupByTrack($commits);
 
         // Fetch track metadata from Spotify API (album art, names)
         $trackIds = array_column($grouped, 'track_id');
@@ -104,65 +105,6 @@ class VibesCommand extends Command
         }
 
         return self::SUCCESS;
-    }
-
-    private function parseGitLog(): array
-    {
-        $result = Process::run('git log --all --no-merges --format="COMMIT_START%n%H%n%an%n%ai%n%s%n%B%nCOMMIT_END"');
-
-        if (! $result->successful()) {
-            return [];
-        }
-
-        $output = $result->output();
-        $commits = [];
-
-        preg_match_all('/COMMIT_START\n(.+?)\nCOMMIT_END/s', $output, $matches);
-
-        foreach ($matches[1] as $block) {
-            $lines = explode("\n", $block, 5);
-            if (count($lines) < 5) {
-                continue;
-            }
-
-            [$hash, $author, $date, $subject, $body] = $lines;
-
-            $fullMessage = $subject."\n".$body;
-            if (preg_match('#https://open\.spotify\.com/track/([A-Za-z0-9]+)#', $fullMessage, $urlMatch)) {
-                $commits[] = [
-                    'hash' => trim($hash),
-                    'short' => substr(trim($hash), 0, 7),
-                    'author' => trim($author),
-                    'date' => trim($date),
-                    'subject' => trim($subject),
-                    'track_url' => $urlMatch[0],
-                    'track_id' => $urlMatch[1],
-                ];
-            }
-        }
-
-        return $commits;
-    }
-
-    private function groupByTrack(array $commits): array
-    {
-        $groups = [];
-
-        foreach ($commits as $commit) {
-            $trackId = $commit['track_id'];
-            if (! isset($groups[$trackId])) {
-                $groups[$trackId] = [
-                    'track_id' => $trackId,
-                    'track_url' => $commit['track_url'],
-                    'commits' => [],
-                ];
-            }
-            $groups[$trackId]['commits'][] = $commit;
-        }
-
-        usort($groups, fn (array $a, array $b): int => count($b['commits']) <=> count($a['commits']));
-
-        return $groups;
     }
 
     private function syncPlaylist(SpotifyDiscoveryService $discovery, array $groups): ?string
