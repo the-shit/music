@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>the-shit/music — Spotify from your terminal</title>
-    <meta name="description" content="A Spotify CLI built on Laravel Zero. Play, pause, queue, discover — and every commit must include the song you were listening to.">
+    <title>the-shit/music — every commit has a soundtrack</title>
+    <meta name="description" content="Every commit carries the Spotify track that was playing when the code was written. A git hook injects it, CI enforces it, and the vibes page turns your git history into a living soundtrack. No music, no merge.">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,35 +20,80 @@
     </nav>
 
     <div class="hero">
-        <h1>Spotify from your <span>terminal</span></h1>
-        <p class="subtitle">A full-featured Spotify CLI with 30+ commands. Play music, manage queues, discover tracks — and CI rejects your code if you weren't listening to music when you wrote it.</p>
+        <h1>Your codebase has a <span>soundtrack</span></h1>
+        <p class="subtitle">Every commit carries the Spotify track that was playing when the code was written. A git hook injects it. CI enforces it. <strong>No music, no merge.</strong></p>
+        <div class="hero-commit">
+            <pre><span class="cmd">$ git log -1</span>
+feat: polish player UI and fix now-playing box alignment
+<span class="vibe">&#x1F3B5; https://open.spotify.com/track/1MQTmpYOZ6fcMQc56Hdo7T</span>
+
+<span class="check">&#x2713; vibe-check</span> <span class="comment">— track found, commit accepted</span></pre>
+        </div>
     </div>
 
     <div class="container">
-        <div class="features">
-            <div class="feature-card">
-                <h3>Playback Control</h3>
-                <p>Play, pause, skip, volume, shuffle, repeat. Full control over Spotify without leaving the terminal.</p>
+        <div class="section">
+            <h2>How the soundtrack happens</h2>
+            <p>A pre-commit hook asks Spotify what you're listening to and appends it to your commit message. CI runs a <em>vibe check</em> on every push &mdash; no track URL means a red build. Merge commits get a pass because even we aren't that unhinged.</p>
+            <p>The byproduct is the <a href="vibes.html">vibes page</a>: an auto-generated, living soundtrack of the entire codebase. Every song that was playing when every line was written, regenerated on every push to master.</p>
+            <div class="manifesto-features">
+                <div class="mf-item">
+                    <div class="mf-icon">&#x1F3B5;</div>
+                    <div class="mf-text"><strong>Pre-commit hook</strong> reads the Spotify API, injects the current track into your commit message</div>
+                </div>
+                <div class="mf-item">
+                    <div class="mf-icon">&#x1F6A8;</div>
+                    <div class="mf-text"><strong>Vibe Check CI</strong> scans every commit for a Spotify URL. No music, no merge.</div>
+                </div>
+                <div class="mf-item">
+                    <div class="mf-icon">&#x267B;&#xFE0F;</div>
+                    <div class="mf-text"><strong>Vibes page</strong> regenerates automatically on every push &mdash; your git history as a playlist</div>
+                </div>
+                <div class="mf-item">
+                    <div class="mf-icon">&#x1F4BB;</div>
+                    <div class="mf-text"><strong>DJ Hook</strong> blocks your AI coding assistant from running commands if Spotify isn't playing</div>
+                </div>
             </div>
-            <div class="feature-card">
-                <h3>Discovery</h3>
-                <p>AI-friendly search, mood queues, and autopilot presets (chill, flow, hype, focus, party, upbeat, melancholy, ambient, workout, sleep) powered by your listening history.</p>
+        </div>
+
+        <div class="section">
+            <h2>The player</h2>
+            <p>Underneath the gimmick is a genuinely premium terminal player built on <strong>php-tui</strong> &mdash; live progress track, album art, queue peek, fuzzy search palette, and keyboard-driven everything. Spotify, but it never leaves your prompt.</p>
+            <!-- Asset slot: replace with docs/assets/player.gif (or .png) when captured -->
+            <div class="media-placeholder">
+                <span class="mp-label">spotify player</span>
+                <span class="mp-note">screenshot / GIF coming soon</span>
             </div>
-            <div class="feature-card">
-                <h3>Queue Management</h3>
-                <p>Add tracks, view upcoming songs, and auto-fill your queue using Spotify's recommendation engine.</p>
-            </div>
-            <div class="feature-card">
-                <h3>Interactive Player</h3>
-                <p>A visual TUI player with progress bar, album art, and keyboard controls. Like Spotify, but in your terminal.</p>
-            </div>
-            <div class="feature-card">
-                <h3>Daemon Mode</h3>
-                <p>Background playback with spotifyd, macOS media key integration, and Control Center sync via nowplaying.</p>
-            </div>
-            <div class="feature-card">
-                <h3>Vibe Check CI</h3>
-                <p>Every commit must include the song you were listening to. CI enforces it. No music, no merge.</p>
+        </div>
+
+        <div class="section">
+            <h2>And yes, it&rsquo;s a full Spotify CLI</h2>
+            <p>30+ commands built on Laravel Zero &mdash; the soundtrack is enforced, but the day-to-day tooling carries its weight too.</p>
+            <div class="features">
+                <div class="feature-card">
+                    <h3>Playback Control</h3>
+                    <p>Play, pause, skip, volume, shuffle, repeat. Full control over Spotify without leaving the terminal.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Discovery</h3>
+                    <p>AI-friendly search, mood queues, and autopilot presets (chill, flow, hype, focus, party, upbeat, melancholy, ambient, workout, sleep) powered by your listening history.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Queue Management</h3>
+                    <p>Add tracks, view upcoming songs, and auto-fill your queue using Spotify's recommendation engine.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Interactive Player</h3>
+                    <p>The php-tui player above &mdash; progress bar, album art, search palette, and keyboard controls.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Daemon Mode</h3>
+                    <p>Background playback with spotifyd, macOS media key integration, and Control Center sync via nowplaying.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>MCP Server</h3>
+                    <p>Expose playback and discovery as <a href="mcp.html">MCP tools</a> so your AI assistant can DJ while you code.</p>
+                </div>
             </div>
         </div>
 
@@ -70,32 +115,6 @@
 
 <span class="comment"># Launch interactive player</span>
 <span class="cmd">spotify player</span></pre>
-        </div>
-
-        <div class="section">
-            <h2>What is this?</h2>
-            <p>This is <strong><a href="https://github.com/the-shit/music">the-shit/music</a></strong> — a Spotify CLI built on Laravel Zero. It controls your music from the terminal &mdash; play, pause, skip, queue, discover, the whole thing.</p>
-            <p>But here's the thing: <strong>every commit must include the Spotify track you were listening to when you wrote the code.</strong></p>
-            <p>A git hook auto-injects the currently playing song into your commit message. CI runs a <em>vibe check</em> on every push. No track URL? <strong>Rejected.</strong> No exceptions. Merge commits get a pass because even we aren't that unhinged.</p>
-            <p>The result is the <a href="vibes.html">vibes page</a> &mdash; a living soundtrack of the entire codebase, auto-generated after every commit. You're looking at every song that was playing when every line of code was written.</p>
-            <div class="manifesto-features">
-                <div class="mf-item">
-                    <div class="mf-icon">&#x1F3B5;</div>
-                    <div class="mf-text"><strong>Pre-commit hook</strong> reads Spotify API, injects track into commit message</div>
-                </div>
-                <div class="mf-item">
-                    <div class="mf-icon">&#x1F6A8;</div>
-                    <div class="mf-text"><strong>Vibe Check CI</strong> scans every commit for a Spotify URL. No music, no merge.</div>
-                </div>
-                <div class="mf-item">
-                    <div class="mf-icon">&#x1F4BB;</div>
-                    <div class="mf-text"><strong>DJ Hook</strong> blocks your AI coding assistant from running commands if Spotify isn't playing</div>
-                </div>
-                <div class="mf-item">
-                    <div class="mf-icon">&#x267B;&#xFE0F;</div>
-                    <div class="mf-text"><strong>Vibes page</strong> regenerates automatically on every push to master</div>
-                </div>
-            </div>
         </div>
     </div>
 
