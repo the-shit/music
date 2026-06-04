@@ -126,6 +126,7 @@ class PremiumPlayerCommand extends Command
         $renderer = new PlayerRenderer(PlayerTheme::forMood($mood));
         $lastTrackKey = null;
         $moodByArtist = []; // cache: artist_id → mood, so revisited tracks are free
+        $upNext = null;     // the next queued track's "Title — Artist", refreshed on track change
 
         $terminal = Terminal::new();
 
@@ -205,9 +206,14 @@ class PremiumPlayerCommand extends Command
                                 $mood = $resolved;
                                 $renderer = new PlayerRenderer(PlayerTheme::forMood($mood));
                             }
+                            // Refresh the up-next peek on the SAME cadence as mood — once
+                            // per track change, never per frame (one extra queue call, not
+                            // one per second; guarded so a miss just hides the peek).
+                            $upNext = $this->peekUpNext($player);
                         }
-                        // Surface the mood on the VM too (title badge / consistency).
+                        // Surface the mood + up-next peek on the VM (title badge / status).
                         $vm->mood = $mood;
+                        $vm->upNext = $upNext;
                     }
                 }
 
@@ -766,6 +772,32 @@ class PremiumPlayerCommand extends Command
             return array_values(is_array($queue['queue'] ?? null) ? $queue['queue'] : []);
         } catch (Throwable) {
             return [];
+        }
+    }
+
+    /**
+     * Peek at the next queued track for the now-playing "up next" line: "Title —
+     * Artist", or null when there is nothing up next / no token / the call fails.
+     *
+     * WHY guarded + only called on track change: this is one extra queue API call,
+     * so (like resolveMood) it must be cheap and crash-proof — a miss simply hides
+     * the peek rather than throwing into the draw loop.
+     */
+    private function peekUpNext(SpotifyPlayerService $player): ?string
+    {
+        try {
+            $queue = $player->getQueue();
+            $first = (is_array($queue['queue'] ?? null) ? $queue['queue'] : [])[0] ?? null;
+
+            if (! is_array($first) || empty($first['name'])) {
+                return null;
+            }
+
+            $artist = $first['artists'][0]['name'] ?? null;
+
+            return $artist ? $first['name'].' — '.$artist : (string) $first['name'];
+        } catch (Throwable) {
+            return null;
         }
     }
 

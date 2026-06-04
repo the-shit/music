@@ -84,23 +84,15 @@ final class PlayerRenderer
     {
         $theme = $this->theme;
 
-        // The track title is the hero line: bold AND mood-accent coloured so it
-        // clearly outranks the white artist and dim album beneath it.
-        $track = ParagraphWidget::fromString($this->truncateDisplay($vm->title, self::TEXT_WIDTH))
-            ->style($theme->accent()->addModifier(Modifier::BOLD));
-
-        $artist = ParagraphWidget::fromString(
-            $theme->icon('artist').' '.$this->truncateDisplay($vm->artist, self::TEXT_WIDTH)
-        )->style($theme->text());
-
-        $album = ParagraphWidget::fromString(
-            $theme->icon('album').' '.$this->truncateDisplay($vm->album, self::TEXT_WIDTH)
-        )->style($theme->dim());
-
         // The key legend is static (no live state, no VS-16 emoji) so it stays
         // readable and width-stable; live shuffle/repeat state lives in statusRow()
         // near the gauges instead — see controlsLines()/statusRow().
         $controls = ParagraphWidget::fromLines(...$this->controlsLines());
+
+        // The now-playing info rows (track…status, + an optional up-next peek). Built
+        // once and placed by infoColumn() so both body layouts share identical content
+        // and the same centre/fill padding behaviour.
+        $rows = $this->infoWidgets($vm);
 
         // LAYOUT IS CONDITIONAL ON REAL ART. Album art is an accent, not scaffolding:
         // when there is a genuine, decodable cover we split into two columns; when
@@ -108,8 +100,8 @@ final class PlayerRenderer
         // single-column panel instead of a dead placeholder block. Asking hasArt()
         // first also primes the decode cache that render() reuses — one fetch, not two.
         $body = $this->art->hasArt($vm->albumArtUrl)
-            ? $this->twoColumnBody($vm, $track, $artist, $album, $controls)
-            : $this->singleColumnBody($vm, $track, $artist, $album, $controls);
+            ? $this->twoColumnBody($vm, $rows, $controls)
+            : $this->singleColumnBody($rows, $controls);
 
         return BlockWidget::default()
             ->borders(Borders::ALL)
@@ -120,81 +112,113 @@ final class PlayerRenderer
     }
 
     /**
-     * The clean single-column now-playing body — metadata, gauges, and the controls
-     * strip stacked full-width. The default when there is no album art.
+     * The now-playing info rows, top to bottom: hero track title, artist, album,
+     * progress, volume, the device/shuffle/repeat status line, and — when the loop
+     * has resolved a next track — a one-line "up next" peek. Returned as a flat list
+     * so the body layouts can place a VARIABLE number of rows (the peek is optional).
+     *
+     * @return list<Widget>
      */
-    private function singleColumnBody(PlayerViewModel $vm, Widget $track, Widget $artist, Widget $album, Widget $controls): Widget
+    private function infoWidgets(PlayerViewModel $vm): array
     {
-        // WHY a spacer ABOVE and BELOW the content (not just a trailing one): the
-        // metadata block is shorter than the viewport, so a single trailing spacer
-        // dumped all the slack into one dead gap between the gauges and the legend
-        // (the audit's "blank middle"). Equal flexible spacers top and bottom instead
-        // CENTRE the block vertically between the title border and the pinned legend,
-        // so the leftover rows read as balanced padding rather than dead space.
+        $theme = $this->theme;
+
+        // The track title is the hero line: bold AND mood-accent coloured so it
+        // clearly outranks the white artist and dim album beneath it.
+        $rows = [
+            ParagraphWidget::fromString($this->truncateDisplay($vm->title, self::TEXT_WIDTH))
+                ->style($theme->accent()->addModifier(Modifier::BOLD)),
+            ParagraphWidget::fromString(
+                $theme->icon('artist').' '.$this->truncateDisplay($vm->artist, self::TEXT_WIDTH)
+            )->style($theme->text()),
+            ParagraphWidget::fromString(
+                $theme->icon('album').' '.$this->truncateDisplay($vm->album, self::TEXT_WIDTH)
+            )->style($theme->dim()),
+            $this->progressRow($vm),
+            $this->volumeRow($vm),
+            $this->statusRow($vm),
+        ];
+
+        // Optional up-next peek — only when the loop has resolved a next track.
+        $upNext = $this->upNextRow($vm);
+        if ($upNext !== null) {
+            $rows[] = $upNext;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Stack the info rows with flexible padding inside whatever area they're given.
+     *
+     * WHY the conditional centring: a short block (no up-next peek) is CENTRED — a
+     * flexible spacer above AND below — so the leftover viewport rows read as balanced
+     * padding rather than one dead gap (the audit's "blank middle"). A taller block
+     * (with the peek) nearly fills the area, so it is top-aligned with a single
+     * trailing spacer — which both looks full and GUARANTEES it can't overflow the
+     * cramped 12-row inline viewport (two flexible spacers + 7 rows + the legend would
+     * not fit). Anything pinned below (the legend) stays put either way.
+     *
+     * @param  list<Widget>  $rows
+     */
+    private function infoColumn(array $rows): Widget
+    {
+        $constraints = [];
+        $widgets = [];
+
+        // Centre short blocks; top-align tall ones (see WHY above).
+        if (count($rows) <= 6) {
+            $constraints[] = Constraint::min(1);
+            $widgets[] = ParagraphWidget::fromString('');
+        }
+
+        foreach ($rows as $row) {
+            $constraints[] = Constraint::length(1);
+            $widgets[] = $row;
+        }
+
+        $constraints[] = Constraint::min(1); // trailing spacer fills the remainder
+        $widgets[] = ParagraphWidget::fromString('');
+
+        return GridWidget::default()
+            ->direction(Direction::Vertical)
+            ->constraints(...$constraints)
+            ->widgets(...$widgets);
+    }
+
+    /**
+     * The single-column now-playing body — the info column with the controls legend
+     * pinned full-width beneath it. The default when there is no album art.
+     *
+     * @param  list<Widget>  $rows
+     */
+    private function singleColumnBody(array $rows, Widget $controls): Widget
+    {
         return GridWidget::default()
             ->direction(Direction::Vertical)
             ->constraints(
-                Constraint::min(1),     // top breathing room → centres the block
-                Constraint::length(1),  // track title
-                Constraint::length(1),  // artist
-                Constraint::length(1),  // album
-                Constraint::length(1),  // progress
-                Constraint::length(1),  // volume
-                Constraint::length(1),  // shuffle/repeat status line, beneath the gauges
-                Constraint::min(1),     // bottom breathing room above the legend
+                Constraint::min(1),     // info column (centres / fills via infoColumn)
                 Constraint::length(2),  // two-line key legend, pinned to the bottom
             )
             ->widgets(
-                ParagraphWidget::fromString(''),
-                $track,
-                $artist,
-                $album,
-                $this->progressRow($vm),
-                $this->volumeRow($vm),
-                $this->statusRow($vm),
-                ParagraphWidget::fromString(''),
+                $this->infoColumn($rows),
                 $controls,
             );
     }
 
     /**
      * The two-column body — a modest album-art accent on the LEFT, the now-playing
-     * info on the RIGHT, and the controls strip spanning FULL width beneath both
+     * info on the RIGHT, and the controls legend spanning FULL width beneath both
      * (it is long and would clip in the narrow info column). Only used when hasArt().
+     *
+     * @param  list<Widget>  $rows
      */
-    private function twoColumnBody(PlayerViewModel $vm, Widget $track, Widget $artist, Widget $album, Widget $controls): Widget
+    private function twoColumnBody(PlayerViewModel $vm, array $rows, Widget $controls): Widget
     {
-        // Centre the info block vertically against the taller album-art column:
-        // equal flexible spacers top and bottom so the metadata sits at the art's
-        // mid-line instead of top-aligned with a blank tail (the audit's "art column
-        // taller than info → blank middle"). Balances the two columns.
-        $info = GridWidget::default()
-            ->direction(Direction::Vertical)
-            ->constraints(
-                Constraint::min(1),     // top breathing room → centres against the art
-                Constraint::length(1),  // track title
-                Constraint::length(1),  // artist
-                Constraint::length(1),  // album
-                Constraint::length(1),  // progress
-                Constraint::length(1),  // volume
-                Constraint::length(1),  // shuffle/repeat status line, beneath the gauges
-                Constraint::min(1),     // bottom breathing room
-            )
-            ->widgets(
-                ParagraphWidget::fromString(''),
-                $track,
-                $artist,
-                $album,
-                $this->progressRow($vm),
-                $this->volumeRow($vm),
-                $this->statusRow($vm),
-                ParagraphWidget::fromString(''),
-            );
-
         // The art renderer rescales to whatever area the layout grants it, so the
         // fixed ART_COLS slice is all the sizing it needs. hasArt() already proved
         // the cover decodes, so render() here returns real art (cache hit), never
-        // the placeholder.
+        // the placeholder. infoColumn() centres / fills the info against the art.
         $columns = GridWidget::default()
             ->direction(Direction::Horizontal)
             ->constraints(
@@ -205,7 +229,7 @@ final class PlayerRenderer
             ->widgets(
                 $this->art->render($vm->albumArtUrl ?? '', self::ART_COLS, (int) (self::ART_COLS / 2)),
                 ParagraphWidget::fromString(''),
-                $info,
+                $this->infoColumn($rows),
             );
 
         return GridWidget::default()
@@ -648,23 +672,55 @@ final class PlayerRenderer
     }
 
     /**
-     * Compact shuffle/repeat status line, sat just beneath the gauges.
+     * Compact now-playing status line, sat just beneath the gauges: the active
+     * device (when known) · shuffle on/off · repeat mode.
      *
-     * WHY separate from the key legend: live state and key-hints are different
-     * kinds of information — interleaving them (the old "🔀 off · 🔁 Off" inside the
-     * key strip) was the audit's readability snag. Here each mode reads as a dim
-     * label + an accent value ("shuffle on · repeat All"), width-stable text only,
-     * so it scans as a status readout rather than another binding.
+     * WHY separate from the key legend: live state and key-hints are different kinds
+     * of information — interleaving them (the old "🔀 off · 🔁 Off" inside the key
+     * strip) was the audit's readability snag. Each segment reads as a dim label + an
+     * accent/text value, WIDTH-STABLE TEXT ONLY (no emoji — this line repaints on every
+     * shuffle/repeat toggle, so a mis-width glyph could leave residue): "Living Room ·
+     * shuffle on · repeat All". Tight " · " separators keep it inside the narrow
+     * (art-shrunk) info column; the device name is hard-truncated for the same reason
+     * and trails so it clips before the shuffle/repeat state if space runs out.
      */
     private function statusRow(PlayerViewModel $vm): Widget
     {
         $theme = $this->theme;
 
-        return ParagraphWidget::fromLines(Line::fromSpans(
+        $spans = [
             Span::styled('shuffle ', $theme->dim()),
             Span::styled($vm->shuffle ? 'on' : 'off', $theme->accent()),
-            Span::styled('   ·   repeat ', $theme->dim()),
+            Span::styled(' · repeat ', $theme->dim()),
             Span::styled($vm->repeatLabel(), $theme->accent()),
+        ];
+
+        if ($vm->deviceName !== null && $vm->deviceName !== '') {
+            $spans[] = Span::styled(' · ', $theme->dim());
+            $spans[] = Span::styled($this->truncateDisplay($vm->deviceName, 16), $theme->text());
+        }
+
+        return ParagraphWidget::fromLines(Line::fromSpans(...$spans));
+    }
+
+    /**
+     * Optional one-line "up next" peek, beneath the status line — the next queued
+     * track, "up next  <track — artist>". Returns null when the loop hasn't resolved
+     * a next track (no queue / nothing up next / API miss), so the row is omitted
+     * entirely rather than showing an empty label. Width-stable text only (same
+     * per-refresh-redraw reason as the status line).
+     */
+    private function upNextRow(PlayerViewModel $vm): ?Widget
+    {
+        if ($vm->upNext === null || $vm->upNext === '') {
+            return null;
+        }
+
+        $theme = $this->theme;
+
+        return ParagraphWidget::fromLines(Line::fromSpans(
+            Span::styled('up next  ', $theme->dim()),
+            Span::styled($this->truncateDisplay($vm->upNext, self::TEXT_WIDTH - 8), $theme->text()),
         ));
     }
 }

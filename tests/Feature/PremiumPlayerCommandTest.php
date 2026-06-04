@@ -156,4 +156,36 @@ describe('PremiumPlayerCommand', function (): void {
             ->and($search['status'])->toBe('No active device');
     });
 
+    /**
+     * The now-playing panel gained an "up next" peek, resolved on track change from
+     * the queue. peekUpNext() formats the next track as "Title — Artist" (or null).
+     */
+    it('peeks the next queued track as "Title — Artist" for the up-next line', function (): void {
+        $player = Mockery::mock(SpotifyPlayerService::class);
+        $player->shouldReceive('getQueue')->once()->andReturn([
+            'queue' => [
+                ['name' => 'Comfortably Numb', 'artists' => [['name' => 'Pink Floyd']]],
+            ],
+        ]);
+
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'peekUpNext');
+
+        expect($method->invoke($command, $player))->toBe('Comfortably Numb — Pink Floyd');
+    });
+
+    it('hides the up-next peek when the queue is empty or the call fails', function (): void {
+        $empty = Mockery::mock(SpotifyPlayerService::class);
+        $empty->shouldReceive('getQueue')->once()->andReturn(['queue' => []]);
+
+        $failing = Mockery::mock(SpotifyPlayerService::class);
+        $failing->shouldReceive('getQueue')->once()->andThrow(new Exception('boom'));
+
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'peekUpNext');
+
+        expect($method->invoke($command, $empty))->toBeNull()
+            ->and($method->invoke($command, $failing))->toBeNull();
+    });
+
 });

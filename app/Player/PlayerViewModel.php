@@ -40,6 +40,12 @@ final class PlayerViewModel
         // Album-art image URL for the art panel; null when the track has no art (or
         // no playback) → the AlbumArtRenderer shows its calm placeholder.
         public ?string $albumArtUrl = null,
+        // The next queued track, "Title — Artist", for the optional "up next" peek on
+        // the now-playing panel. NOT derivable from the playback payload — it needs a
+        // separate queue API call, so the loop resolves it on track change (see
+        // PremiumPlayerCommand) and leaves it null otherwise. Mutable + trailing with a
+        // safe default so fromPlayback() stays I/O-free and positional ctors keep working.
+        public ?string $upNext = null,
     ) {}
 
     /**

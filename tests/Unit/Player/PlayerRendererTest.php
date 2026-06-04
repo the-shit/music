@@ -55,12 +55,13 @@ function sampleViewModel(array $overrides = []): PlayerViewModel
         'hasPlayback' => true,
         'mood' => 'neutral',
         'albumArtUrl' => null,
+        'upNext' => null,
     ], $overrides);
 
     return new PlayerViewModel(
         $d['title'], $d['artist'], $d['album'], $d['isPlaying'], $d['progressMs'],
         $d['durationMs'], $d['volume'], $d['shuffle'], $d['repeat'], $d['deviceName'], $d['hasPlayback'],
-        $d['mood'], $d['albumArtUrl'],
+        $d['mood'], $d['albumArtUrl'], $d['upNext'],
     );
 }
 
@@ -348,6 +349,40 @@ describe('PlayerRenderer', function (): void {
             ->toContain('Search')
             ->toContain('Type to search')         // empty-query hint, no list
             ->not->toContain('▶');                // nothing selectable yet
+    });
+
+    it('shows the device, shuffle and repeat on the now-playing status line', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        $out = renderPremiumPlayerInline($renderer->nowPlaying(sampleViewModel([
+            'deviceName' => 'Living Room', 'shuffle' => true, 'repeat' => 'context',
+        ])));
+
+        expect($out)
+            ->toContain('shuffle on')
+            ->toContain('repeat All')
+            ->toContain('Living Room');   // active device surfaced
+
+        // No device → the segment is omitted (no stray separator / empty label).
+        $noDevice = renderPremiumPlayerInline($renderer->nowPlaying(sampleViewModel([
+            'deviceName' => null, 'shuffle' => false, 'repeat' => 'off',
+        ])));
+        expect($noDevice)->toContain('shuffle off')->toContain('repeat Off');
+    });
+
+    it('shows an up-next peek when a next track is known, and omits it otherwise', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        $withPeek = renderPremiumPlayerInline($renderer->nowPlaying(sampleViewModel([
+            'upNext' => 'Comfortably Numb — Pink Floyd',
+        ])));
+        expect($withPeek)
+            ->toContain('up next')
+            ->toContain('Comfortably Numb');
+
+        // Null up-next → no peek row at all (not an empty "up next" label).
+        $noPeek = renderPremiumPlayerInline($renderer->nowPlaying(sampleViewModel(['upNext' => null])));
+        expect($noPeek)->not->toContain('up next');
     });
 
     it('balances the now-playing panel with no dead block of blank rows at the inline viewport', function (): void {
