@@ -6,6 +6,7 @@ use App\Agents\AdaptAgent;
 use App\Mcp\Concerns\HandlesAuthErrors;
 use App\Services\SpotifyDiscoveryService;
 use App\Services\SpotifyPlayerService;
+use App\Support\AudioFeatureTargets;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -72,16 +73,7 @@ class SessionAdjustTool extends Tool
             // Queue new tracks based on adjusted phases
             $queued = 0;
             foreach ($decoded['adjusted_phases'] ?? [] as $phase) {
-                $audioFeatures = [];
-                if (isset($phase['energy'])) {
-                    $audioFeatures['target_energy'] = $phase['energy'];
-                }
-                if (isset($phase['valence'])) {
-                    $audioFeatures['target_valence'] = $phase['valence'];
-                }
-                if (isset($phase['tempo'])) {
-                    $audioFeatures['target_tempo'] = $phase['tempo'];
-                }
+                $audioFeatures = AudioFeatureTargets::fromPhase($phase);
 
                 $tracks = $discovery->getSmartRecommendations(5, null, $audioFeatures);
                 foreach ($tracks as $track) {
