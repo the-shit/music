@@ -169,10 +169,12 @@ class PremiumPlayerCommand extends Command
             'lastQueried' => 0.0,
         ];
 
-        // Read-only "up next" overlay state. Items are the raw Spotify queue tracks,
+        // Interactive "up next" overlay state. Items are the raw Spotify queue tracks,
         // snapshotted when the overlay opens (the queue rarely shifts under us in the
         // few seconds it's open, and a per-frame refetch would hammer the API).
-        $queue = ['active' => false, 'items' => [], 'selected' => 0];
+        // 'status' carries an inline note (e.g. a no-device failure) without closing
+        // the overlay, mirroring the search palette / playlist picker.
+        $queue = ['active' => false, 'items' => [], 'selected' => 0, 'status' => ''];
 
         // Playlist picker overlay state. 'status' carries an inline note (e.g. a
         // no-device failure) without closing the overlay, mirroring the palette.
@@ -236,7 +238,7 @@ class PremiumPlayerCommand extends Command
                     if ($search['active']) {
                         $outcome = $this->handleSearchEvent($event, $player, $search);
                     } elseif ($queue['active']) {
-                        $outcome = $this->handleQueueEvent($event, $queue);
+                        $outcome = $this->handleQueueEvent($event, $player, $queue);
                     } elseif ($playlist['active']) {
                         $outcome = $this->handlePlaylistEvent($event, $player, $playlist);
                     } else {
@@ -249,9 +251,9 @@ class PremiumPlayerCommand extends Command
                             continue;
                         }
 
-                        // `u` opens the read-only up-next queue; snapshot it now.
+                        // `u` opens the interactive up-next queue; snapshot it now.
                         if ($outcome === self::QUEUE) {
-                            $queue = ['active' => true, 'items' => $this->safeQueue($player), 'selected' => 0];
+                            $queue = ['active' => true, 'items' => $this->safeQueue($player), 'selected' => 0, 'status' => ''];
 
                             continue;
                         }
@@ -401,7 +403,7 @@ class PremiumPlayerCommand extends Command
         }
 
         if ($queue['active']) {
-            return $renderer->queueOverlay($queue['items'], $queue['selected']);
+            return $renderer->queueOverlay($queue['items'], $queue['selected'], $queue['status']);
         }
 
         if ($playlist['active']) {
@@ -564,17 +566,19 @@ class PremiumPlayerCommand extends Command
     }
 
     /**
-     * Handle a keypress while the read-only queue overlay is open: ↑↓ scroll the
-     * highlighted row, esc closes, Ctrl+C still quits the whole player. There is no
-     * ⏎ action — the queue is a view, not a picker.
+     * Handle a keypress while the up-next queue overlay is open: ↑↓ move the
+     * highlighted row, ⏎ plays the chosen up-next track (and closes), esc closes,
+     * Ctrl+C still quits the whole player. A no-device/API failure on play keeps the
+     * overlay open with an inline status — same contract as the search palette.
      *
      * @param  array<string, mixed>  $queue
      */
-    private function handleQueueEvent(object $event, array &$queue): string
+    private function handleQueueEvent(object $event, SpotifyPlayerService $player, array &$queue): string
     {
         if ($event instanceof CodedKeyEvent) {
             return match ($event->code) {
                 KeyCode::Esc => $this->closeOverlay($queue),
+                KeyCode::Enter => $this->playSelectedQueueTrack($player, $queue),
                 KeyCode::Up => $this->scrollOverlay($queue, -1),
                 KeyCode::Down => $this->scrollOverlay($queue, 1),
                 default => self::NONE,
@@ -587,6 +591,36 @@ class PremiumPlayerCommand extends Command
         }
 
         return self::NONE;
+    }
+
+    /**
+     * Play the highlighted up-next track and close the queue overlay. Plays the
+     * track's own uri (jumping the queue to it), so it mirrors the search palette's
+     * playSelected(). A no-device/API failure keeps the overlay open with an inline
+     * status instead of crashing the loop.
+     *
+     * @param  array<string, mixed>  $queue
+     */
+    private function playSelectedQueueTrack(SpotifyPlayerService $player, array &$queue): string
+    {
+        $track = $queue['items'][$queue['selected']] ?? null;
+
+        if ($track === null || empty($track['uri'])) {
+            return self::NONE; // empty queue / nothing highlighted
+        }
+
+        try {
+            $player->play($track['uri']);
+        } catch (Throwable) {
+            // Plain text, NO variation-selector emoji (same width trap as elsewhere).
+            $queue['status'] = 'No active device';
+
+            return self::NONE;
+        }
+
+        $queue['active'] = false;
+
+        return self::REFRESH; // refetch now-playing so the panel reflects the new track
     }
 
     /**

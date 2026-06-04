@@ -319,21 +319,23 @@ final class PlayerRenderer
     }
 
     /**
-     * Read-only "up next" overlay: a centered modal listing the queued tracks
-     * (track — artist), the highlighted row scrollable with ↑↓, esc to close.
+     * Interactive "up next" overlay: a centered modal listing the queued tracks
+     * (track — artist), the highlighted row moved with ↑↓, ⏎ to play the chosen
+     * up-next track, esc to close. An inline status (e.g. a no-device note) is
+     * surfaced in the footer without closing the overlay, like the palette/picker.
      *
      * WHY a sibling of searchOverlay (not folded into it): same centered-modal
-     * shell, but the data is the raw Spotify queue shape and the interaction is
-     * navigate-only — there is no query line and ⏎ does nothing. Keeping it a
-     * distinct, pure method means it is buffer-testable exactly like the palette,
-     * and the command's loop just hands it the queue snapshot + selection.
+     * shell and selection model, but the data is the raw Spotify queue shape and
+     * the action is "jump to this up-next track". Keeping it a distinct, pure
+     * method means it is buffer-testable exactly like the palette, and the
+     * command's loop just hands it the queue snapshot + selection + status.
      *
      * Long queues scroll: only a fixed window of rows is shown, kept around the
      * selection, so the modal never overflows the inline viewport.
      *
      * @param  list<array{name?: string, uri?: string, artists?: list<array{name?: string}>}>  $queue
      */
-    public function queueOverlay(array $queue, int $selectedIndex): Widget
+    public function queueOverlay(array $queue, int $selectedIndex, string $status = ''): Widget
     {
         $theme = $this->theme;
 
@@ -350,7 +352,13 @@ final class PlayerRenderer
             ? [Line::fromSpans(Span::styled('Queue is empty', $theme->dim()))]
             : $this->windowedSelectableList($labels, $selectedIndex);
 
-        $contents = $this->listContents($bodyLines, '↑↓ scroll · esc close');
+        // Footer mirrors the palette/picker: static hints, prefixed with any status.
+        $footer = '↑↓ select · ⏎ play · esc close';
+        if ($status !== '') {
+            $footer = $status.'   ·   '.$footer;
+        }
+
+        $contents = $this->listContents($bodyLines, $footer);
 
         return $this->centeredModal(' '.$theme->icon('queue').' Up Next ', $contents);
     }

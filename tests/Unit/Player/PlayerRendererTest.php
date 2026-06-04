@@ -154,8 +154,25 @@ describe('PlayerRenderer', function (): void {
             ->toContain('Fleetwood Mac')      // artist 1
             ->toContain('Black')              // track 2
             ->toContain('▶ Black')            // selection marker on the chosen row
-            ->toContain('scroll')             // footer hint
-            ->toContain('close');             // read-only: no "play"
+            ->toContain('select')             // footer hint
+            ->toContain('play')               // queue is now playable (⏎ play)
+            ->toContain('close');
+    });
+
+    it('surfaces an inline status in the queue overlay without closing it', function (): void {
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        $queue = [
+            ['name' => 'Dreams', 'uri' => 'spotify:track:1', 'artists' => [['name' => 'Fleetwood Mac']]],
+        ];
+
+        // A failed ⏎ play surfaces a status (e.g. no device) but keeps the list up.
+        $out = renderPremiumPlayerInline($renderer->queueOverlay($queue, 0, 'No active device'));
+
+        expect($out)
+            ->toContain('No active device')
+            ->toContain('Dreams')
+            ->toContain('play');
     });
 
     it('shows an empty-queue message when there are no up-next tracks', function (): void {
@@ -225,7 +242,8 @@ describe('PlayerRenderer', function (): void {
             ->toContain('Dreams')
             ->toContain('Fleetwood Mac')
             ->toContain('▶ Black')          // selected row still visible
-            ->toContain('scroll')           // footer pinned, not clipped off
+            ->toContain('select')           // footer pinned, not clipped off
+            ->toContain('play')
             ->toContain('close');
     });
 

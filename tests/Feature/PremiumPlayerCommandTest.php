@@ -2,6 +2,7 @@
 
 use App\Commands\PremiumPlayerCommand;
 use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyPlayerService;
 
 /**
  * WHY these are the only tests: the interactive php-tui loop can't be driven from
@@ -53,6 +54,56 @@ describe('PremiumPlayerCommand', function (): void {
         expect($surface($on, $off, $off))->toBe('search');
         expect($surface($off, $on, $off))->toBe('queue');
         expect($surface($off, $off, $on))->toBe('playlist');
+    });
+
+    /**
+     * The queue overlay is now interactive: ⏎ plays the highlighted up-next track
+     * (by its own uri) and closes. Drive the handler directly — the php-tui loop
+     * can't be run in a non-TTY test, but its play logic is plain and unit-testable.
+     */
+    it('plays the highlighted up-next track and closes the queue overlay on Enter', function (): void {
+        $player = Mockery::mock(SpotifyPlayerService::class);
+        $player->shouldReceive('play')->once()->with('spotify:track:abc');
+
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'playSelectedQueueTrack');
+
+        $queue = [
+            'active' => true,
+            'selected' => 1,
+            'status' => '',
+            'items' => [
+                ['uri' => 'spotify:track:zzz'],
+                ['uri' => 'spotify:track:abc'],
+            ],
+        ];
+        // invokeArgs binds the by-ref $queue param so we can assert the mutation.
+        $args = [$player, &$queue];
+        $outcome = $method->invokeArgs($command, $args);
+
+        expect($outcome)->toBe('refresh')
+            ->and($queue['active'])->toBeFalse();
+    });
+
+    it('keeps the queue overlay open with an inline status when the play fails', function (): void {
+        $player = Mockery::mock(SpotifyPlayerService::class);
+        $player->shouldReceive('play')->once()->andThrow(new Exception('No active device'));
+
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'playSelectedQueueTrack');
+
+        $queue = [
+            'active' => true,
+            'selected' => 0,
+            'status' => '',
+            'items' => [['uri' => 'spotify:track:abc']],
+        ];
+        $args = [$player, &$queue];
+        $outcome = $method->invokeArgs($command, $args);
+
+        expect($outcome)->toBe('none')
+            ->and($queue['active'])->toBeTrue()
+            ->and($queue['status'])->toBe('No active device');
     });
 
 });
