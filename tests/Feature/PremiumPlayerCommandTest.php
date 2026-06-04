@@ -42,18 +42,19 @@ describe('PremiumPlayerCommand', function (): void {
     it('names the active surface so the loop can clear across transitions', function (): void {
         $command = new PremiumPlayerCommand;
         $method = new ReflectionMethod($command, 'currentSurface');
-        $surface = fn (array $s, array $q, array $p): string => $method->invoke($command, $s, $q, $p);
+        $surface = fn (array $s, array $q, array $p, array $y): string => $method->invoke($command, $s, $q, $p, $y);
 
         $off = ['active' => false];
         $on = ['active' => true];
 
         // No overlay open → the now-playing panel.
-        expect($surface($off, $off, $off))->toBe('panel');
+        expect($surface($off, $off, $off, $off))->toBe('panel');
 
         // Each overlay reports its own name; search wins the precedence when checked.
-        expect($surface($on, $off, $off))->toBe('search');
-        expect($surface($off, $on, $off))->toBe('queue');
-        expect($surface($off, $off, $on))->toBe('playlist');
+        expect($surface($on, $off, $off, $off))->toBe('search');
+        expect($surface($off, $on, $off, $off))->toBe('queue');
+        expect($surface($off, $off, $on, $off))->toBe('playlist');
+        expect($surface($off, $off, $off, $on))->toBe('lyrics');
     });
 
     /**
@@ -267,6 +268,98 @@ describe('PremiumPlayerCommand', function (): void {
 
         expect($method->invoke($command, $empty))->toBeNull()
             ->and($method->invoke($command, $failing))->toBeNull();
+    });
+
+    /**
+     * The lyrics overlay (y) scrolls a fixed window over the fetched lines.
+     * Drive the handler directly, like the queue tests — esc closes, ↑↓ slide
+     * the window clamped to (count − visible rows), Ctrl+C quits the player.
+     */
+    it('scrolls the lyrics window with arrows, clamped to the last full page', function (): void {
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'handleLyricsEvent');
+
+        // 10 lines with an 8-row window → max scroll offset is 2.
+        $lyrics = [
+            'active' => true,
+            'track' => 'Song',
+            'lines' => array_map(fn (int $i): string => "Line {$i}", range(1, 10)),
+            'scroll' => 0,
+        ];
+
+        $down = \PhpTui\Term\Event\CodedKeyEvent::new(\PhpTui\Term\KeyCode::Down);
+        $up = \PhpTui\Term\Event\CodedKeyEvent::new(\PhpTui\Term\KeyCode::Up);
+
+        // ↑ at the top is a no-op (clamped at 0).
+        $args = [$up, &$lyrics];
+        expect($method->invokeArgs($command, $args))->toBe('none')
+            ->and($lyrics['scroll'])->toBe(0);
+
+        // ↓ three times: 0 → 1 → 2 → clamped at 2 (10 lines − 8 visible).
+        foreach (range(1, 3) as $i) {
+            $args = [$down, &$lyrics];
+            $method->invokeArgs($command, $args);
+        }
+        expect($lyrics['scroll'])->toBe(2);
+
+        // esc closes the overlay; Ctrl+C still quits the whole player.
+        $esc = \PhpTui\Term\Event\CodedKeyEvent::new(\PhpTui\Term\KeyCode::Esc);
+        $args = [$esc, &$lyrics];
+        expect($method->invokeArgs($command, $args))->toBe('none')
+            ->and($lyrics['active'])->toBeFalse();
+
+        $args = [\PhpTui\Term\Event\CharKeyEvent::new("\x03"), &$lyrics];
+        expect($method->invokeArgs($command, $args))->toBe('quit');
+    });
+
+    it('does not scroll when there are no lyric lines', function (): void {
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'handleLyricsEvent');
+
+        // null lines (no match / failure) → ↓ stays clamped at 0, never errors.
+        $lyrics = ['active' => true, 'track' => null, 'lines' => null, 'scroll' => 0];
+
+        $down = \PhpTui\Term\Event\CodedKeyEvent::new(\PhpTui\Term\KeyCode::Down);
+        $args = [$down, &$lyrics];
+
+        expect($method->invokeArgs($command, $args))->toBe('none')
+            ->and($lyrics['scroll'])->toBe(0);
+    });
+
+    /**
+     * safeLyrics() is the loop's crash-proof seam to the LyricsProvider: no
+     * playback → null without ever touching the network; with playback it asks
+     * lrclib with the track's artist/title/duration (ms → seconds). Driven with
+     * Http::fake (the provider is final, so we exercise the real one).
+     */
+    it('skips the lyrics lookup when nothing is playing and fetches by track when playing', function (): void {
+        // Fresh provider cache so this test controls its own fetches.
+        (new ReflectionProperty(App\Player\LyricsProvider::class, 'cache'))->setValue(null, []);
+        Illuminate\Support\Facades\Http::fake([
+            'lrclib.net/*' => Illuminate\Support\Facades\Http::response([
+                'plainLyrics' => 'Is this the real life?',
+            ]),
+        ]);
+
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'safeLyrics');
+        $provider = new App\Player\LyricsProvider;
+
+        // No playback (or no VM at all) → null, and lrclib is never consulted.
+        $idle = App\Player\PlayerViewModel::fromPlayback(null);
+        expect($method->invoke($command, $provider, $idle))->toBeNull()
+            ->and($method->invoke($command, $provider, null))->toBeNull();
+        Illuminate\Support\Facades\Http::assertNothingSent();
+
+        // Playing → fetches by artist/title with the duration in SECONDS (354000ms).
+        $playing = App\Player\PlayerViewModel::fromPlayback([
+            'name' => 'Bohemian Rhapsody', 'artist' => 'Queen', 'album' => 'A Night at the Opera',
+            'is_playing' => true, 'progress_ms' => 1_000, 'duration_ms' => 354_000,
+        ]);
+        expect($method->invoke($command, $provider, $playing))->toBe(['Is this the real life?']);
+        Illuminate\Support\Facades\Http::assertSent(
+            fn ($request): bool => str_contains($request->url(), 'duration=354')
+        );
     });
 
 });

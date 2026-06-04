@@ -32,7 +32,7 @@ final class PlayerTheme
 
     /**
      * @param  string  $mood  One of config('autopilot.mood_presets') keys, or
-     *                         'neutral' when the mood is unknown (graceful default).
+     *                        'neutral' when the mood is unknown (graceful default).
      */
     public function __construct(private readonly string $mood = 'neutral') {}
 
@@ -148,6 +148,7 @@ final class PlayerTheme
             'search' => '🔍',
             'queue' => '📋',
             'playlist' => '📚',
+            'lyrics' => '📝',
             'device' => '📱',
             'music' => '🎵',
             'artist' => '👤',
