@@ -218,7 +218,7 @@ describe('PlayerRenderer', function (): void {
             ->toContain('17 tracks')
             ->toContain('▶ Focus Flow')       // selection marker on row 0
             ->toContain('play')               // footer hint (playable, unlike queue)
-            ->toContain('cancel');
+            ->toContain('close');
     });
 
     it('surfaces an inline status and an empty-state in the playlist overlay', function (): void {
@@ -278,7 +278,32 @@ describe('PlayerRenderer', function (): void {
             ->toContain('42 tracks')
             ->toContain('Road Trip')
             ->toContain('play')             // footer pinned, not clipped off
-            ->toContain('cancel');
+            ->toContain('close');
+    });
+
+    it('unifies search, queue and playlist on a consistent select/play/close footer and highlight', function (): void {
+        // The audit's "three overlays, three behaviours": footers read "esc cancel"
+        // vs "esc close" and used different row renderers. They must now all share the
+        // "↑↓ select · ⏎ <act> · esc close" shape AND the same ▶ selection highlight.
+        $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
+
+        $search = renderPremiumPlayerInline($renderer->searchOverlay('q', [
+            ['uri' => 'spotify:track:1', 'name' => 'Song', 'artist' => 'Artist'],
+        ], 0));
+        $queue = renderPremiumPlayerInline($renderer->queueOverlay([
+            ['name' => 'Song', 'uri' => 'spotify:track:1', 'artists' => [['name' => 'Artist']]],
+        ], 0));
+        $playlist = renderPremiumPlayerInline($renderer->playlistOverlay([
+            ['id' => 'p1', 'name' => 'Mix', 'tracks' => ['total' => 3]],
+        ], 0));
+
+        foreach (['search' => $search, 'queue' => $queue, 'playlist' => $playlist] as $name => $out) {
+            expect($out)
+                ->toContain('select')   // ↑↓ select
+                ->toContain('play')     // ⏎ play
+                ->toContain('close')    // esc close — unified (was "esc cancel" for two)
+                ->toContain('▶ ');      // identical selected-row highlight marker
+        }
     });
 
     it('shows a visible empty-state in each overlay at the 12-row inline viewport', function (): void {

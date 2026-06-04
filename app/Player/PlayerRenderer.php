@@ -298,28 +298,23 @@ final class PlayerRenderer
         } elseif ($results === []) {
             $bodyLines[] = Line::fromSpans(Span::styled('No matches', $theme->dim()));
         } else {
-            // One row per result. The selected row gets a ▶ marker AND a reversed
-            // accent style — the marker so the selection survives a colour-stripped
-            // or non-truecolor terminal, the style so it pops where colour works.
-            foreach (array_slice($results, 0, self::SEARCH_RESULTS) as $i => $track) {
-                $label = $this->truncateDisplay(
+            // Shared selection renderer — identical ▶ marker + highlight as the queue
+            // and playlist overlays, so the three feel like one component (search's
+            // artist key is flat `artist`; queue/playlist nest it differently, so we
+            // pre-build labels and hand the same list builder to all three).
+            $labels = array_map(
+                fn (array $track): string => $this->truncateDisplay(
                     ($track['name'] ?? 'Unknown').'  —  '.($track['artist'] ?? 'Unknown'),
                     self::TEXT_WIDTH,
-                );
-
-                $bodyLines[] = $i === $selectedIndex
-                    ? Line::fromSpans(Span::styled('▶ '.$label, $theme->accent()->addModifier(Modifier::BOLD | Modifier::REVERSED)))
-                    : Line::fromSpans(Span::styled('  '.$label, $theme->text()));
-            }
+                ),
+                array_values($results),
+            );
+            $bodyLines = $this->windowedSelectableList($labels, $selectedIndex);
         }
 
-        // Footer: static key hints, plus any inline status (e.g. a no-device note
-        // or a "+ queued" confirm). Two actions on the selected result now — ⏎ plays
-        // it now, `a` adds it to the queue.
-        $footer = '↑↓ select · ⏎ play · a queue · esc cancel';
-        if ($status !== '') {
-            $footer = $status.'   ·   '.$footer;
-        }
+        // Footer: unified `↑↓ select · ⏎ <act> · esc close` shape (search adds the
+        // extra `a queue` action), prefixed with any inline status / "+ queued".
+        $footer = $this->modalFooter('↑↓ select · ⏎ play · a queue · esc close', $status);
 
         // WHY a Grid (not one Paragraph): with a full 8-row result list the footer
         // would be pushed past the modal's bottom and clipped — taking any inline
@@ -375,11 +370,8 @@ final class PlayerRenderer
             ? [Line::fromSpans(Span::styled('Queue is empty', $theme->dim()))]
             : $this->windowedSelectableList($labels, $selectedIndex);
 
-        // Footer mirrors the palette/picker: static hints, prefixed with any status.
-        $footer = '↑↓ select · ⏎ play · esc close';
-        if ($status !== '') {
-            $footer = $status.'   ·   '.$footer;
-        }
+        // Unified footer shape, shared with the search palette and playlist picker.
+        $footer = $this->modalFooter('↑↓ select · ⏎ play · esc close', $status);
 
         $contents = $this->listContents($bodyLines, $footer);
 
@@ -414,15 +406,23 @@ final class PlayerRenderer
             ? [Line::fromSpans(Span::styled('No playlists found', $theme->dim()))]
             : $this->windowedSelectableList($labels, $selectedIndex);
 
-        // Footer mirrors the palette: static hints, prefixed with any inline status.
-        $footer = '↑↓ select · ⏎ play · esc cancel';
-        if ($status !== '') {
-            $footer = $status.'   ·   '.$footer;
-        }
+        // Unified footer shape, shared with the search palette and queue overlay.
+        $footer = $this->modalFooter('↑↓ select · ⏎ play · esc close', $status);
 
         $contents = $this->listContents($bodyLines, $footer);
 
         return $this->centeredModal(' '.$theme->icon('playlist').' Playlists ', $contents);
+    }
+
+    /**
+     * Compose a modal footer: the static key hints, prefixed with any inline status
+     * (a no-device note, a "+ queued" confirm). One helper so the search palette,
+     * queue overlay and playlist picker render the status/hints identically — the
+     * audit's "three overlays, three behaviours" → one consistent footer.
+     */
+    private function modalFooter(string $hints, string $status = ''): string
+    {
+        return $status === '' ? $hints : $status.'   ·   '.$hints;
     }
 
     /**
