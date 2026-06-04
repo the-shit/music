@@ -1,8 +1,19 @@
-# Spotify CLI
+# Your codebase has a soundtrack
 
-Spotify as terminal infrastructure. 30+ commands, 12 MCP tools, mood-aware autopilot, event-driven integrations — use what you need, ignore what you don't.
+Every commit in this repo carries the Spotify track that was playing when the code was written. A git hook injects it. CI enforces it. **No music, no merge.**
 
-**[Docs](https://the-shit.github.io/music/)** · **[Commands](https://the-shit.github.io/music/commands.html)** · **[MCP](https://the-shit.github.io/music/mcp.html)** · **[Vibes](https://the-shit.github.io/music/vibes.html)**
+The byproduct is the [vibes page](https://the-shit.github.io/music/vibes.html) — an auto-generated, living soundtrack of the entire codebase. Every song that was playing when every line was written, regenerated on every push to master.
+
+**[Docs](https://the-shit.github.io/music/)** · **[Vibes](https://the-shit.github.io/music/vibes.html)** · **[Commands](https://the-shit.github.io/music/commands.html)** · **[MCP](https://the-shit.github.io/music/mcp.html)**
+
+## How the soundtrack happens
+
+1. **You listen** — Spotify plays while you code, like it already does.
+2. **The hook captures** — a pre-commit hook asks the CLI what's playing and appends the track URL to your commit message.
+3. **CI enforces** — the Vibe Check gate scans every commit for a Spotify URL. No music, no merge.
+4. **The vibes page regenerates** — every push to master rebuilds the soundtrack of the whole repo.
+
+It's enforced by the same pipeline as PHPStan and test coverage. Music is a CI gate here, not a gimmick.
 
 ## Quick Start
 
@@ -15,16 +26,26 @@ spotify play "Killing In the Name"
 spotify current    # See what's playing
 ```
 
-That's it. Everything else is optional.
+That's it. The hook and CI gate are wired up per-repo — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Use What You Need
+## The Premium Player
 
-Every feature is a layer you opt into. Nothing assumes anything else is running.
+`spotify player:premium` — a full php-tui player in your terminal. Album art rendered as ANSI, mood-aware theming, a search palette with play-now and queue actions, playlist browsing, and a queue peek. It's the player a vibes-enforced codebase deserves.
+
+```bash
+spotify player:premium
+```
+
+(The classic `spotify player` TUI is still there if you want something lighter.)
+
+## And it's a full Spotify CLI
+
+The soundtrack is enforced, but the day-to-day tooling carries its weight too: 30+ commands, 12 MCP tools, mood-aware autopilot, event-driven integrations. Every feature is a layer you opt into — nothing assumes anything else is running.
 
 | Layer | What it does | Required? |
 |---|---|---|
 | **CLI commands** | Play, pause, skip, queue, search, volume, shuffle, repeat | Just this |
-| **Interactive player** | TUI with progress bar, controls, playlist browsing | `spotify player` when you want it |
+| **Premium player** | php-tui player with art, mood theming, search palette | `spotify player:premium` when you want it |
 | **MCP server** | 12 tools for AI assistants (Claude, etc.) to control Spotify | Configure if you use AI tools |
 | **Daemon** | Headless Spotify Connect speaker via spotifyd | Install if you want background playback |
 | **Media bridge** | macOS Control Center + media keys via native Swift | Install if you want media key control |
@@ -37,7 +58,7 @@ See the full [command reference](https://the-shit.github.io/music/commands.html)
 
 ## Why This Instead Of...
 
-**spotify_player / ncspot / spotatui** — Great TUI players. But they only play music. No MCP server, no queue intelligence, no integrations, no service management. If you just want a terminal UI, those are solid. If you want Spotify as composable infrastructure, this is it.
+**spotify_player / ncspot / spotatui** — Great TUI players. But they only play music. No commit soundtrack, no MCP server, no queue intelligence, no integrations. If you just want a terminal UI, those are solid. If you want Spotify as composable infrastructure — and your git history to have a soundtrack — this is it.
 
 **Standalone MCP servers** — There are a handful on Smithery/GitHub. Most are weekend scripts with 3-5 tools and no maintenance. This is a real application with 12 MCP tools, 2 resources, battle-tested against Spotify's API deprecations, and actively maintained.
 
@@ -114,12 +135,6 @@ spotify webhook:configure --url=https://your.endpoint/hook --secret=your-secret
 ```bash
 spotify watch --json | your-consumer
 ```
-
-## Vibe Check
-
-Every commit must include the Spotify track playing when the code was written. A pre-commit hook injects the track metadata, and CI rejects any push without one.
-
-The result is the [vibes page](https://the-shit.github.io/music/vibes.html) — a living soundtrack of the entire codebase.
 
 ## Contributing
 
