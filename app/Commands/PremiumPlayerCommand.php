@@ -168,6 +168,7 @@ class PremiumPlayerCommand extends Command
             'status' => '',
             'dirty' => false,       // query changed since the last query → re-search
             'lastQueried' => 0.0,
+            'returnTo' => null,     // self::QUEUE when opened from the queue overlay
         ];
 
         // Interactive "up next" overlay state. Items are the raw Spotify queue tracks,
@@ -243,8 +244,28 @@ class PremiumPlayerCommand extends Command
                 while (($event = $events->next()) !== null) {
                     if ($search['active']) {
                         $outcome = $this->handleSearchEvent($event, $player, $search);
+
+                        // The palette can be LAYERED over the queue overlay (opened
+                        // with `/` from the queue — returnTo). When it closes (esc,
+                        // or a successful ⏎ play), drop back onto a FRESH queue
+                        // snapshot so a just-queued/just-played track shows, and
+                        // clamp the selection to the new length.
+                        if (! $search['active'] && $search['returnTo'] === self::QUEUE) {
+                            $queue['items'] = $this->safeQueue($player);
+                            $queue['selected'] = max(0, min($queue['selected'], count($queue['items']) - 1));
+                            $queue['status'] = '';
+                        }
                     } elseif ($queue['active']) {
                         $outcome = $this->handleQueueEvent($event, $player, $queue);
+
+                        // `/` from the queue layers the search palette ON TOP (the
+                        // queue state stays intact underneath); returnTo records
+                        // where to land when the palette closes.
+                        if ($outcome === self::SEARCH) {
+                            $search = ['active' => true, 'query' => '', 'results' => [], 'selected' => 0, 'status' => '', 'dirty' => false, 'lastQueried' => 0.0, 'returnTo' => self::QUEUE];
+
+                            continue;
+                        }
                     } elseif ($playlist['active']) {
                         $outcome = $this->handlePlaylistEvent($event, $player, $playlist);
                     } else {
@@ -252,7 +273,7 @@ class PremiumPlayerCommand extends Command
 
                         // `/` opens the palette in-place (no suspend).
                         if ($outcome === self::SEARCH) {
-                            $search = ['active' => true, 'query' => '', 'results' => [], 'selected' => 0, 'status' => '', 'dirty' => false, 'lastQueried' => 0.0];
+                            $search = ['active' => true, 'query' => '', 'results' => [], 'selected' => 0, 'status' => '', 'dirty' => false, 'lastQueried' => 0.0, 'returnTo' => null];
 
                             continue;
                         }
@@ -616,9 +637,12 @@ class PremiumPlayerCommand extends Command
 
     /**
      * Handle a keypress while the up-next queue overlay is open: ↑↓ move the
-     * highlighted row, ⏎ plays the chosen up-next track (and closes), esc closes,
-     * Ctrl+C still quits the whole player. A no-device/API failure on play keeps the
-     * overlay open with an inline status — same contract as the search palette.
+     * highlighted row, ⏎ plays the chosen up-next track (and closes), `/` layers
+     * the search palette over the queue (to add tracks in context — closing it
+     * returns to a refreshed queue), `n` skips the current track (the queue shifts,
+     * so it is re-snapshotted in place), esc closes, Ctrl+C still quits the whole
+     * player. A no-device/API failure on play/skip keeps the overlay open with an
+     * inline status — same contract as the search palette.
      *
      * @param  array<string, mixed>  $queue
      */
@@ -634,12 +658,42 @@ class PremiumPlayerCommand extends Command
             };
         }
 
-        // Ctrl+C always quits the whole player, even from an overlay.
-        if ($event instanceof CharKeyEvent && $event->char === "\x03") {
-            return self::QUIT;
+        if (! $event instanceof CharKeyEvent) {
+            return self::NONE;
         }
 
-        return self::NONE;
+        return match ($event->char) {
+            "\x03" => self::QUIT, // Ctrl+C always quits, even from an overlay
+            '/' => self::SEARCH,  // layer the search palette over the queue
+            'n' => $this->skipFromQueue($player, $queue),
+            default => self::NONE,
+        };
+    }
+
+    /**
+     * Skip the current track from the queue overlay and KEEP it open. The queue
+     * shifts when its head starts playing, so the snapshot is refreshed in place
+     * (selection clamped) rather than left stale. A no-device/API failure keeps
+     * the overlay open with an inline status — same contract as ⏎ play.
+     *
+     * @param  array<string, mixed>  $queue
+     */
+    private function skipFromQueue(SpotifyPlayerService $player, array &$queue): string
+    {
+        try {
+            $player->next();
+        } catch (Throwable) {
+            // Plain text, NO variation-selector emoji (same width trap as elsewhere).
+            $queue['status'] = 'No active device';
+
+            return self::NONE;
+        }
+
+        $queue['items'] = $this->safeQueue($player);
+        $queue['selected'] = max(0, min($queue['selected'], count($queue['items']) - 1));
+        $queue['status'] = '';
+
+        return self::REFRESH; // refetch now-playing so the panel reflects the skip
     }
 
     /**

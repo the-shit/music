@@ -363,8 +363,10 @@ final class PlayerRenderer
     /**
      * Interactive "up next" overlay: a centered modal listing the queued tracks
      * (track — artist), the highlighted row moved with ↑↓, ⏎ to play the chosen
-     * up-next track, esc to close. An inline status (e.g. a no-device note) is
-     * surfaced in the footer without closing the overlay, like the palette/picker.
+     * up-next track, `/` to layer the search palette over the queue (add tracks
+     * in context), `n` to skip the current track, esc to close. An inline status
+     * (e.g. a no-device note) is surfaced in the footer without closing the
+     * overlay, like the palette/picker.
      *
      * WHY a sibling of searchOverlay (not folded into it): same centered-modal
      * shell and selection model, but the data is the raw Spotify queue shape and
@@ -395,7 +397,7 @@ final class PlayerRenderer
             : $this->windowedSelectableList($labels, $selectedIndex);
 
         // Unified footer shape, shared with the search palette and playlist picker.
-        $footer = $this->modalFooter('↑↓ select · ⏎ play · esc close', $status);
+        $footer = $this->modalFooter('↑↓ select · ⏎ play · / search · n skip · esc close', $status);
 
         $contents = $this->listContents($bodyLines, $footer);
 
@@ -519,12 +521,17 @@ final class PlayerRenderer
             ->titleStyle($theme->heading())
             ->widget($contents);
 
+        // 70% (not 60%): the widest unified footer — the queue overlay's
+        // '↑↓ select · ⏎ play · / search · n skip · esc close' — is ~50 cells,
+        // and at 60% of an 80-col terminal the modal's inner width (~46) clipped
+        // 'esc close' clean off. 70% (~54 inner) fits every footer AND the full
+        // TEXT_WIDTH(48) row labels that 60% was silently truncating.
         return GridWidget::default()
             ->direction(Direction::Horizontal)
             ->constraints(
-                Constraint::percentage(20),
-                Constraint::percentage(60),
-                Constraint::percentage(20),
+                Constraint::percentage(15),
+                Constraint::percentage(70),
+                Constraint::percentage(15),
             )
             ->widgets(
                 ParagraphWidget::fromString(''),
