@@ -2,9 +2,11 @@
 
 namespace App\Commands;
 
+use App\Agents\AdaptAgent;
 use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyDiscoveryService;
 use App\Services\SpotifyPlayerService;
+use App\Support\AudioFeatureTargets;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\confirm;
@@ -20,6 +22,9 @@ class AutopilotCommand extends Command
         {--threshold=3 : Refill when queue has fewer than N tracks}
         {--mood=flow : Mood preset (chill/flow/hype/focus/party/upbeat/melancholy/ambient/workout/sleep)}
         {--interval=3 : Watch polling interval in seconds}
+        {--adapt : Adapt audio-feature targets from skip/complete behavior via AI}
+        {--adapt-after=4 : Re-evaluate targets after N track-change observations}
+        {--json : Output decision events as JSON lines}
         {--install : Install autopilot as a background LaunchAgent}
         {--uninstall : Remove the autopilot LaunchAgent}
         {--status : Check autopilot daemon status}';
@@ -38,7 +43,30 @@ class AutopilotCommand extends Command
 
     private const HEALTH_CHECK_THRESHOLD = 3;
 
+    /** A track change arriving sooner than this means the previous track was skipped */
+    private const SKIP_THRESHOLD_SECONDS = 30;
+
+    /** How many recent skip/complete observations to keep for the adapt agent */
+    private const LEDGER_MAX_ENTRIES = 10;
+
     private int $consecutiveFailures = 0;
+
+    private bool $jsonMode = false;
+
+    private bool $adaptEnabled = false;
+
+    private int $adaptAfter = 4;
+
+    /** @var array{track: string, artist: string, at: int}|null */
+    private ?array $previousTrack = null;
+
+    /** @var array<int, array{track: string, artist: string, signal: string, dwell_seconds: int}> */
+    private array $eventLedger = [];
+
+    private int $eventsSinceAdapt = 0;
+
+    /** @var array<string, int|float>|null AI-adapted target_* features (replaces the static mood preset when set) */
+    private ?array $adaptedTargets = null;
 
     private SpotifyPlayerService $player;
 
@@ -70,12 +98,18 @@ class AutopilotCommand extends Command
             return self::FAILURE;
         }
         $threshold = max(1, (int) $this->option('threshold'));
+        $this->jsonMode = (bool) $this->option('json');
+        $this->adaptEnabled = (bool) $this->option('adapt');
+        $this->adaptAfter = max(1, (int) $this->option('adapt-after'));
         $mood = $this->resolveMood((string) $this->option('mood'));
         $interval = max(1, (int) $this->option('interval'));
 
-        info("Autopilot engaged — mood: {$mood}, threshold: {$threshold}");
-        info('Listening for track changes — Ctrl+C to stop');
-        $this->newLine();
+        if (! $this->jsonMode) {
+            $adaptive = $this->adaptEnabled ? ', adaptive' : '';
+            info("Autopilot engaged — mood: {$mood}, threshold: {$threshold}{$adaptive}");
+            info('Listening for track changes — Ctrl+C to stop');
+            $this->newLine();
+        }
 
         // Open a pipe to `watch --json` so we get one JSON line per event
         $php = PHP_BINARY;
@@ -86,7 +120,11 @@ class AutopilotCommand extends Command
         $pipe = popen($cmd, 'r');
 
         if (! $pipe) {
-            error('Failed to open watch pipe.');
+            if ($this->jsonMode) {
+                $this->emitDecision('error', ['stage' => 'startup', 'message' => 'Failed to open watch pipe']);
+            } else {
+                error('Failed to open watch pipe.');
+            }
 
             return self::FAILURE;
         }
@@ -94,8 +132,10 @@ class AutopilotCommand extends Command
         if (function_exists('pcntl_signal')) {
             pcntl_signal(SIGINT, function () use ($pipe): void {
                 pclose($pipe);
-                $this->newLine();
-                info('Autopilot disengaged.');
+                if (! $this->jsonMode) {
+                    $this->newLine();
+                    info('Autopilot disengaged.');
+                }
                 exit(0);
             });
         }
@@ -124,14 +164,35 @@ class AutopilotCommand extends Command
                 continue;
             }
 
-            $this->line("Track changed: <fg=cyan>{$event['track']}</> by {$event['artist']}");
+            $signal = $this->recordObservation($event);
+
+            if ($this->jsonMode) {
+                $this->emitDecision('observe', [
+                    'track' => $event['track'],
+                    'artist' => $event['artist'],
+                    'previous_signal' => $signal,
+                ]);
+            } else {
+                $this->line("Track changed: <fg=cyan>{$event['track']}</> by {$event['artist']}");
+                if ($signal !== null) {
+                    $this->line("  <fg=gray>Previous track: {$signal}</>");
+                }
+            }
+
+            if ($this->adaptEnabled && $this->eventsSinceAdapt >= $this->adaptAfter) {
+                $this->adaptTargets($mood);
+            }
 
             try {
                 $this->maybeRefill($threshold, $mood);
                 $this->consecutiveFailures = 0;
             } catch (\Exception $e) {
                 $this->consecutiveFailures++;
-                warning("Refill error: {$e->getMessage()}");
+                if ($this->jsonMode) {
+                    $this->emitDecision('error', ['stage' => 'refill', 'message' => $e->getMessage()]);
+                } else {
+                    warning("Refill error: {$e->getMessage()}");
+                }
 
                 if ($this->consecutiveFailures >= self::HEALTH_CHECK_THRESHOLD) {
                     $this->triggerDaemonHealthCheck();
@@ -342,18 +403,29 @@ XML;
 
     private function triggerDaemonHealthCheck(): void
     {
-        warning('Multiple consecutive failures — running daemon health check...');
+        if (! $this->jsonMode) {
+            warning('Multiple consecutive failures — running daemon health check...');
+        }
 
         try {
             $exitCode = $this->call('daemon', ['action' => 'health', '--heal' => true]);
 
-            if ($exitCode === self::SUCCESS) {
+            if ($this->jsonMode) {
+                $this->emitDecision('error', [
+                    'stage' => 'health_check',
+                    'message' => $exitCode === self::SUCCESS ? 'Daemon health restored' : 'Daemon health check could not fully resolve the issue',
+                ]);
+            } elseif ($exitCode === self::SUCCESS) {
                 info('Daemon health restored');
             } else {
                 warning('Daemon health check could not fully resolve the issue');
             }
         } catch (\Exception $e) {
-            warning("Health check failed: {$e->getMessage()}");
+            if ($this->jsonMode) {
+                $this->emitDecision('error', ['stage' => 'health_check', 'message' => $e->getMessage()]);
+            } else {
+                warning("Health check failed: {$e->getMessage()}");
+            }
         }
     }
 
@@ -390,6 +462,151 @@ XML;
         return $output !== '' && $output !== '0' && ! str_contains($output, 'Could not find');
     }
 
+    // ── Adaptive mood (--adapt) ───────────────────────────────────
+
+    /**
+     * Classify the previous track as skip/complete from dwell time and
+     * append it to the recent ledger. Returns the signal, or null when
+     * this is the first observed track.
+     */
+    private function recordObservation(array $event): ?string
+    {
+        $at = isset($event['timestamp']) ? (strtotime((string) $event['timestamp']) ?: time()) : time();
+
+        $signal = null;
+
+        if ($this->previousTrack !== null) {
+            $dwell = max(0, $at - $this->previousTrack['at']);
+            $signal = $dwell < self::SKIP_THRESHOLD_SECONDS ? 'skip' : 'complete';
+
+            $this->eventLedger[] = [
+                'track' => $this->previousTrack['track'],
+                'artist' => $this->previousTrack['artist'],
+                'signal' => $signal,
+                'dwell_seconds' => $dwell,
+            ];
+            $this->eventLedger = array_slice($this->eventLedger, -self::LEDGER_MAX_ENTRIES);
+            $this->eventsSinceAdapt++;
+        }
+
+        $this->previousTrack = [
+            'track' => (string) ($event['track'] ?? 'Unknown'),
+            'artist' => (string) ($event['artist'] ?? 'Unknown'),
+            'at' => $at,
+        ];
+
+        return $signal;
+    }
+
+    /**
+     * Ask the AdaptAgent whether the seed mood targets should change based
+     * on the skip/complete ledger. Never throws — on any failure the
+     * current targets are kept and an error decision is emitted.
+     */
+    private function adaptTargets(string $mood): void
+    {
+        $this->eventsSinceAdapt = 0;
+
+        try {
+            $currentTargets = $this->activeTargets($mood);
+
+            $prompt = "Seed mood: {$mood}\n"
+                .'Current audio feature targets: '.json_encode($currentTargets)."\n"
+                .'Recent listening ledger (oldest first, skip = user skipped quickly, complete = listened through): '
+                .json_encode($this->eventLedger)."\n\n"
+                .'Based on the skip/complete signals, should the audio feature targets change? '
+                .'If yes, provide a single adjusted phase.';
+
+            $response = (new AdaptAgent)->prompt($prompt);
+            $decoded = $this->decodeAgentJson($response->text);
+
+            if (! is_array($decoded)) {
+                $this->emitAdaptFailure('Unparseable AdaptAgent response');
+
+                return;
+            }
+
+            $reasoning = (string) ($decoded['reasoning'] ?? '');
+
+            if (empty($decoded['should_adjust'])) {
+                if ($this->jsonMode) {
+                    $this->emitDecision('hold', ['stage' => 'adapt', 'reasoning' => $reasoning]);
+                } else {
+                    $this->line("  <fg=gray>Adapt: no change — {$reasoning}</>");
+                }
+
+                return;
+            }
+
+            $phase = $decoded['adjusted_phases'][0] ?? null;
+            $targets = is_array($phase) ? AudioFeatureTargets::fromPhase($phase) : [];
+
+            if ($targets === []) {
+                $this->emitAdaptFailure('AdaptAgent suggested adjusting but provided no usable targets');
+
+                return;
+            }
+
+            $this->adaptedTargets = $targets;
+
+            if ($this->jsonMode) {
+                $this->emitDecision('adapt', ['reasoning' => $reasoning, 'targets' => $targets]);
+            } else {
+                info("Adapted targets ({$reasoning}): ".json_encode($targets));
+            }
+        } catch (\Throwable $e) {
+            $this->emitAdaptFailure($e->getMessage());
+        }
+    }
+
+    private function emitAdaptFailure(string $message): void
+    {
+        if ($this->jsonMode) {
+            $this->emitDecision('error', ['stage' => 'adapt', 'message' => $message]);
+        } else {
+            warning("Adapt skipped: {$message}");
+        }
+    }
+
+    /**
+     * Strip optional markdown fencing and decode the agent's JSON reply.
+     */
+    private function decodeAgentJson(string $text): ?array
+    {
+        $text = preg_replace('/^```(?:json)?\s*/m', '', $text);
+        $text = preg_replace('/\s*```\s*$/m', '', (string) $text);
+
+        $decoded = json_decode(trim((string) $text), true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * The target_* audio features used for refill — AI-adapted targets when
+     * --adapt has produced them, otherwise the static mood preset.
+     *
+     * @return array<string, int|float>
+     */
+    private function activeTargets(string $mood): array
+    {
+        return $this->adaptedTargets
+            ?? $this->moodPresets()[$mood]
+            ?? $this->moodPresets()['flow']
+            ?? [];
+    }
+
+    /**
+     * Emit one structured decision event as a JSON line (--json mode).
+     */
+    private function emitDecision(string $type, array $data = []): void
+    {
+        $this->line(json_encode(array_merge(
+            ['type' => $type],
+            $data,
+            ['timestamp' => now()->toIso8601String()],
+        )));
+    }
+
     // ── Queue logic ───────────────────────────────────────────────
 
     private function maybeRefill(int $threshold, string $mood): void
@@ -399,10 +616,16 @@ XML;
         $queueDepth = count($queue);
         $current = $this->player->getCurrentPlayback();
 
-        $this->line("  Queue depth: {$queueDepth} / threshold: {$threshold}");
+        if (! $this->jsonMode) {
+            $this->line("  Queue depth: {$queueDepth} / threshold: {$threshold}");
+        }
 
         if ($queueDepth >= $threshold) {
-            $this->line('  <fg=gray>Queue healthy — no refill needed</>');
+            if ($this->jsonMode) {
+                $this->emitDecision('hold', ['queue_depth' => $queueDepth, 'threshold' => $threshold]);
+            } else {
+                $this->line('  <fg=gray>Queue healthy — no refill needed</>');
+            }
 
             return;
         }
@@ -425,7 +648,7 @@ XML;
         $recentlyPlayed = $this->discovery->getRecentlyPlayed(5);
 
         [$seedTrackIds, $seedArtistIds] = $this->buildRecommendationSeeds($current, $recentlyPlayed);
-        $moodParams = $this->moodPresets()[$mood] ?? $this->moodPresets()['flow'];
+        $moodParams = $this->activeTargets($mood);
 
         // Build the dedup set — time-bounded session URIs + current context
         $excludeUris = array_fill_keys(array_keys($this->sessionUriTimestamps), true);
@@ -447,11 +670,14 @@ XML;
 
         // If still empty (unlikely now), fall back to improved related tracks
         if ($recommendations === [] && $currentArtist) {
-            $this->line('  <fg=gray>Smart discovery empty — falling back to related tracks</>');
+            if (! $this->jsonMode) {
+                $this->line('  <fg=gray>Smart discovery empty — falling back to related tracks</>');
+            }
             $recommendations = $this->discovery->getRelatedTracks($currentArtist, $current['name'] ?? '', $needed + 10);
         }
 
         $added = 0;
+        $queuedTracks = [];
         foreach ($recommendations as $track) {
             if ($added >= $needed) {
                 break;
@@ -466,7 +692,10 @@ XML;
                 $this->sessionUriTimestamps[$track['uri']] = time();
                 $excludeUris[$track['uri']] = true;
                 $added++;
-                $this->line("  Queued: <fg=green>{$track['name']}</> by {$track['artist']}");
+                $queuedTracks[] = ['name' => $track['name'], 'artist' => $track['artist'], 'uri' => $track['uri']];
+                if (! $this->jsonMode) {
+                    $this->line("  Queued: <fg=green>{$track['name']}</> by {$track['artist']}");
+                }
             } catch (\Exception) {
                 continue;
             }
@@ -474,7 +703,19 @@ XML;
 
         if ($added > 0) {
             $this->lastRefillTime = now()->format('H:i:s');
-            info("Refilled {$added} tracks ({$mood} mood) at {$this->lastRefillTime}");
+            if ($this->jsonMode) {
+                $this->emitDecision('refill', [
+                    'added' => $added,
+                    'mood' => $mood,
+                    'adapted' => $this->adaptedTargets !== null,
+                    'targets' => $moodParams,
+                    'tracks' => $queuedTracks,
+                ]);
+            } else {
+                info("Refilled {$added} tracks ({$mood} mood) at {$this->lastRefillTime}");
+            }
+        } elseif ($this->jsonMode) {
+            $this->emitDecision('error', ['stage' => 'refill', 'message' => 'No fresh recommendations available to add']);
         } else {
             warning('No fresh recommendations available to add');
         }
@@ -487,8 +728,10 @@ XML;
             return $mood;
         }
 
-        $allowed = implode(', ', array_keys($presets));
-        warning("Unknown mood '{$mood}' — using 'flow' ({$allowed})");
+        if (! $this->jsonMode) {
+            $allowed = implode(', ', array_keys($presets));
+            warning("Unknown mood '{$mood}' — using 'flow' ({$allowed})");
+        }
 
         return 'flow';
     }
