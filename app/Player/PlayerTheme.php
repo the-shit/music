@@ -31,8 +31,37 @@ final class PlayerTheme
     use RendersPlayback;
 
     /**
+     * The manual theme-override cycle for the player's `t` key: null first (= Auto,
+     * follow the genre-detected mood), then every mood the moodColor()/moodLabel()
+     * vocabulary knows how to render. Lives here — not in the command — because this
+     * class owns the mood→look vocabulary; the command only walks the ring.
+     *
+     * @var list<string|null>
+     */
+    public const MOOD_CYCLE = [null, 'chill', 'flow', 'focus', 'hype', 'party', 'upbeat', 'melancholy', 'ambient', 'workout', 'sleep'];
+
+    /**
+     * Advance a manual theme override one step around {@see MOOD_CYCLE}, wrapping
+     * back to null (Auto) after the last mood. An unrecognised value resets to
+     * Auto rather than throwing — the safe landing for stale/bogus state.
+     *
+     * Pure and static so the cycle is unit-testable without driving keystrokes
+     * through the player loop.
+     */
+    public static function nextOverride(?string $current): ?string
+    {
+        $index = array_search($current, self::MOOD_CYCLE, true);
+
+        if ($index === false) {
+            return null; // unrecognised → reset to Auto
+        }
+
+        return self::MOOD_CYCLE[($index + 1) % count(self::MOOD_CYCLE)];
+    }
+
+    /**
      * @param  string  $mood  One of config('autopilot.mood_presets') keys, or
-     *                         'neutral' when the mood is unknown (graceful default).
+     *                        'neutral' when the mood is unknown (graceful default).
      */
     public function __construct(private readonly string $mood = 'neutral') {}
 

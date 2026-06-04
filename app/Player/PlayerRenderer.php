@@ -650,6 +650,7 @@ final class PlayerRenderer
                 ['/', 'search'],
                 ['u', 'queue'],
                 ['l', 'playlists'],
+                ['t', 'theme'],
                 ['q', 'quit'],
             ]),
         ];
