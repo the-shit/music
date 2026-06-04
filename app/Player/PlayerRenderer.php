@@ -331,7 +331,7 @@ final class PlayerRenderer
                     ($track['name'] ?? 'Unknown').'  —  '.($track['artist'] ?? 'Unknown'),
                     self::TEXT_WIDTH,
                 ),
-                array_values($results),
+                $results,
             );
             $bodyLines = $this->windowedSelectableList($labels, $selectedIndex);
         }
@@ -387,7 +387,7 @@ final class PlayerRenderer
                 ($track['name'] ?? 'Unknown').'  —  '.($track['artists'][0]['name'] ?? 'Unknown'),
                 self::TEXT_WIDTH,
             ),
-            array_values($queue),
+            $queue,
         );
 
         $bodyLines = $labels === []
@@ -423,7 +423,7 @@ final class PlayerRenderer
                 ($playlist['name'] ?? 'Untitled').'  ('.($playlist['tracks']['total'] ?? 0).' tracks)',
                 self::TEXT_WIDTH,
             ),
-            array_values($playlists),
+            $playlists,
         );
 
         $bodyLines = $labels === []
