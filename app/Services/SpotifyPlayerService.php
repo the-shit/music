@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\SpotifyRateLimit;
 use Exception;
 use Illuminate\Support\Facades\Http;
 
@@ -55,14 +56,14 @@ class SpotifyPlayerService
             }
         }
 
-        $response = Http::withToken($this->auth->getAccessToken())
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->put($this->baseUri.'me/player/play', [
                 'device_id' => $deviceId,
                 'uris' => [$uri],
-            ]);
+            ]));
 
-        if (! $response->successful()) {
-            $error = $response->json();
+        if (! $response?->successful()) {
+            $error = $response?->json();
             throw new \Exception($error['error']['message'] ?? 'Failed to play track');
         }
     }
@@ -93,11 +94,11 @@ class SpotifyPlayerService
 
         $body = $deviceId ? ['device_id' => $deviceId] : [];
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->put($this->baseUri.'me/player/play', $body);
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/play', $body));
 
-        if (! $response->successful()) {
-            $error = $response->json();
+        if (! $response?->successful()) {
+            $error = $response?->json();
             throw new \Exception($error['error']['message'] ?? 'Failed to resume playback');
         }
     }
@@ -109,11 +110,11 @@ class SpotifyPlayerService
     {
         $this->auth->requireAuth();
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->put($this->baseUri.'me/player/pause');
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/pause'));
 
-        if (! $response->successful()) {
-            $error = $response->json();
+        if (! $response?->successful()) {
+            $error = $response?->json();
             throw new \Exception($error['error']['message'] ?? 'Failed to pause playback');
         }
     }
@@ -128,10 +129,10 @@ class SpotifyPlayerService
         // Clamp volume to 0-100
         $volumePercent = max(0, min(100, $volumePercent));
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->put($this->baseUri.'me/player/volume?volume_percent='.$volumePercent);
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/volume?volume_percent='.$volumePercent));
 
-        return $response->successful();
+        return $response !== null && $response->successful();
     }
 
     /**
@@ -141,11 +142,11 @@ class SpotifyPlayerService
     {
         $this->auth->requireAuth();
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->post($this->baseUri.'me/player/next');
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->post($this->baseUri.'me/player/next'));
 
-        if (! $response->successful()) {
-            $error = $response->json();
+        if (! $response?->successful()) {
+            $error = $response?->json();
             throw new \Exception($error['error']['message'] ?? 'Failed to skip track');
         }
     }
@@ -157,11 +158,11 @@ class SpotifyPlayerService
     {
         $this->auth->requireAuth();
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->post($this->baseUri.'me/player/previous');
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->post($this->baseUri.'me/player/previous'));
 
-        if (! $response->successful()) {
-            $error = $response->json();
+        if (! $response?->successful()) {
+            $error = $response?->json();
             throw new \Exception($error['error']['message'] ?? 'Failed to skip to previous');
         }
     }
@@ -173,10 +174,10 @@ class SpotifyPlayerService
     {
         $this->auth->requireAuth();
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->get($this->baseUri.'me/player/devices');
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'me/player/devices'));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             $data = $response->json();
 
             return $data['devices'] ?? [];
@@ -192,14 +193,14 @@ class SpotifyPlayerService
     {
         $this->auth->requireAuth();
 
-        $response = Http::withToken($this->auth->getAccessToken())
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->put($this->baseUri.'me/player', [
                 'device_ids' => [$deviceId],
                 'play' => $play,
-            ]);
+            ]));
 
-        if (! $response->successful()) {
-            $error = $response->json();
+        if (! $response?->successful()) {
+            $error = $response?->json();
             throw new Exception($error['error']['message'] ?? 'Failed to transfer playback');
         }
     }
@@ -236,14 +237,14 @@ class SpotifyPlayerService
         }
 
         // The queue endpoint expects uri as a query parameter, not in the body
-        $response = Http::withToken($this->auth->getAccessToken())
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->post($this->baseUri.'me/player/queue?'.http_build_query([
                 'uri' => $uri,
                 'device_id' => $device['id'],
-            ]));
+            ])));
 
-        if (! $response->successful()) {
-            $error = $response->json();
+        if (! $response?->successful()) {
+            $error = $response?->json();
             throw new \Exception($error['error']['message'] ?? 'Failed to add to queue');
         }
     }
@@ -257,10 +258,10 @@ class SpotifyPlayerService
             return [];
         }
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->get($this->baseUri.'me/player/queue');
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'me/player/queue'));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             $data = $response->json();
 
             return [
@@ -279,11 +280,11 @@ class SpotifyPlayerService
     {
         $this->auth->requireAuth();
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->put($this->baseUri.'me/player/seek?position_ms='.$positionMs);
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/seek?position_ms='.$positionMs));
 
-        if (! $response->successful()) {
-            $error = $response->json();
+        if (! $response?->successful()) {
+            $error = $response?->json();
             throw new \Exception($error['error']['message'] ?? 'Failed to seek');
         }
     }
@@ -295,10 +296,10 @@ class SpotifyPlayerService
     {
         $this->auth->requireAuth();
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->put($this->baseUri.'me/player/shuffle?state='.($state ? 'true' : 'false'));
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/shuffle?state='.($state ? 'true' : 'false')));
 
-        return $response->successful();
+        return $response !== null && $response->successful();
     }
 
     /**
@@ -313,10 +314,10 @@ class SpotifyPlayerService
             throw new \Exception('Invalid repeat state. Use: off, track, or context');
         }
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->put($this->baseUri.'me/player/repeat?state='.$state);
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri.'me/player/repeat?state='.$state));
 
-        return $response->successful();
+        return $response !== null && $response->successful();
     }
 
     /**
@@ -329,10 +330,10 @@ class SpotifyPlayerService
         }
 
         // Use /me/player instead of /me/player/currently-playing to get full state including device
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->get($this->baseUri.'me/player');
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'me/player'));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             $data = $response->json();
             if (isset($data['item'])) {
                 $albumImages = $data['item']['album']['images'] ?? [];
@@ -379,10 +380,10 @@ class SpotifyPlayerService
             return [];
         }
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->get($this->baseUri.'artists/'.$artistId);
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'artists/'.$artistId));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             return $response->json('genres') ?? [];
         }
 
@@ -400,12 +401,12 @@ class SpotifyPlayerService
 
         $device = $deviceId ?: $this->getActiveDevice()['id'] ?? null;
 
-        $response = Http::withToken($this->auth->getAccessToken())
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->put($this->baseUri.'me/player/play', [
                 'device_id' => $device,
                 'context_uri' => "spotify:playlist:{$playlistId}",
-            ]);
+            ]));
 
-        return $response->successful();
+        return $response !== null && $response->successful();
     }
 }

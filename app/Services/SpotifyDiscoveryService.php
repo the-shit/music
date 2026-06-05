@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\SpotifyRateLimit;
 use Illuminate\Support\Facades\Http;
 
 class SpotifyDiscoveryService
@@ -22,14 +23,14 @@ class SpotifyDiscoveryService
     {
         $this->auth->requireAuth();
 
-        $response = Http::withToken($this->auth->getAccessToken())
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'search', [
                 'q' => $query,
                 'type' => $type,
                 'limit' => 1,
-            ]);
+            ]));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             $data = $response->json();
             if (isset($data['tracks']['items'][0])) {
                 $track = $data['tracks']['items'][0];
@@ -52,14 +53,14 @@ class SpotifyDiscoveryService
     {
         $this->auth->requireAuth();
 
-        $response = Http::withToken($this->auth->getAccessToken())
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'search', [
                 'q' => $query,
                 'type' => $type,
                 'limit' => $limit,
-            ]);
+            ]));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             $data = $response->json();
             $results = [];
 
@@ -87,13 +88,13 @@ class SpotifyDiscoveryService
     {
         $this->auth->requireAuth();
 
-        $response = Http::withToken($this->auth->getAccessToken())
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'me/top/tracks', [
                 'time_range' => $timeRange,
                 'limit' => $limit,
-            ]);
+            ]));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             $data = $response->json();
             $tracks = [];
 
@@ -119,13 +120,13 @@ class SpotifyDiscoveryService
     {
         $this->auth->requireAuth();
 
-        $response = Http::withToken($this->auth->getAccessToken())
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'me/top/artists', [
                 'time_range' => $timeRange,
                 'limit' => $limit,
-            ]);
+            ]));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             $data = $response->json();
             $artists = [];
 
@@ -150,12 +151,12 @@ class SpotifyDiscoveryService
     {
         $this->auth->requireAuth();
 
-        $response = Http::withToken($this->auth->getAccessToken())
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'me/player/recently-played', [
                 'limit' => $limit,
-            ]);
+            ]));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             $data = $response->json();
             $tracks = [];
 
@@ -233,10 +234,10 @@ class SpotifyDiscoveryService
             $params[$key] = $value;
         }
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->get($this->baseUri.'recommendations', $params);
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'recommendations', $params));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             $data = $response->json();
             $tracks = [];
 
@@ -456,12 +457,12 @@ class SpotifyDiscoveryService
             return [];
         }
 
-        $response = Http::withToken($this->auth->getAccessToken())
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'me/playlists', [
                 'limit' => $limit,
-            ]);
+            ]));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             $data = $response->json();
 
             return $data['items'] ?? [];
@@ -479,10 +480,10 @@ class SpotifyDiscoveryService
             return [];
         }
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->get($this->baseUri."playlists/{$playlistId}/tracks");
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri."playlists/{$playlistId}/tracks"));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             $data = $response->json();
 
             return $data['items'] ?? [];
@@ -504,12 +505,12 @@ class SpotifyDiscoveryService
 
         // Spotify allows max 50 IDs per request
         foreach (array_chunk($trackIds, 50) as $chunk) {
-            $response = Http::withToken($this->auth->getAccessToken())
+            $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
                 ->get($this->baseUri.'tracks', [
                     'ids' => implode(',', $chunk),
-                ]);
+                ]));
 
-            if ($response->successful()) {
+            if ($response !== null && $response->successful()) {
                 foreach ($response->json()['tracks'] ?? [] as $track) {
                     if (! $track) {
                         continue;
@@ -606,14 +607,14 @@ class SpotifyDiscoveryService
             return null;
         }
 
-        $response = Http::withToken($this->auth->getAccessToken())
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->post($this->baseUri."users/{$profile['id']}/playlists", [
                 'name' => $name,
                 'description' => $description,
                 'public' => $public,
-            ]);
+            ]));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             return $response->json();
         }
 
@@ -631,19 +632,19 @@ class SpotifyDiscoveryService
         $first = true;
         foreach (array_chunk($trackUris, 100) as $chunk) {
             if ($first) {
-                $response = Http::withToken($this->auth->getAccessToken())
+                $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
                     ->put($this->baseUri."playlists/{$playlistId}/tracks", [
                         'uris' => $chunk,
-                    ]);
+                    ]));
                 $first = false;
             } else {
-                $response = Http::withToken($this->auth->getAccessToken())
+                $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
                     ->post($this->baseUri."playlists/{$playlistId}/tracks", [
                         'uris' => $chunk,
-                    ]);
+                    ]));
             }
 
-            if (! $response->successful()) {
+            if (! $response?->successful()) {
                 return false;
             }
         }
@@ -676,10 +677,10 @@ class SpotifyDiscoveryService
             return false;
         }
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->put($this->baseUri."playlists/{$playlistId}", $details);
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->put($this->baseUri."playlists/{$playlistId}", $details));
 
-        return $response->successful();
+        return $response !== null && $response->successful();
     }
 
     /**
@@ -689,10 +690,10 @@ class SpotifyDiscoveryService
     {
         $this->auth->requireAuth();
 
-        $response = Http::withToken($this->auth->getAccessToken())
-            ->get($this->baseUri.'me');
+        $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
+            ->get($this->baseUri.'me'));
 
-        if ($response->successful()) {
+        if ($response !== null && $response->successful()) {
             return $response->json();
         }
 

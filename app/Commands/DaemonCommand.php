@@ -24,6 +24,13 @@ class DaemonCommand extends Command
 
     private const LEGACY_LAUNCH_AGENT_LABEL = 'com.spotify-cli.spotifyd';
 
+    /**
+     * Health scans only this recent window of spotifyd.log — the log is never
+     * rotated outside --heal, so it accumulates weeks of history and stale
+     * errors that say nothing about the daemon's health right now.
+     */
+    private const LOG_TAIL_LINES = 500;
+
     private string $pidFile;
 
     private string $configDir;
@@ -94,7 +101,7 @@ class DaemonCommand extends Command
         $configFile = $this->configDir.'/spotifyd.conf';
         $orphanPid = trim((string) shell_exec("pgrep -f 'spotifyd.*{$configFile}' 2>/dev/null | head -1"));
         $orphanComm = $orphanPid !== '' && $orphanPid !== '0' ? trim((string) shell_exec("ps -p {$orphanPid} -o comm= 2>/dev/null")) : '';
-        if ($orphanPid && $orphanComm === 'spotifyd') {
+        if ($orphanPid && self::isSpotifydComm($orphanComm)) {
             warning("Found orphaned spotifyd (PID: {$orphanPid}) — adopting it");
             $this->savePid((int) $orphanPid);
             info('✅ Daemon adopted');
@@ -393,13 +400,27 @@ class DaemonCommand extends Command
 
         // Verify the PID is actually spotifyd, not a recycled process
         $comm = trim((string) shell_exec("ps -p {$pid} -o comm= 2>/dev/null"));
-        if ($comm !== 'spotifyd') {
+        if (! self::isSpotifydComm($comm)) {
             @unlink($this->pidFile);
 
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * Whether a `ps -o comm=` value names a spotifyd binary.
+     *
+     * WHY not `$comm === 'spotifyd'`: on macOS `comm` is the FULL PATH
+     * (/Users/x/.local/bin/spotifyd-rodio), and our preferred binary is named
+     * `spotifyd-rodio` — so an exact match was ALWAYS false, health reported
+     * the daemon dead forever, and the --heal loop never engaged. Public static
+     * + pure so the comparison itself is unit-testable.
+     */
+    public static function isSpotifydComm(string $comm): bool
+    {
+        return str_starts_with(basename(trim($comm)), 'spotifyd');
     }
 
     private function getDaemonPid(): ?int
@@ -409,7 +430,7 @@ class DaemonCommand extends Command
             $pid = (int) file_get_contents($this->pidFile);
             if ($pid > 0 && @posix_kill($pid, 0)) {
                 $comm = trim((string) shell_exec("ps -p {$pid} -o comm= 2>/dev/null"));
-                if ($comm === 'spotifyd') {
+                if (self::isSpotifydComm($comm)) {
                     return $pid;
                 }
             }
@@ -420,7 +441,7 @@ class DaemonCommand extends Command
         $pid = trim((string) shell_exec("pgrep -f 'spotifyd.*{$configFile}' 2>/dev/null | head -1"));
         if ($pid !== '' && $pid !== '0') {
             $comm = trim((string) shell_exec("ps -p {$pid} -o comm= 2>/dev/null"));
-            if ($comm === 'spotifyd') {
+            if (self::isSpotifydComm($comm)) {
                 return (int) $pid;
             }
         }
@@ -635,8 +656,21 @@ XML;
             'pid' => $pid,
             'errors' => $errors,
             'cache_size_mb' => $cacheSize,
-            'log_lines' => file_exists($logFile) ? count(file($logFile)) : 0,
+            'log_lines' => $this->countLogLines($logFile),
         ];
+    }
+
+    /**
+     * Count log lines without loading the file into memory — count(file())
+     * materialised every line of a multi-million-line log just to count them.
+     */
+    private function countLogLines(string $logFile): int
+    {
+        if (! file_exists($logFile)) {
+            return 0;
+        }
+
+        return (int) trim((string) shell_exec('wc -l < '.escapeshellarg($logFile).' 2>/dev/null'));
     }
 
     private function heal(array $diagnosis): int
@@ -761,9 +795,13 @@ XML;
             'failed to put connect state' => 0,
         ];
 
-        // Read last 500 lines to avoid parsing massive logs
-        $lines = file($logFile);
-        $lines = array_slice($lines, -500);
+        // Scan ONLY a recent tail window. file() loaded the ENTIRE log into
+        // memory first (weeks of history, millions of lines) just to slice the
+        // end off — and any error counted from months-old lines is meaningless
+        // for "is the daemon healthy right now". tail streams the last lines
+        // without reading the rest.
+        $tail = (string) shell_exec('tail -n '.self::LOG_TAIL_LINES.' '.escapeshellarg($logFile).' 2>/dev/null');
+        $lines = $tail === '' ? [] : explode("\n", $tail);
 
         foreach ($lines as $line) {
             foreach ($patterns as $pattern => $count) {

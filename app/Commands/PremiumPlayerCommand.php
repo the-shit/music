@@ -12,6 +12,7 @@ use App\Player\PlayerTheme;
 use App\Player\PlayerViewModel;
 use App\Services\SpotifyDiscoveryService;
 use App\Services\SpotifyPlayerService;
+use App\Support\SpotifyRateLimit;
 use LaravelZero\Framework\Commands\Command;
 use PhpTui\Term\Actions;
 use PhpTui\Term\Event\CharKeyEvent;
@@ -210,6 +211,10 @@ class PremiumPlayerCommand extends Command
                     // artist_id we need to resolve mood.
                     $payload = $this->safePlayback($player);
                     $vm = PlayerViewModel::fromPlayback($payload);
+                    // Stamp the 429 breaker state each refresh: when Spotify is
+                    // rate-limiting us every poll comes back empty, and the empty
+                    // panel must say so instead of "Nothing playing right now".
+                    $vm->rateLimitedUntil = SpotifyRateLimit::resumesAt();
                     $lastFetch = $now;
 
                     // Resolve mood ONLY when the track changes (cheap key compare),
@@ -499,7 +504,9 @@ class PremiumPlayerCommand extends Command
             return $renderer->lyricsOverlay($lyrics['track'], $lyrics['lines'], $lyrics['scroll']);
         }
 
-        return ($vm !== null && $vm->hasPlayback) ? $renderer->nowPlaying($vm) : $renderer->empty();
+        // The empty state carries the rate-limit notice (when the breaker is
+        // open) so a throttled player reads honestly instead of "Nothing playing".
+        return ($vm !== null && $vm->hasPlayback) ? $renderer->nowPlaying($vm) : $renderer->empty($vm?->rateLimitNotice());
     }
 
     /**
