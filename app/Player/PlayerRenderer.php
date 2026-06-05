@@ -278,16 +278,26 @@ final class PlayerRenderer
     /**
      * The calm nothing-playing panel. Same mood frame, centred guidance text —
      * so an idle player still feels like part of the surface, not an error.
+     *
+     * When a $notice is given (the VM's rate-limit line) it REPLACES the default
+     * "Nothing playing right now": while Spotify is 429-ing us every poll fails,
+     * so claiming nothing is playing would be a lie — the honest state is "we're
+     * rate-limited, back at ~HH:MM". php-tui's centred alignment owns the
+     * padding, so the box stays aligned for any notice length.
      */
-    public function empty(): Widget
+    public function empty(?string $notice = null): Widget
     {
         $theme = $this->theme;
 
+        $hint = $notice === null
+            ? 'Press / to search, or start playback on Spotify'
+            : 'Polling is paused so the limit can reset';
+
         $body = ParagraphWidget::fromLines(
             Line::fromString(''),
-            Line::fromSpans(Span::styled('Nothing playing right now', $theme->text())),
+            Line::fromSpans(Span::styled($notice ?? 'Nothing playing right now', $theme->text())),
             Line::fromString(''),
-            Line::fromSpans(Span::styled('Press / to search, or start playback on Spotify', $theme->dim())),
+            Line::fromSpans(Span::styled($hint, $theme->dim())),
         )->alignment(HorizontalAlignment::Center);
 
         return BlockWidget::default()

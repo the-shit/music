@@ -46,7 +46,28 @@ final class PlayerViewModel
         // PremiumPlayerCommand) and leaves it null otherwise. Mutable + trailing with a
         // safe default so fromPlayback() stays I/O-free and positional ctors keep working.
         public ?string $upNext = null,
+        // Unix timestamp when Spotify's 429 rate limit lifts, null when not limited.
+        // NOT derivable from the playback payload — the loop reads it from the
+        // SpotifyRateLimit breaker each refresh (see PremiumPlayerCommand). Drives the
+        // honest rate-limited empty state instead of a misleading "Nothing playing".
+        // Mutable + trailing with a safe default, same contract as mood/upNext.
+        public ?int $rateLimitedUntil = null,
     ) {}
+
+    /**
+     * Honest empty-state line while Spotify is rate-limiting us, or null when
+     * the breaker is closed. Lives on the VM (not the renderer) so the wording
+     * and the HH:MM formatting are unit-testable pure PHP — the renderer just
+     * swaps it in for "Nothing playing right now".
+     */
+    public function rateLimitNotice(): ?string
+    {
+        if ($this->rateLimitedUntil === null) {
+            return null;
+        }
+
+        return '⏳ Spotify is rate-limiting us — resumes ~'.date('H:i', $this->rateLimitedUntil);
+    }
 
     /**
      * Map a SpotifyPlayerService::getCurrentPlayback() payload into a view model.
