@@ -92,6 +92,24 @@ uses()->afterEach(function (): void {
 
 /*
 |--------------------------------------------------------------------------
+| Laravel Prompts — fall back to Symfony questions in every test
+|--------------------------------------------------------------------------
+|
+| Without the fallback, select()/text() render to the real terminal: under
+| a TTY they block on keyboard input forever (the suite used to hang
+| deterministically at PlayerCommandTest when run in a real terminal), and
+| without one they only terminate by throwing on EOF. With the fallback,
+| prompts route through Symfony questions, expectsQuestion() can drive
+| them, and the suite behaves identically in CI, pipes, and terminals.
+| fallbackWhen() ORs into sticky static state, so set it suite-wide here
+| rather than per-file where it would be order-dependent.
+*/
+uses()->beforeEach(function (): void {
+    \Laravel\Prompts\Prompt::fallbackWhen(true);
+})->in('Feature', 'Unit');
+
+/*
+|--------------------------------------------------------------------------
 | Laravel Prompts spin() — deterministic full suite (no SIGHUP hang)
 |--------------------------------------------------------------------------
 |
