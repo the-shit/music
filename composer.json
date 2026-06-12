@@ -67,8 +67,14 @@
         }
     },
     "scripts": {
-        "test": "@php -d disable_functions=pcntl_fork vendor/bin/pest",
-        "test:coverage": "@php -d disable_functions=pcntl_fork vendor/bin/pest --coverage",
+        "test": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php -d disable_functions=pcntl_fork vendor/bin/pest"
+        ],
+        "test:coverage": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php -d disable_functions=pcntl_fork vendor/bin/pest --coverage"
+        ],
         "lint": "pint --dirty",
         "lint:check": "pint --test",
         "analyse": "phpstan analyse --no-progress",
