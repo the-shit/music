@@ -37,7 +37,9 @@ describe('PlayerCommand', function (): void {
 
         $this->artisan('player')
             ->expectsOutputToContain('🎵 Spotify Interactive Player')
-            ->expectsOutputToContain('Loading...');
+            ->expectsOutputToContain('Loading...')
+            ->expectsQuestion('What would you like to do?', 'exit')
+            ->expectsOutputToContain('👋 Goodbye!');
     });
 
     it('displays current track info', function (): void {
@@ -62,7 +64,9 @@ describe('PlayerCommand', function (): void {
 
         $this->artisan('player')
             ->expectsOutputToContain('🎵 Spotify Interactive Player')
-            ->expectsOutputToContain('Loading...');
+            ->expectsOutputToContain('Loading...')
+            ->expectsQuestion('Controls', 'exit')
+            ->expectsOutputToContain('👋 Goodbye!');
     });
 
 });

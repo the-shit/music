@@ -66,10 +66,11 @@ describe('SetupCommand', function (): void {
                 'client_secret' => 'existingclientsecret12345',
             ]));
 
-            // With reset flag, it should proceed to setup
-            Prompt::interactive(false);
-
+            // Declining the confirmation cancels the reset cleanly — the same
+            // path the old non-interactive default-false behaviour exercised.
             $this->artisan('setup', ['--reset' => true])
+                ->expectsConfirmation('This will remove your stored Spotify credentials. Continue?', 'no')
+                ->expectsOutputToContain('Setup cancelled.')
                 ->assertExitCode(0);
         });
 
