@@ -28,7 +28,7 @@ class DevicesCommand extends Command
         try {
             $devices = $player->getDevices();
 
-            if (empty($devices)) {
+            if ($devices === []) {
                 warning('📱 No devices found');
                 info('💡 Open Spotify on your phone, computer, or smart speaker');
 

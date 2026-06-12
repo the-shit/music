@@ -240,7 +240,7 @@ class PulseCommand extends Command
      */
     private function maybeReset(): void
     {
-        if ($this->nextResetAt === null) {
+        if (! $this->nextResetAt instanceof \Carbon\CarbonInterface) {
             $this->nextResetAt = $this->computeNextReset();
 
             return;
@@ -265,7 +265,7 @@ class PulseCommand extends Command
 
         $candidate = now()->setTime((int) $hour, (int) $minute, 0);
         if (now()->greaterThanOrEqualTo($candidate)) {
-            $candidate = $candidate->addDay();
+            return $candidate->addDay();
         }
 
         return $candidate;

@@ -40,7 +40,7 @@ class RecentCommand extends Command
             info('🕐 Recently Played:');
             $this->newLine();
 
-            if (empty($tracks)) {
+            if ($tracks === []) {
                 warning('No recently played tracks found.');
 
                 return self::SUCCESS;

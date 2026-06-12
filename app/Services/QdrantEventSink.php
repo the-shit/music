@@ -117,7 +117,7 @@ class QdrantEventSink
 
     private function getClient(): Qdrant
     {
-        if ($this->client === null) {
+        if (! $this->client instanceof \TheShit\Vector\Qdrant) {
             $this->client = new Qdrant(
                 new QdrantConnector(
                     baseUrl: config('spotify.qdrant.url'),

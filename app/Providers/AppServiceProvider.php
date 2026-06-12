@@ -27,11 +27,11 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(SpotifyAuthManager::class);
 
-        $this->app->singleton(SpotifyPlayerService::class, function ($app) {
+        $this->app->singleton(SpotifyPlayerService::class, function ($app): \App\Services\SpotifyPlayerService {
             return new SpotifyPlayerService($app->make(SpotifyAuthManager::class));
         });
 
-        $this->app->singleton(SpotifyDiscoveryService::class, function ($app) {
+        $this->app->singleton(SpotifyDiscoveryService::class, function ($app): \App\Services\SpotifyDiscoveryService {
             return new SpotifyDiscoveryService($app->make(SpotifyAuthManager::class));
         });
     }
