@@ -32,6 +32,8 @@ That's it. The hook and CI gate are wired up per-repo — see [CONTRIBUTING.md](
 
 `spotify player:premium` — a full php-tui player in your terminal. Album art rendered as ANSI, mood-aware theming, a search palette with play-now and queue actions, playlist browsing, and a queue peek. It's the player a vibes-enforced codebase deserves.
 
+![Premium player demo — mood theming, lyrics, queue peek, and the search palette](docs/demo/premium-player.gif)
+
 ```bash
 spotify player:premium
 ```
