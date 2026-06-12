@@ -132,7 +132,7 @@ class SpotifyPlayerService
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->put($this->baseUri.'me/player/volume?volume_percent='.$volumePercent));
 
-        return $response !== null && $response->successful();
+        return $response instanceof \Illuminate\Http\Client\Response && $response->successful();
     }
 
     /**
@@ -177,7 +177,7 @@ class SpotifyPlayerService
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'me/player/devices'));
 
-        if ($response !== null && $response->successful()) {
+        if ($response instanceof \Illuminate\Http\Client\Response && $response->successful()) {
             $data = $response->json();
 
             return $data['devices'] ?? [];
@@ -261,7 +261,7 @@ class SpotifyPlayerService
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'me/player/queue'));
 
-        if ($response !== null && $response->successful()) {
+        if ($response instanceof \Illuminate\Http\Client\Response && $response->successful()) {
             $data = $response->json();
 
             return [
@@ -299,7 +299,7 @@ class SpotifyPlayerService
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->put($this->baseUri.'me/player/shuffle?state='.($state ? 'true' : 'false')));
 
-        return $response !== null && $response->successful();
+        return $response instanceof \Illuminate\Http\Client\Response && $response->successful();
     }
 
     /**
@@ -317,7 +317,7 @@ class SpotifyPlayerService
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->put($this->baseUri.'me/player/repeat?state='.$state));
 
-        return $response !== null && $response->successful();
+        return $response instanceof \Illuminate\Http\Client\Response && $response->successful();
     }
 
     /**
@@ -333,7 +333,7 @@ class SpotifyPlayerService
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'me/player'));
 
-        if ($response !== null && $response->successful()) {
+        if ($response instanceof \Illuminate\Http\Client\Response && $response->successful()) {
             $data = $response->json();
             if (isset($data['item'])) {
                 $albumImages = $data['item']['album']['images'] ?? [];
@@ -383,7 +383,7 @@ class SpotifyPlayerService
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'artists/'.$artistId));
 
-        if ($response !== null && $response->successful()) {
+        if ($response instanceof \Illuminate\Http\Client\Response && $response->successful()) {
             return $response->json('genres') ?? [];
         }
 
@@ -407,6 +407,6 @@ class SpotifyPlayerService
                 'context_uri' => "spotify:playlist:{$playlistId}",
             ]));
 
-        return $response !== null && $response->successful();
+        return $response instanceof \Illuminate\Http\Client\Response && $response->successful();
     }
 }

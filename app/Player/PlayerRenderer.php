@@ -149,7 +149,7 @@ final class PlayerRenderer
 
         // Optional up-next peek — only when the loop has resolved a next track.
         $upNext = $this->upNextRow($vm);
-        if ($upNext !== null) {
+        if ($upNext instanceof \PhpTui\Tui\Widget\Widget) {
             $rows[] = $upNext;
         }
 

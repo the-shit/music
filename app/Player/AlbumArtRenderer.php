@@ -96,7 +96,7 @@ final class AlbumArtRenderer
                     return;
                 }
 
-                $pixels = self::rescale($matrix, $pixelWidth, $pixelHeight);
+                $pixels = $this->rescale($matrix, $pixelWidth, $pixelHeight);
 
                 // Paint pixels directly onto the grid via ClosureShape — the only
                 // php-tui seam that exposes raw (Position, Color) painting without
@@ -139,7 +139,7 @@ final class AlbumArtRenderer
 
         // GD is the decoder; without it we can't turn bytes into pixels, so we
         // degrade rather than fatal. Cached so the check is paid once per URL.
-        if (! self::gdAvailable()) {
+        if (! $this->gdAvailable()) {
             return self::$cache[$url] = null;
         }
 
@@ -169,7 +169,7 @@ final class AlbumArtRenderer
             return self::$cache[$url] = null;
         }
 
-        $matrix = self::toMatrix($image);
+        $matrix = $this->toMatrix($image);
         imagedestroy($image);
 
         return self::$cache[$url] = $matrix;
@@ -181,7 +181,7 @@ final class AlbumArtRenderer
      *
      * @return list<list<array{int, int, int}>>
      */
-    private static function toMatrix(GdImage $image): array
+    private function toMatrix(GdImage $image): array
     {
         $width = imagesx($image);
         $height = imagesy($image);
@@ -225,7 +225,7 @@ final class AlbumArtRenderer
      * @param  list<list<array{int, int, int}>>  $source
      * @return list<list<array{int, int, int}>>
      */
-    private static function rescale(array $source, int $targetWidth, int $targetHeight): array
+    private function rescale(array $source, int $targetWidth, int $targetHeight): array
     {
         $sourceHeight = count($source);
         $sourceWidth = $sourceHeight > 0 ? count($source[0]) : 0;
@@ -270,7 +270,7 @@ final class AlbumArtRenderer
             ->widget($body);
     }
 
-    private static function gdAvailable(): bool
+    private function gdAvailable(): bool
     {
         return extension_loaded('gd') && function_exists('imagecreatefromstring');
     }

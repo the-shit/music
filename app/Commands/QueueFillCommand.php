@@ -76,7 +76,7 @@ class QueueFillCommand extends Command
             $recommendations = $discovery->getRecommendations($seedTrackIds, $seedArtistIds, $needed + 5);
 
             // If still empty, fall back to improved related tracks
-            if (empty($recommendations) && $currentlyPlaying) {
+            if ($recommendations === [] && $currentlyPlaying) {
                 $artistName = $currentlyPlaying['artists'][0]['name'] ?? null;
                 $trackName = $currentlyPlaying['name'] ?? null;
 
@@ -85,7 +85,7 @@ class QueueFillCommand extends Command
                 }
             }
 
-            if (empty($recommendations)) {
+            if ($recommendations === []) {
                 if ($this->option('json')) {
                     $this->line(json_encode([
                         'filled' => false,

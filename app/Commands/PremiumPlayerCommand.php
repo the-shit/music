@@ -206,7 +206,7 @@ class PremiumPlayerCommand extends Command
 
                 // Keep playback state fresh even while the palette is open, so closing
                 // search drops straight back into a current now-playing panel.
-                if ($vm === null || ($now - $lastFetch) >= self::REFRESH_SECONDS) {
+                if (! $vm instanceof \App\Player\PlayerViewModel || ($now - $lastFetch) >= self::REFRESH_SECONDS) {
                     // Keep the raw payload: the VM is pure and doesn't carry the
                     // artist_id we need to resolve mood.
                     $payload = $this->safePlayback($player);
@@ -269,7 +269,7 @@ class PremiumPlayerCommand extends Command
                 // Drain all buffered input each tick (next() is non-blocking). Each
                 // overlay consumes keys differently; only one is ever active at a time.
                 $events = $terminal->events();
-                while (($event = $events->next()) !== null) {
+                while (($event = $events->next()) instanceof \PhpTui\Term\Event) {
                     if ($search['active']) {
                         $outcome = $this->handleSearchEvent($event, $player, $search);
 
@@ -332,7 +332,7 @@ class PremiumPlayerCommand extends Command
                         if ($outcome === self::CYCLE_THEME) {
                             $themeOverride = PlayerTheme::nextOverride($themeOverride);
                             $renderer = new PlayerRenderer(PlayerTheme::forMood($themeOverride ?? $mood));
-                            if ($vm !== null && $vm->hasPlayback) {
+                            if ($vm->hasPlayback) {
                                 $vm->mood = $themeOverride ?? $mood;
                             }
 
@@ -344,7 +344,7 @@ class PremiumPlayerCommand extends Command
                         if ($outcome === self::LYRICS) {
                             $lyrics = [
                                 'active' => true,
-                                'track' => ($vm !== null && $vm->hasPlayback) ? $vm->title : null,
+                                'track' => $vm->hasPlayback ? $vm->title : null,
                                 'lines' => $this->safeLyrics($lyricsProvider, $vm),
                                 'scroll' => 0,
                             ];
@@ -457,10 +457,10 @@ class PremiumPlayerCommand extends Command
                 ' ' => $this->togglePlayback($player, $vm),
                 'n' => $this->then(fn () => $player->next()),
                 'p' => $this->then(fn () => $player->previous()),
-                's' => $this->then(fn () => $player->setShuffle(! $vm->shuffle)),
-                'r' => $this->then(fn () => $player->setRepeat($this->nextRepeat($vm->repeat))),
-                '+', '=' => $this->then(fn () => $player->setVolume(min(100, ($vm->volume ?? 0) + 10))),
-                '-', '_' => $this->then(fn () => $player->setVolume(max(0, ($vm->volume ?? 0) - 10))),
+                's' => $this->then(fn (): bool => $player->setShuffle(! $vm->shuffle)),
+                'r' => $this->then(fn (): bool => $player->setRepeat($this->nextRepeat($vm->repeat))),
+                '+', '=' => $this->then(fn (): bool => $player->setVolume(min(100, ($vm->volume ?? 0) + 10))),
+                '-', '_' => $this->then(fn (): bool => $player->setVolume(max(0, ($vm->volume ?? 0) - 10))),
                 default => self::NONE,
             };
         } catch (Throwable) {
@@ -506,7 +506,7 @@ class PremiumPlayerCommand extends Command
 
         // The empty state carries the rate-limit notice (when the breaker is
         // open) so a throttled player reads honestly instead of "Nothing playing".
-        return ($vm !== null && $vm->hasPlayback) ? $renderer->nowPlaying($vm) : $renderer->empty($vm?->rateLimitNotice());
+        return ($vm instanceof \App\Player\PlayerViewModel && $vm->hasPlayback) ? $renderer->nowPlaying($vm) : $renderer->empty($vm?->rateLimitNotice());
     }
 
     /**
@@ -877,7 +877,7 @@ class PremiumPlayerCommand extends Command
      */
     private function safeLyrics(LyricsProvider $provider, ?PlayerViewModel $vm): ?array
     {
-        if ($vm === null || ! $vm->hasPlayback) {
+        if (! $vm instanceof \App\Player\PlayerViewModel || ! $vm->hasPlayback) {
             return null;
         }
 

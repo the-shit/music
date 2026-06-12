@@ -69,7 +69,7 @@ class TopCommand extends Command
                 }
             }
 
-            if (empty($items)) {
+            if ($items === []) {
                 warning('No data found for this time range.');
             }
 

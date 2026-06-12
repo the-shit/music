@@ -22,7 +22,7 @@ it('runs spin() callbacks inline and returns their value', function (): void {
     // mutation here proves the callback ran synchronously in this process.
     $ranInThisProcess = 0;
 
-    $result = spin(function () use (&$ranInThisProcess) {
+    $result = spin(function () use (&$ranInThisProcess): string {
         $ranInThisProcess++;
 
         return 'callback-ran';

@@ -2,6 +2,7 @@
 /.idea
 /.vscode
 /.vagrant
+/.claude
 .phpunit.result.cache
 /coverage
 bin/media-bridge

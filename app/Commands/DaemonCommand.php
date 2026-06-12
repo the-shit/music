@@ -804,7 +804,7 @@ XML;
         $lines = $tail === '' ? [] : explode("\n", $tail);
 
         foreach ($lines as $line) {
-            foreach ($patterns as $pattern => $count) {
+            foreach (array_keys($patterns) as $pattern) {
                 if (stripos($line, $pattern) !== false) {
                     $patterns[$pattern]++;
                 }

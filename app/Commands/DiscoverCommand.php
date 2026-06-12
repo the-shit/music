@@ -49,7 +49,7 @@ class DiscoverCommand extends Command
             info("🔍 Discover: {$enrichedQuery}");
             $this->newLine();
 
-            if (empty($tracks)) {
+            if ($tracks === []) {
                 warning('No tracks found. Try different keywords.');
 
                 return self::SUCCESS;

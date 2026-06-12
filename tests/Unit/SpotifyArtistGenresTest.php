@@ -35,7 +35,7 @@ it('returns the artist genres from GET /artists/{id}', function (): void {
 
     expect($this->service->getArtistGenres('artist123'))->toBe(['classic rock', 'glam rock']);
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'artists/artist123'));
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'artists/artist123'));
 });
 
 it('returns an empty array when the artist has no genres key', function (): void {

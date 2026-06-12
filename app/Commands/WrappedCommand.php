@@ -112,7 +112,7 @@ class WrappedCommand extends Command
         $fill = $w - $this->width($title);
         $lines[] = '╭'.$title.str_repeat('─', max(0, $fill)).'╮';
 
-        $row = fn (string $content = '') => '│'.$this->pad($content, $w).'│';
+        $row = fn (string $content = ''): string => '│'.$this->pad($content, $w).'│';
 
         $lines[] = $row();
         $lines[] = $row(sprintf('  %4d   commits set to music', $stats['total_commits']));
