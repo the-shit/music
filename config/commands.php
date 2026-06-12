@@ -83,6 +83,8 @@ return [
         Laravel\Mcp\Console\Commands\MakePromptCommand::class,
         Laravel\Mcp\Console\Commands\MakeResourceCommand::class,
         Laravel\Mcp\Console\Commands\InspectorCommand::class,
+        Laravel\Ai\Console\Commands\MakeAgentCommand::class,
+        Laravel\Ai\Console\Commands\MakeToolCommand::class,
         ...$devHidden,
     ],
 
