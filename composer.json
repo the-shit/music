@@ -28,7 +28,7 @@
         "laravel/mcp": "^0.5.9",
         "laravel/prompts": "^0.3",
         "php-tui/php-tui": "^0.2.1",
-        "the-shit/vector": "dev-main"
+        "the-shit/vector": "^0.2.1"
     },
     "require-dev": {
         "laravel/pint": "^1.22",
@@ -92,12 +92,5 @@
     "prefer-stable": true,
     "bin": [
         "spotify"
-    ],
-    "repositories": [
-        {
-            "name": "vector",
-            "type": "vcs",
-            "url": "https://github.com/the-shit/vector.git"
-        }
     ]
 }
