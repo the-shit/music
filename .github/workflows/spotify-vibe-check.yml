@@ -37,11 +37,21 @@ jobs:
             SHORT="${HASH:0:7}"
             MSG=$(git log --format="%B" -n 1 "$HASH")
 
-            # Skip merge commits
+            # Skip merge commits (two parents). GitHub squash-to-master is a
+            # single parent whose subject is "title (#123)" and whose body is
+            # whatever the merge box had — often without the track trailer.
+            # The pull_request Vibe Check already gated the branch commits.
             PARENT_COUNT=$(git cat-file -p "$HASH" | grep -c "^parent ")
             if [ "$PARENT_COUNT" -gt 1 ]; then
               echo "⏭️  $SHORT — merge commit (skipped)"
               continue
+            fi
+            if [ "${{ github.event_name }}" != "pull_request" ]; then
+              SUBJECT=$(echo "$MSG" | head -1)
+              if echo "$SUBJECT" | grep -qE '\(#[0-9]+\)$'; then
+                echo "⏭️  $SHORT — GitHub squash/merge commit (skipped)"
+                continue
+              fi
             fi
 
             if echo "$MSG" | grep -qE "open\.spotify\.com/track/[A-Za-z0-9]+"; then
