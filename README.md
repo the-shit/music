@@ -15,6 +15,17 @@ The byproduct is the [vibes page](https://the-shit.github.io/music/vibes.html) â
 
 It's enforced by the same pipeline as PHPStan and test coverage. Music is a CI gate here, not a gimmick.
 
+## On the Omarchy bar
+
+Chip on the bar: now-playing, play/pause. Popup: skip, chill / flow / hype. Not a second Spotify client â€” it shells out to the `spotify` binary you already installed.
+
+```bash
+omarchy plugin add https://github.com/the-shit/omarchy-music.git
+omarchy plugin enable the-shit.music --section right
+```
+
+[`the-shit/omarchy-music`](https://github.com/the-shit/omarchy-music). Requires this CLI on `PATH` plus `spotify login`. Stock `omarchy.media` stays.
+
 ## Quick Start
 
 ```bash
