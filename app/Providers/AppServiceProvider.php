@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyDiscoveryService;
 use App\Services\SpotifyPlayerService;
+use Dotenv\Dotenv;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -16,7 +17,7 @@ class AppServiceProvider extends ServiceProvider
     {
         // Load environment variables from .env file if it exists
         if (file_exists(base_path('.env'))) {
-            \Dotenv\Dotenv::createImmutable(base_path())->safeLoad();
+            Dotenv::createImmutable(base_path())->safeLoad();
         }
     }
 
@@ -27,11 +28,11 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(SpotifyAuthManager::class);
 
-        $this->app->singleton(SpotifyPlayerService::class, function ($app): \App\Services\SpotifyPlayerService {
+        $this->app->singleton(SpotifyPlayerService::class, function ($app): SpotifyPlayerService {
             return new SpotifyPlayerService($app->make(SpotifyAuthManager::class));
         });
 
-        $this->app->singleton(SpotifyDiscoveryService::class, function ($app): \App\Services\SpotifyDiscoveryService {
+        $this->app->singleton(SpotifyDiscoveryService::class, function ($app): SpotifyDiscoveryService {
             return new SpotifyDiscoveryService($app->make(SpotifyAuthManager::class));
         });
     }

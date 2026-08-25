@@ -31,7 +31,7 @@ class SessionAdjustTool extends Tool
 
     public function handle(Request $request, SpotifyPlayerService $player, SpotifyDiscoveryService $discovery): Response
     {
-        return $this->withAuthHandling(function () use ($request, $player, $discovery): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($request, $player, $discovery): Response {
             $state = $this->loadSessionState();
 
             if (! $state) {

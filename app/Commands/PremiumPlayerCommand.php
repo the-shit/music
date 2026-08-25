@@ -15,6 +15,7 @@ use App\Services\SpotifyPlayerService;
 use App\Support\SpotifyRateLimit;
 use LaravelZero\Framework\Commands\Command;
 use PhpTui\Term\Actions;
+use PhpTui\Term\Event;
 use PhpTui\Term\Event\CharKeyEvent;
 use PhpTui\Term\Event\CodedKeyEvent;
 use PhpTui\Term\KeyCode;
@@ -206,7 +207,7 @@ class PremiumPlayerCommand extends Command
 
                 // Keep playback state fresh even while the palette is open, so closing
                 // search drops straight back into a current now-playing panel.
-                if (! $vm instanceof \App\Player\PlayerViewModel || ($now - $lastFetch) >= self::REFRESH_SECONDS) {
+                if (! $vm instanceof PlayerViewModel || ($now - $lastFetch) >= self::REFRESH_SECONDS) {
                     // Keep the raw payload: the VM is pure and doesn't carry the
                     // artist_id we need to resolve mood.
                     $payload = $this->safePlayback($player);
@@ -269,7 +270,7 @@ class PremiumPlayerCommand extends Command
                 // Drain all buffered input each tick (next() is non-blocking). Each
                 // overlay consumes keys differently; only one is ever active at a time.
                 $events = $terminal->events();
-                while (($event = $events->next()) instanceof \PhpTui\Term\Event) {
+                while (($event = $events->next()) instanceof Event) {
                     if ($search['active']) {
                         $outcome = $this->handleSearchEvent($event, $player, $search);
 
@@ -506,7 +507,7 @@ class PremiumPlayerCommand extends Command
 
         // The empty state carries the rate-limit notice (when the breaker is
         // open) so a throttled player reads honestly instead of "Nothing playing".
-        return ($vm instanceof \App\Player\PlayerViewModel && $vm->hasPlayback) ? $renderer->nowPlaying($vm) : $renderer->empty($vm?->rateLimitNotice());
+        return ($vm instanceof PlayerViewModel && $vm->hasPlayback) ? $renderer->nowPlaying($vm) : $renderer->empty($vm?->rateLimitNotice());
     }
 
     /**
@@ -877,7 +878,7 @@ class PremiumPlayerCommand extends Command
      */
     private function safeLyrics(LyricsProvider $provider, ?PlayerViewModel $vm): ?array
     {
-        if (! $vm instanceof \App\Player\PlayerViewModel || ! $vm->hasPlayback) {
+        if (! $vm instanceof PlayerViewModel || ! $vm->hasPlayback) {
             return null;
         }
 

@@ -2,6 +2,7 @@
 
 use App\Commands\WrappedCommand;
 use App\Support\CommitSoundtrack;
+use Illuminate\Support\Facades\Artisan;
 
 function wrappedStats(array $overrides = []): array
 {
@@ -76,8 +77,8 @@ it('outputs raw stats as json with --json', function (): void {
     ]);
     $this->app->instance(CommitSoundtrack::class, $fake);
 
-    $code = Illuminate\Support\Facades\Artisan::call('wrapped', ['--json' => true, '--no-enrich' => true]);
-    $output = Illuminate\Support\Facades\Artisan::output();
+    $code = Artisan::call('wrapped', ['--json' => true, '--no-enrich' => true]);
+    $output = Artisan::output();
 
     expect($code)->toBe(0);
     expect($output)

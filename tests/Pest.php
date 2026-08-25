@@ -1,5 +1,8 @@
 <?php
 
+use Laravel\Prompts\Prompt;
+use Tests\TestCase;
+
 /*
 |--------------------------------------------------------------------------
 | mbstring Polyfill
@@ -63,7 +66,7 @@ if (! function_exists('mb_strimwidth')) {
 |
 */
 
-uses(Tests\TestCase::class)->in('Feature', 'Unit/Agents');
+uses(TestCase::class)->in('Feature', 'Unit/Agents');
 
 /*
 | Terminal & process safety net for the whole suite.
@@ -105,7 +108,7 @@ uses()->afterEach(function (): void {
 | rather than per-file where it would be order-dependent.
 */
 uses()->beforeEach(function (): void {
-    \Laravel\Prompts\Prompt::fallbackWhen(true);
+    Prompt::fallbackWhen(true);
 })->in('Feature', 'Unit');
 
 /*

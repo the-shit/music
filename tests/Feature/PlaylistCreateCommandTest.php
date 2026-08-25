@@ -90,7 +90,7 @@ describe('PlaylistCreateCommand', function (): void {
         $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('createPlaylist')
                 ->once()
-                ->andThrow(new \Exception('Unauthorized'));
+                ->andThrow(new Exception('Unauthorized'));
         });
 
         $this->artisan('playlist:create', ['name' => 'Fail'])

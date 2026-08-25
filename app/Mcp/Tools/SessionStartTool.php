@@ -31,7 +31,7 @@ class SessionStartTool extends Tool
 
     public function handle(Request $request, SessionService $session): Response
     {
-        return $this->withAuthHandling(function () use ($request, $session): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($request, $session): Response {
             $prompt = $request->get('prompt');
             $duration = $request->get('duration', 60);
 

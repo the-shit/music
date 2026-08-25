@@ -1,5 +1,7 @@
 <?php
 
+use App\Commands\SetupCommand;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Laravel\Prompts\Prompt;
 
@@ -88,7 +90,7 @@ describe('SetupCommand', function (): void {
     describe('validateCredentials method', function (): void {
 
         it('accepts valid credentials', function (): void {
-            $command = $this->app->make(\App\Commands\SetupCommand::class);
+            $command = $this->app->make(SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('validateCredentials');
             $method->setAccessible(true);
@@ -102,7 +104,7 @@ describe('SetupCommand', function (): void {
         });
 
         it('throws on short client_id', function (): void {
-            $command = $this->app->make(\App\Commands\SetupCommand::class);
+            $command = $this->app->make(SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('validateCredentials');
             $method->setAccessible(true);
@@ -110,11 +112,11 @@ describe('SetupCommand', function (): void {
             expect(fn (): mixed => $method->invoke($command, [
                 'client_id' => 'short',
                 'client_secret' => 'secret1234567890secret',
-            ]))->toThrow(\Exception::class, 'Client ID appears to be invalid');
+            ]))->toThrow(Exception::class, 'Client ID appears to be invalid');
         });
 
         it('throws on short client_secret', function (): void {
-            $command = $this->app->make(\App\Commands\SetupCommand::class);
+            $command = $this->app->make(SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('validateCredentials');
             $method->setAccessible(true);
@@ -122,11 +124,11 @@ describe('SetupCommand', function (): void {
             expect(fn (): mixed => $method->invoke($command, [
                 'client_id' => 'abcdef1234567890abcdef',
                 'client_secret' => 'short',
-            ]))->toThrow(\Exception::class, 'Client Secret appears to be invalid');
+            ]))->toThrow(Exception::class, 'Client Secret appears to be invalid');
         });
 
         it('throws on client_id with invalid characters', function (): void {
-            $command = $this->app->make(\App\Commands\SetupCommand::class);
+            $command = $this->app->make(SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('validateCredentials');
             $method->setAccessible(true);
@@ -134,11 +136,11 @@ describe('SetupCommand', function (): void {
             expect(fn (): mixed => $method->invoke($command, [
                 'client_id' => 'invalid-chars-here!!!!!!',
                 'client_secret' => 'secret1234567890secret',
-            ]))->toThrow(\Exception::class, 'Client ID contains invalid characters');
+            ]))->toThrow(Exception::class, 'Client ID contains invalid characters');
         });
 
         it('throws on client_secret with invalid characters', function (): void {
-            $command = $this->app->make(\App\Commands\SetupCommand::class);
+            $command = $this->app->make(SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('validateCredentials');
             $method->setAccessible(true);
@@ -146,7 +148,7 @@ describe('SetupCommand', function (): void {
             expect(fn (): mixed => $method->invoke($command, [
                 'client_id' => 'abcdef1234567890abcdef',
                 'client_secret' => 'invalid-chars-here!!!!!!',
-            ]))->toThrow(\Exception::class, 'Client Secret contains invalid characters');
+            ]))->toThrow(Exception::class, 'Client Secret contains invalid characters');
         });
 
     });
@@ -154,7 +156,7 @@ describe('SetupCommand', function (): void {
     describe('storeCredentials method', function (): void {
 
         it('stores credentials to config dir as JSON', function (): void {
-            $command = $this->app->make(\App\Commands\SetupCommand::class);
+            $command = $this->app->make(SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('storeCredentials');
             $method->setAccessible(true);
@@ -173,7 +175,7 @@ describe('SetupCommand', function (): void {
         });
 
         it('sets credentials file permissions to 0600', function (): void {
-            $command = $this->app->make(\App\Commands\SetupCommand::class);
+            $command = $this->app->make(SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('storeCredentials');
             $method->setAccessible(true);
@@ -201,7 +203,7 @@ describe('SetupCommand', function (): void {
             file_put_contents($credFile, '{"client_id":"test"}');
             file_put_contents($tokenFile, '{"access_token":"test"}');
 
-            $command = $this->app->make(\App\Commands\SetupCommand::class);
+            $command = $this->app->make(SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('clearStoredCredentials');
             $method->setAccessible(true);
@@ -212,12 +214,12 @@ describe('SetupCommand', function (): void {
         });
 
         it('does not throw when files do not exist', function (): void {
-            $command = $this->app->make(\App\Commands\SetupCommand::class);
+            $command = $this->app->make(SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('clearStoredCredentials');
             $method->setAccessible(true);
 
-            expect(fn (): mixed => $method->invoke($command))->not->toThrow(\Throwable::class);
+            expect(fn (): mixed => $method->invoke($command))->not->toThrow(Throwable::class);
         });
 
     });
@@ -225,7 +227,7 @@ describe('SetupCommand', function (): void {
     describe('findAvailablePort method', function (): void {
 
         it('returns a port number between 8888 and 8892', function (): void {
-            $command = $this->app->make(\App\Commands\SetupCommand::class);
+            $command = $this->app->make(SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('findAvailablePort');
             $method->setAccessible(true);
@@ -240,11 +242,11 @@ describe('SetupCommand', function (): void {
     describe('testSpotifyConnection method', function (): void {
 
         it('returns false when HTTP request fails', function (): void {
-            \Illuminate\Support\Facades\Http::fake([
-                'accounts.spotify.com/*' => \Illuminate\Support\Facades\Http::response([], 401),
+            Http::fake([
+                'accounts.spotify.com/*' => Http::response([], 401),
             ]);
 
-            $command = $this->app->make(\App\Commands\SetupCommand::class);
+            $command = $this->app->make(SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('testSpotifyConnection');
             $method->setAccessible(true);
@@ -258,11 +260,11 @@ describe('SetupCommand', function (): void {
         });
 
         it('returns false when access_token not in response', function (): void {
-            \Illuminate\Support\Facades\Http::fake([
-                'accounts.spotify.com/*' => \Illuminate\Support\Facades\Http::response(['error' => 'invalid'], 200),
+            Http::fake([
+                'accounts.spotify.com/*' => Http::response(['error' => 'invalid'], 200),
             ]);
 
-            $command = $this->app->make(\App\Commands\SetupCommand::class);
+            $command = $this->app->make(SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('testSpotifyConnection');
             $method->setAccessible(true);
@@ -276,11 +278,11 @@ describe('SetupCommand', function (): void {
         });
 
         it('returns true when access_token is present', function (): void {
-            \Illuminate\Support\Facades\Http::fake([
-                'accounts.spotify.com/*' => \Illuminate\Support\Facades\Http::response(['access_token' => 'tok123'], 200),
+            Http::fake([
+                'accounts.spotify.com/*' => Http::response(['access_token' => 'tok123'], 200),
             ]);
 
-            $command = $this->app->make(\App\Commands\SetupCommand::class);
+            $command = $this->app->make(SetupCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('testSpotifyConnection');
             $method->setAccessible(true);

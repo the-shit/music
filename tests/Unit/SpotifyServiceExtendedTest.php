@@ -20,7 +20,7 @@ function makeServices(bool $authenticated = true): array
         $mockAuth->shouldReceive('requireAuth')->andReturn(null);
         $mockAuth->shouldReceive('isConfigured')->andReturn(true);
     } else {
-        $mockAuth->shouldReceive('requireAuth')->andThrow(new \Exception('Not authenticated. Run "spotify login" first.'));
+        $mockAuth->shouldReceive('requireAuth')->andThrow(new Exception('Not authenticated. Run "spotify login" first.'));
         $mockAuth->shouldReceive('getAccessToken')->andReturn(null);
         $mockAuth->shouldReceive('isConfigured')->andReturn(false);
     }
@@ -52,87 +52,87 @@ describe('SpotifyService Extended', function (): void {
 
         it('search() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthDiscovery->search('test'))
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('play() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthPlayer->play('spotify:track:123'))
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('resume() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthPlayer->resume())
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('pause() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthPlayer->pause())
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('next() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthPlayer->next())
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('previous() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthPlayer->previous())
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('getDevices() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthPlayer->getDevices())
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('transferPlayback() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthPlayer->transferPlayback('device_id'))
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('addToQueue() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthPlayer->addToQueue('spotify:track:123'))
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('setVolume() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthPlayer->setVolume(50))
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('setShuffle() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthPlayer->setShuffle(true))
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('setRepeat() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthPlayer->setRepeat('off'))
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('getTopTracks() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthDiscovery->getTopTracks())
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('getTopArtists() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthDiscovery->getTopArtists())
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('getRecentlyPlayed() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthDiscovery->getRecentlyPlayed())
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('getUserProfile() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthDiscovery->getUserProfile())
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('searchMultiple() throws when not authenticated', function (): void {
             expect(fn () => $this->unauthDiscovery->searchMultiple('test'))
-                ->toThrow(\Exception::class, 'Not authenticated');
+                ->toThrow(Exception::class, 'Not authenticated');
         });
 
         it('getPlaylists() returns empty array when not authenticated', function (): void {
@@ -173,7 +173,7 @@ describe('SpotifyService Extended', function (): void {
             ]);
 
             expect(fn () => $this->playerService->pause())
-                ->toThrow(\Exception::class, 'Player error');
+                ->toThrow(Exception::class, 'Player error');
         });
 
         it('next() throws on API failure', function (): void {
@@ -185,7 +185,7 @@ describe('SpotifyService Extended', function (): void {
             ]);
 
             expect(fn () => $this->playerService->next())
-                ->toThrow(\Exception::class, 'Skip failed');
+                ->toThrow(Exception::class, 'Skip failed');
         });
 
         it('previous() throws on API failure', function (): void {
@@ -197,7 +197,7 @@ describe('SpotifyService Extended', function (): void {
             ]);
 
             expect(fn () => $this->playerService->previous())
-                ->toThrow(\Exception::class, 'Previous failed');
+                ->toThrow(Exception::class, 'Previous failed');
         });
 
         it('transferPlayback() throws on API failure', function (): void {
@@ -209,7 +209,7 @@ describe('SpotifyService Extended', function (): void {
             ]);
 
             expect(fn () => $this->playerService->transferPlayback('device123'))
-                ->toThrow(\Exception::class, 'Transfer failed');
+                ->toThrow(Exception::class, 'Transfer failed');
         });
 
         it('addToQueue() throws when no active device', function (): void {
@@ -220,7 +220,7 @@ describe('SpotifyService Extended', function (): void {
             ]);
 
             expect(fn () => $this->playerService->addToQueue('spotify:track:123'))
-                ->toThrow(\Exception::class, 'No active Spotify device');
+                ->toThrow(Exception::class, 'No active Spotify device');
         });
 
         it('addToQueue() throws on API failure', function (): void {
@@ -235,7 +235,7 @@ describe('SpotifyService Extended', function (): void {
             ]);
 
             expect(fn () => $this->playerService->addToQueue('spotify:track:123'))
-                ->toThrow(\Exception::class, 'Queue error');
+                ->toThrow(Exception::class, 'Queue error');
         });
 
         it('play() throws when no device available', function (): void {
@@ -246,7 +246,7 @@ describe('SpotifyService Extended', function (): void {
             ]);
 
             expect(fn () => $this->playerService->play('spotify:track:123'))
-                ->toThrow(\Exception::class, 'No Spotify devices available');
+                ->toThrow(Exception::class, 'No Spotify devices available');
         });
 
         it('play() throws on API failure', function (): void {
@@ -261,7 +261,7 @@ describe('SpotifyService Extended', function (): void {
             ]);
 
             expect(fn () => $this->playerService->play('spotify:track:123'))
-                ->toThrow(\Exception::class, 'Play failed');
+                ->toThrow(Exception::class, 'Play failed');
         });
 
         it('resume() throws when no device available', function (): void {
@@ -272,7 +272,7 @@ describe('SpotifyService Extended', function (): void {
             ]);
 
             expect(fn () => $this->playerService->resume())
-                ->toThrow(\Exception::class, 'No Spotify devices available');
+                ->toThrow(Exception::class, 'No Spotify devices available');
         });
 
         it('resume() throws on API failure', function (): void {
@@ -287,12 +287,12 @@ describe('SpotifyService Extended', function (): void {
             ]);
 
             expect(fn () => $this->playerService->resume())
-                ->toThrow(\Exception::class, 'Resume failed');
+                ->toThrow(Exception::class, 'Resume failed');
         });
 
         it('setRepeat() throws on invalid state', function (): void {
             expect(fn () => $this->playerService->setRepeat('invalid'))
-                ->toThrow(\Exception::class, 'Invalid repeat state');
+                ->toThrow(Exception::class, 'Invalid repeat state');
         });
 
         it('play() with inactive device transfers playback first', function (): void {

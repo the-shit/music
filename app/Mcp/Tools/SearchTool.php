@@ -39,7 +39,7 @@ class SearchTool extends Tool
 
     public function handle(Request $request, SpotifyDiscoveryService $discovery): Response
     {
-        return $this->withAuthHandling(function () use ($request, $discovery): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($request, $discovery): Response {
             $query = $request->get('query');
             $type = $request->get('type', 'track');
             $limit = min(20, max(1, (int) $request->get('limit', 5)));

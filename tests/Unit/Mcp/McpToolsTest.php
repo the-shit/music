@@ -15,6 +15,7 @@ use App\Mcp\Tools\SkipTool;
 use App\Mcp\Tools\VolumeTool;
 use App\Services\SpotifyDiscoveryService;
 use App\Services\SpotifyPlayerService;
+use Laravel\Mcp\Server\Testing\TestResponse;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -28,7 +29,7 @@ describe('HandlesAuthErrors', function (): void {
     it('returns clean error response when auth expires during pause', function (): void {
         $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('pause')->once()->andThrow(
-                new \Exception('Not authenticated. Run "spotify login" first.')
+                new Exception('Not authenticated. Run "spotify login" first.')
             );
         });
 
@@ -40,7 +41,7 @@ describe('HandlesAuthErrors', function (): void {
     it('returns clean error response when session expires during play', function (): void {
         $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldReceive('search')->once()->andThrow(
-                new \Exception('Session expired. Run "spotify login" to re-authenticate.')
+                new Exception('Session expired. Run "spotify login" to re-authenticate.')
             );
         });
 
@@ -52,12 +53,12 @@ describe('HandlesAuthErrors', function (): void {
     it('re-throws non-auth exceptions', function (): void {
         $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('pause')->once()->andThrow(
-                new \Exception('No Spotify devices available. Open Spotify on any device.')
+                new Exception('No Spotify devices available. Open Spotify on any device.')
             );
         });
 
-        expect(fn (): \Laravel\Mcp\Server\Testing\TestResponse => SpotifyServer::tool(PauseTool::class))
-            ->toThrow(\Exception::class, 'No Spotify devices available');
+        expect(fn (): TestResponse => SpotifyServer::tool(PauseTool::class))
+            ->toThrow(Exception::class, 'No Spotify devices available');
     });
 
 });

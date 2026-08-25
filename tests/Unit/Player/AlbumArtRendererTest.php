@@ -8,12 +8,13 @@ use PhpTui\Tui\Display\Backend\DummyBackend;
 use PhpTui\Tui\DisplayBuilder;
 use PhpTui\Tui\Extension\Core\Widget\CanvasWidget;
 use PhpTui\Tui\Widget\Widget;
+use Tests\TestCase;
 
 // WHY: this file uses the Http facade (faked), which needs the Laravel container
 // booted. tests/Unit is otherwise pure-PHP, so bind just this file to the app
 // TestCase — the decode path is genuinely a unit of the player lane, it merely
 // happens to depend on the framework's HTTP client.
-uses(Tests\TestCase::class);
+uses(TestCase::class);
 
 /**
  * WHY: like the rest of the player lane, the album-art widget is verified by

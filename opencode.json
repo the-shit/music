@@ -1,6 +1,8 @@
 {
     "$schema": "https://opencode.ai/config.json",
-    "instructions": [],
+    "instructions": [
+        "This project uses Laravel Zero framework. All commands are built using Laravel Zero's Command class."
+    ],
     "mcp": {
         "spotify": {
             "type": "local",
@@ -11,6 +13,13 @@
                 "mcp:start",
                 "spotify"
             ]
+        }
+    },
+    "languageServers": {
+        "php": {
+            "intelephense": {
+                "stubs": ["laravel"]
+            }
         }
     }
 }

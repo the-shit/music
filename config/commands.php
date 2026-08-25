@@ -1,5 +1,23 @@
 <?php
 
+use App\Commands\EventEmitCommand;
+use App\Commands\ServeCommand;
+use App\Commands\WebhookTestCommand;
+use Illuminate\Console\Scheduling\ScheduleFinishCommand;
+use Illuminate\Console\Scheduling\ScheduleListCommand;
+use Illuminate\Console\Scheduling\ScheduleRunCommand;
+use Illuminate\Foundation\Console\VendorPublishCommand;
+use Laravel\Ai\Console\Commands\MakeAgentCommand;
+use Laravel\Mcp\Console\Commands\InspectorCommand;
+use Laravel\Mcp\Console\Commands\MakePromptCommand;
+use Laravel\Mcp\Console\Commands\MakeResourceCommand;
+use Laravel\Mcp\Console\Commands\MakeServerCommand;
+use Laravel\Mcp\Console\Commands\MakeToolCommand;
+use LaravelZero\Framework\Commands\StubPublishCommand;
+use NunoMaduro\LaravelConsoleSummary\SummaryCommand;
+use Symfony\Component\Console\Command\DumpCompletionCommand;
+use Symfony\Component\Console\Command\HelpCommand;
+
 /*
 | Dev/test commands that ship in the binary but are hidden from the command
 | list in the production distribution. "Production" = the built phar users
@@ -7,12 +25,12 @@
 | `php spotify ...` from source always shows everything. Set APP_ENV=production
 | to force the production surface while testing locally.
 */
-$inDistribution = \Phar::running(false) !== '' || env('APP_ENV') === 'production';
+$inDistribution = Phar::running(false) !== '' || env('APP_ENV') === 'production';
 
 $devHidden = $inDistribution ? [
-    App\Commands\WebhookTestCommand::class,
-    App\Commands\ServeCommand::class,
-    App\Commands\EventEmitCommand::class,
+    WebhookTestCommand::class,
+    ServeCommand::class,
+    EventEmitCommand::class,
 ] : [];
 
 return [
@@ -28,7 +46,7 @@ return [
     |
     */
 
-    'default' => NunoMaduro\LaravelConsoleSummary\SummaryCommand::class,
+    'default' => SummaryCommand::class,
 
     /*
     |--------------------------------------------------------------------------
@@ -70,20 +88,20 @@ return [
     */
 
     'hidden' => [
-        NunoMaduro\LaravelConsoleSummary\SummaryCommand::class,
-        Symfony\Component\Console\Command\DumpCompletionCommand::class,
-        Symfony\Component\Console\Command\HelpCommand::class,
-        Illuminate\Console\Scheduling\ScheduleRunCommand::class,
-        Illuminate\Console\Scheduling\ScheduleListCommand::class,
-        Illuminate\Console\Scheduling\ScheduleFinishCommand::class,
-        Illuminate\Foundation\Console\VendorPublishCommand::class,
-        LaravelZero\Framework\Commands\StubPublishCommand::class,
-        Laravel\Mcp\Console\Commands\MakeServerCommand::class,
-        Laravel\Mcp\Console\Commands\MakeToolCommand::class,
-        Laravel\Mcp\Console\Commands\MakePromptCommand::class,
-        Laravel\Mcp\Console\Commands\MakeResourceCommand::class,
-        Laravel\Mcp\Console\Commands\InspectorCommand::class,
-        Laravel\Ai\Console\Commands\MakeAgentCommand::class,
+        SummaryCommand::class,
+        DumpCompletionCommand::class,
+        HelpCommand::class,
+        ScheduleRunCommand::class,
+        ScheduleListCommand::class,
+        ScheduleFinishCommand::class,
+        VendorPublishCommand::class,
+        StubPublishCommand::class,
+        MakeServerCommand::class,
+        MakeToolCommand::class,
+        MakePromptCommand::class,
+        MakeResourceCommand::class,
+        InspectorCommand::class,
+        MakeAgentCommand::class,
         Laravel\Ai\Console\Commands\MakeToolCommand::class,
         ...$devHidden,
     ],

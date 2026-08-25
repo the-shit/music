@@ -18,7 +18,7 @@ class SessionStatusTool extends Tool
 
     public function handle(Request $request, SpotifyPlayerService $player): Response
     {
-        return $this->withAuthHandling(function () use ($player): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($player): Response {
             $state = $this->loadSessionState();
 
             if (! $state) {

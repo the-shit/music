@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Support\AudioFeatureTargets;
 
 it('maps energy, valence and tempo to target_* audio features', function (): void {

@@ -22,7 +22,7 @@ class QueueShowTool extends Tool
 
     public function handle(Request $request, SpotifyPlayerService $player): Response
     {
-        return $this->withAuthHandling(function () use ($player): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($player): Response {
             $queue = $player->getQueue();
 
             if ($queue === [] || empty($queue['queue'])) {

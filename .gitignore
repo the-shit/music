@@ -10,3 +10,4 @@ bin/media-bridge
 .env.backup
 .env.production
 .env.*.local
+/.opencode/

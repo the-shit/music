@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\HandlesAuthErrors;
@@ -18,7 +20,7 @@ class PauseTool extends Tool
 
     public function handle(Request $request, SpotifyPlayerService $player): Response
     {
-        return $this->withAuthHandling(function () use ($player): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($player): Response {
             $player->pause();
 
             return Response::text('Playback paused.');

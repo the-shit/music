@@ -20,10 +20,9 @@ return static function (RectorConfig $rectorConfig): void {
     $rectorConfig->sets([
         SetList::CODE_QUALITY,
         SetList::NAMING,
-        SetList::STRICT_BOOLEANS,
         SetList::TYPE_DECLARATION,
         SetList::EARLY_RETURN,
-        PHPUnitSetList::PHPUNIT_100,
+        PHPUnitSetList::PHPUNIT_CODE_QUALITY,
     ]);
 
     $rectorConfig->skip([

@@ -18,6 +18,8 @@ use App\Mcp\Tools\SessionStatusTool;
 use App\Mcp\Tools\ShuffleTool;
 use App\Mcp\Tools\SkipTool;
 use App\Mcp\Tools\VolumeTool;
+use Laravel\Mcp\Server;
+use Laravel\Mcp\Server\Attributes\Name;
 use Tests\TestCase;
 
 uses(TestCase::class);
@@ -26,13 +28,13 @@ describe('SpotifyServer', function (): void {
 
     it('has the correct server name', function (): void {
         $reflection = new ReflectionClass(SpotifyServer::class);
-        $attribute = $reflection->getAttributes(\Laravel\Mcp\Server\Attributes\Name::class)[0] ?? null;
+        $attribute = $reflection->getAttributes(Name::class)[0] ?? null;
         expect($attribute)->not->toBeNull();
         expect($attribute->newInstance()->value)->toBe('spotify');
     });
 
     it('extends Laravel MCP Server', function (): void {
-        expect(is_subclass_of(SpotifyServer::class, \Laravel\Mcp\Server::class))->toBeTrue();
+        expect(is_subclass_of(SpotifyServer::class, Server::class))->toBeTrue();
     });
 
     it('registers all expected tool classes', function (): void {
