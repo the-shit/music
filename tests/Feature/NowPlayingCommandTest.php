@@ -1,5 +1,6 @@
 <?php
 
+use App\Commands\NowPlayingCommand;
 use App\Services\SpotifyAuthManager;
 
 describe('NowPlayingCommand', function (): void {
@@ -7,24 +8,24 @@ describe('NowPlayingCommand', function (): void {
     describe('command metadata', function (): void {
 
         it('has correct command name', function (): void {
-            $command = $this->app->make(\App\Commands\NowPlayingCommand::class);
+            $command = $this->app->make(NowPlayingCommand::class);
             expect($command->getName())->toBe('nowplaying');
         });
 
         it('has a description', function (): void {
-            $command = $this->app->make(\App\Commands\NowPlayingCommand::class);
+            $command = $this->app->make(NowPlayingCommand::class);
             expect($command->getDescription())->not->toBeEmpty();
         });
 
         it('has --interval option with default of 3', function (): void {
-            $command = $this->app->make(\App\Commands\NowPlayingCommand::class);
+            $command = $this->app->make(NowPlayingCommand::class);
             $definition = $command->getDefinition();
             expect($definition->hasOption('interval'))->toBeTrue();
             expect($definition->getOption('interval')->getDefault())->toBe('3');
         });
 
         it('has --stop option', function (): void {
-            $command = $this->app->make(\App\Commands\NowPlayingCommand::class);
+            $command = $this->app->make(NowPlayingCommand::class);
             $definition = $command->getDefinition();
             expect($definition->hasOption('stop'))->toBeTrue();
         });
@@ -93,8 +94,8 @@ describe('NowPlayingCommand', function (): void {
             // We can test this by checking the command structure is correct
             // The actual python3 check uses shell_exec('which python3')
             // In a real test environment python3 is usually available
-            $command = $this->app->make(\App\Commands\NowPlayingCommand::class);
-            expect($command)->toBeInstanceOf(\App\Commands\NowPlayingCommand::class);
+            $command = $this->app->make(NowPlayingCommand::class);
+            expect($command)->toBeInstanceOf(NowPlayingCommand::class);
         });
 
     });

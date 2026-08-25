@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Support\SpotifyRateLimit;
 use Exception;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 class SpotifyPlayerService
@@ -28,7 +29,7 @@ class SpotifyPlayerService
         if (! $deviceId) {
             $device = $this->getActiveDevice();
             if (! $device) {
-                throw new \Exception('No Spotify devices available. Open Spotify on any device.');
+                throw new Exception('No Spotify devices available. Open Spotify on any device.');
             }
 
             // If device exists but not active, activate it
@@ -64,7 +65,7 @@ class SpotifyPlayerService
 
         if (! $response?->successful()) {
             $error = $response?->json();
-            throw new \Exception($error['error']['message'] ?? 'Failed to play track');
+            throw new Exception($error['error']['message'] ?? 'Failed to play track');
         }
     }
 
@@ -79,7 +80,7 @@ class SpotifyPlayerService
         if (! $deviceId) {
             $device = $this->getActiveDevice();
             if (! $device) {
-                throw new \Exception('No Spotify devices available. Open Spotify on any device.');
+                throw new Exception('No Spotify devices available. Open Spotify on any device.');
             }
 
             // If device exists but not active, activate it
@@ -99,7 +100,7 @@ class SpotifyPlayerService
 
         if (! $response?->successful()) {
             $error = $response?->json();
-            throw new \Exception($error['error']['message'] ?? 'Failed to resume playback');
+            throw new Exception($error['error']['message'] ?? 'Failed to resume playback');
         }
     }
 
@@ -115,7 +116,7 @@ class SpotifyPlayerService
 
         if (! $response?->successful()) {
             $error = $response?->json();
-            throw new \Exception($error['error']['message'] ?? 'Failed to pause playback');
+            throw new Exception($error['error']['message'] ?? 'Failed to pause playback');
         }
     }
 
@@ -132,7 +133,7 @@ class SpotifyPlayerService
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->put($this->baseUri.'me/player/volume?volume_percent='.$volumePercent));
 
-        return $response instanceof \Illuminate\Http\Client\Response && $response->successful();
+        return $response instanceof Response && $response->successful();
     }
 
     /**
@@ -147,7 +148,7 @@ class SpotifyPlayerService
 
         if (! $response?->successful()) {
             $error = $response?->json();
-            throw new \Exception($error['error']['message'] ?? 'Failed to skip track');
+            throw new Exception($error['error']['message'] ?? 'Failed to skip track');
         }
     }
 
@@ -163,7 +164,7 @@ class SpotifyPlayerService
 
         if (! $response?->successful()) {
             $error = $response?->json();
-            throw new \Exception($error['error']['message'] ?? 'Failed to skip to previous');
+            throw new Exception($error['error']['message'] ?? 'Failed to skip to previous');
         }
     }
 
@@ -177,7 +178,7 @@ class SpotifyPlayerService
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'me/player/devices'));
 
-        if ($response instanceof \Illuminate\Http\Client\Response && $response->successful()) {
+        if ($response instanceof Response && $response->successful()) {
             $data = $response->json();
 
             return $data['devices'] ?? [];
@@ -233,7 +234,7 @@ class SpotifyPlayerService
         // Get active device first
         $device = $this->getActiveDevice();
         if (! $device) {
-            throw new \Exception('No active Spotify device. Start playing something first.');
+            throw new Exception('No active Spotify device. Start playing something first.');
         }
 
         // The queue endpoint expects uri as a query parameter, not in the body
@@ -245,7 +246,7 @@ class SpotifyPlayerService
 
         if (! $response?->successful()) {
             $error = $response?->json();
-            throw new \Exception($error['error']['message'] ?? 'Failed to add to queue');
+            throw new Exception($error['error']['message'] ?? 'Failed to add to queue');
         }
     }
 
@@ -261,7 +262,7 @@ class SpotifyPlayerService
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'me/player/queue'));
 
-        if ($response instanceof \Illuminate\Http\Client\Response && $response->successful()) {
+        if ($response instanceof Response && $response->successful()) {
             $data = $response->json();
 
             return [
@@ -285,7 +286,7 @@ class SpotifyPlayerService
 
         if (! $response?->successful()) {
             $error = $response?->json();
-            throw new \Exception($error['error']['message'] ?? 'Failed to seek');
+            throw new Exception($error['error']['message'] ?? 'Failed to seek');
         }
     }
 
@@ -299,7 +300,7 @@ class SpotifyPlayerService
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->put($this->baseUri.'me/player/shuffle?state='.($state ? 'true' : 'false')));
 
-        return $response instanceof \Illuminate\Http\Client\Response && $response->successful();
+        return $response instanceof Response && $response->successful();
     }
 
     /**
@@ -311,13 +312,13 @@ class SpotifyPlayerService
 
         // State can be: off, track, context
         if (! in_array($state, ['off', 'track', 'context'])) {
-            throw new \Exception('Invalid repeat state. Use: off, track, or context');
+            throw new Exception('Invalid repeat state. Use: off, track, or context');
         }
 
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->put($this->baseUri.'me/player/repeat?state='.$state));
 
-        return $response instanceof \Illuminate\Http\Client\Response && $response->successful();
+        return $response instanceof Response && $response->successful();
     }
 
     /**
@@ -333,7 +334,7 @@ class SpotifyPlayerService
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'me/player'));
 
-        if ($response instanceof \Illuminate\Http\Client\Response && $response->successful()) {
+        if ($response instanceof Response && $response->successful()) {
             $data = $response->json();
             if (isset($data['item'])) {
                 $albumImages = $data['item']['album']['images'] ?? [];
@@ -383,7 +384,7 @@ class SpotifyPlayerService
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
             ->get($this->baseUri.'artists/'.$artistId));
 
-        if ($response instanceof \Illuminate\Http\Client\Response && $response->successful()) {
+        if ($response instanceof Response && $response->successful()) {
             return $response->json('genres') ?? [];
         }
 
@@ -407,6 +408,6 @@ class SpotifyPlayerService
                 'context_uri' => "spotify:playlist:{$playlistId}",
             ]));
 
-        return $response instanceof \Illuminate\Http\Client\Response && $response->successful();
+        return $response instanceof Response && $response->successful();
     }
 }

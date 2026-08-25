@@ -150,7 +150,7 @@ describe('EventEmitCommand', function (): void {
 
             expect($lines)->toHaveCount(3);
 
-            $events = array_map(fn ($line): mixed => json_decode($line, true), $lines);
+            $events = array_map(fn (string $line): mixed => json_decode($line, true), $lines);
             expect($events[0]['event'])->toBe('spotify.first');
             expect($events[1]['event'])->toBe('spotify.second');
             expect($events[2]['event'])->toBe('spotify.third');
@@ -238,7 +238,7 @@ describe('EventEmitCommand', function (): void {
             expect($eventData)->toHaveKey('timestamp');
 
             // Verify it's a valid ISO 8601 timestamp
-            $timestamp = \DateTime::createFromFormat(\DateTime::ATOM, $eventData['timestamp']);
+            $timestamp = DateTime::createFromFormat(DateTime::ATOM, $eventData['timestamp']);
             expect($timestamp)->not->toBeFalse();
         });
 

@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Helpers\ConfigHelper;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use LaravelZero\Framework\Commands\Command;
@@ -356,7 +357,7 @@ class SetupCommand extends Command
     private function storeCredentials(array $credentials): void
     {
         // Store in ~/.config/spotify-cli/credentials.json (PHAR-compatible)
-        $configDir = \App\Helpers\ConfigHelper::configDir();
+        $configDir = ConfigHelper::configDir();
 
         // Ensure directory exists
         if (! is_dir($configDir)) {
@@ -413,12 +414,12 @@ class SetupCommand extends Command
 
     private function hasStoredCredentials(): bool
     {
-        return \App\Helpers\ConfigHelper::hasCredentials();
+        return ConfigHelper::hasCredentials();
     }
 
     private function clearStoredCredentials(): void
     {
-        $configDir = \App\Helpers\ConfigHelper::configDir();
+        $configDir = ConfigHelper::configDir();
 
         // Clear credentials file
         $credentialsFile = $configDir.'/credentials.json';
@@ -427,7 +428,7 @@ class SetupCommand extends Command
         }
 
         // Clear token from config directory
-        $tokenFile = \App\Helpers\ConfigHelper::tokenPath();
+        $tokenFile = ConfigHelper::tokenPath();
         if (file_exists($tokenFile)) {
             unlink($tokenFile);
         }

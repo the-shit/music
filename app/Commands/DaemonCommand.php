@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
+use App\Services\Daemon\DeviceResolution;
 use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
@@ -16,7 +17,7 @@ class DaemonCommand extends Command
 {
     use RequiresSpotifyConfig;
 
-    protected $signature = 'daemon {action : start, stop, status, health, install, or uninstall} {--name= : Device name for Spotify Connect} {--audio-device= : Audio output device (e.g. "Wave Link Stream")} {--heal : Auto-heal when health check detects issues} {--json : Output health status as JSON}';
+    protected $signature = 'daemon {action : start, stop, status, health, install, or uninstall} {--name= : Device name for Spotify Connect (defaults to hostname)} {--audio-device= : Audio output device (e.g. "Wave Link Stream")} {--heal : Auto-heal when health check detects issues} {--json : Output health status as JSON}';
 
     protected $description = 'Manage the Spotify daemon for terminal playback';
 
@@ -35,12 +36,25 @@ class DaemonCommand extends Command
 
     private string $configDir;
 
+    private DeviceResolution $deviceResolution;
+
     public function __construct()
     {
         parent::__construct();
 
         $this->configDir = ($_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp').'/.config/spotify-cli';
         $this->pidFile = $this->configDir.'/daemon.pid';
+        $this->deviceResolution = new DeviceResolution;
+    }
+
+    public function setDeviceResolution(DeviceResolution $deviceResolution): void
+    {
+        $this->deviceResolution = $deviceResolution;
+    }
+
+    public function getDeviceResolution(): DeviceResolution
+    {
+        return $this->deviceResolution;
     }
 
     private SpotifyAuthManager $auth;
@@ -84,7 +98,7 @@ class DaemonCommand extends Command
             if ($this->getDaemonPid()) {
                 info('✅ Daemon started via LaunchAgent');
 
-                $deviceName = $this->option('name') ?: 'Work Mac';
+                $deviceName = $this->resolveDeviceName();
                 $this->transferPlaybackToDaemon($deviceName);
 
                 return self::SUCCESS;
@@ -106,7 +120,7 @@ class DaemonCommand extends Command
             $this->savePid((int) $orphanPid);
             info('✅ Daemon adopted');
 
-            $deviceName = $this->option('name') ?: 'Work Mac';
+            $deviceName = $this->resolveDeviceName();
             $this->transferPlaybackToDaemon($deviceName);
 
             return self::SUCCESS;
@@ -151,7 +165,7 @@ class DaemonCommand extends Command
         $this->savePid($pid);
         info('✅ Daemon started');
 
-        $deviceName = $this->option('name') ?: 'Work Mac';
+        $deviceName = $this->resolveDeviceName();
         $this->transferPlaybackToDaemon($deviceName);
 
         return self::SUCCESS;
@@ -277,7 +291,7 @@ class DaemonCommand extends Command
         // Check if it started
         usleep(2000000);
         if ($this->getDaemonPid()) {
-            $deviceName = $this->option('name') ?: 'Work Mac';
+            $deviceName = $this->resolveDeviceName();
             info("📱 Daemon started as \"{$deviceName}\"");
         }
 
@@ -326,7 +340,14 @@ class DaemonCommand extends Command
         return $which ?: null;
     }
 
-    private function writeSpotifydConfig(string $daemonPath): string
+    private function resolveDeviceName(): string
+    {
+        return $this->deviceResolution->resolveDaemonName(
+            $this->option('name') ?: null,
+        );
+    }
+
+    public function writeSpotifydConfig(string $daemonPath): string
     {
         $configFile = $this->configDir.'/spotifyd.conf';
 
@@ -334,7 +355,7 @@ class DaemonCommand extends Command
             mkdir($this->configDir, 0755, true);
         }
 
-        $deviceName = $this->option('name') ?: 'Work Mac';
+        $deviceName = $this->resolveDeviceName();
 
         // Detect backend from binary capabilities
         $helpOutput = (string) shell_exec("{$daemonPath} --help 2>&1");
@@ -756,7 +777,7 @@ XML;
             if ($this->getDaemonPid()) {
                 info('Daemon restarted successfully');
 
-                $deviceName = $this->option('name') ?: 'Work Mac';
+                $deviceName = $this->resolveDeviceName();
                 $this->transferPlaybackToDaemon($deviceName);
 
                 return self::SUCCESS;

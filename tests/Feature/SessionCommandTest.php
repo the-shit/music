@@ -1,5 +1,6 @@
 <?php
 
+use App\Commands\SessionCommand;
 use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyDiscoveryService;
 use App\Services\SpotifyPlayerService;
@@ -66,7 +67,7 @@ it('runs a quick session with mood preset', function (): void {
 });
 
 it('has correct signature options', function (): void {
-    $command = $this->app->make(\App\Commands\SessionCommand::class);
+    $command = $this->app->make(SessionCommand::class);
     $definition = $command->getDefinition();
 
     expect($definition->hasOption('mood'))->toBeTrue();
@@ -76,7 +77,7 @@ it('has correct signature options', function (): void {
 });
 
 it('has correct command metadata', function (): void {
-    $command = $this->app->make(\App\Commands\SessionCommand::class);
+    $command = $this->app->make(SessionCommand::class);
     expect($command->getName())->toBe('session');
     expect($command->getDescription())->not->toBeEmpty();
 });
@@ -112,7 +113,7 @@ it('falls back to quick session when no OpenRouter key', function (): void {
 });
 
 it('extracts mood from description keywords', function (): void {
-    $command = new \App\Commands\SessionCommand;
+    $command = new SessionCommand;
     $method = new ReflectionMethod($command, 'extractMoodFallback');
     $method->setAccessible(true);
 
@@ -143,7 +144,7 @@ it('shows zero tracks warning on empty results', function (): void {
 });
 
 it('renders energy bar correctly', function (): void {
-    $command = new \App\Commands\SessionCommand;
+    $command = new SessionCommand;
     $method = new ReflectionMethod($command, 'energyBar');
     $method->setAccessible(true);
 

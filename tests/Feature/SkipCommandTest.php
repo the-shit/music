@@ -1,5 +1,6 @@
 <?php
 
+use App\Commands\SkipCommand;
 use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyPlayerService;
 
@@ -105,7 +106,7 @@ describe('SkipCommand', function (): void {
                     'name' => 'Song',
                     'artist' => 'Artist',
                 ]);
-                $mock->shouldReceive('next')->once()->andThrow(new \Exception('API error'));
+                $mock->shouldReceive('next')->once()->andThrow(new Exception('API error'));
             });
 
             $this->artisan('skip')
@@ -117,18 +118,18 @@ describe('SkipCommand', function (): void {
     describe('command metadata', function (): void {
 
         it('has correct command name', function (): void {
-            $command = $this->app->make(\App\Commands\SkipCommand::class);
+            $command = $this->app->make(SkipCommand::class);
             expect($command->getName())->toBe('skip');
         });
 
         it('has optional direction argument', function (): void {
-            $command = $this->app->make(\App\Commands\SkipCommand::class);
+            $command = $this->app->make(SkipCommand::class);
             $definition = $command->getDefinition();
             expect($definition->hasArgument('direction'))->toBeTrue();
         });
 
         it('has json option', function (): void {
-            $command = $this->app->make(\App\Commands\SkipCommand::class);
+            $command = $this->app->make(SkipCommand::class);
             $definition = $command->getDefinition();
             expect($definition->hasOption('json'))->toBeTrue();
         });

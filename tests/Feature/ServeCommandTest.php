@@ -1,6 +1,10 @@
 <?php
 
+use App\Commands\ServeCommand;
 use App\Services\SpotifyAuthManager;
+use Illuminate\Console\OutputStyle;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 
 it('requires configuration', function (): void {
     $mock = Mockery::mock(SpotifyAuthManager::class);
@@ -12,7 +16,7 @@ it('requires configuration', function (): void {
 });
 
 it('has correct signature options', function (): void {
-    $command = $this->app->make(\App\Commands\ServeCommand::class);
+    $command = $this->app->make(ServeCommand::class);
     $definition = $command->getDefinition();
 
     expect($definition->hasOption('port'))->toBeTrue();
@@ -26,12 +30,12 @@ describe('ServeCommand extended', function (): void {
     describe('command metadata', function (): void {
 
         it('has correct command name', function (): void {
-            $command = $this->app->make(\App\Commands\ServeCommand::class);
+            $command = $this->app->make(ServeCommand::class);
             expect($command->getName())->toBe('serve');
         });
 
         it('has a description', function (): void {
-            $command = $this->app->make(\App\Commands\ServeCommand::class);
+            $command = $this->app->make(ServeCommand::class);
             expect($command->getDescription())->not->toBeEmpty();
         });
 
@@ -47,14 +51,14 @@ describe('ServeCommand extended', function (): void {
             config(['spotify.config_dir' => $configDir]);
 
             // Use reflection to call the private createHandler method
-            $command = $this->app->make(\App\Commands\ServeCommand::class);
+            $command = $this->app->make(ServeCommand::class);
             $reflection = new ReflectionClass($command);
 
             // Set up the command's output and input (required for artisan commands)
-            $input = new \Symfony\Component\Console\Input\ArrayInput([]);
-            $output = new \Symfony\Component\Console\Output\NullOutput;
+            $input = new ArrayInput([]);
+            $output = new NullOutput;
             $command->setInput($input);
-            $command->setOutput(new \Illuminate\Console\OutputStyle($input, $output));
+            $command->setOutput(new OutputStyle($input, $output));
 
             $method = $reflection->getMethod('createHandler');
             $method->setAccessible(true);
@@ -79,13 +83,13 @@ describe('ServeCommand extended', function (): void {
             config(['spotify.token_path' => sys_get_temp_dir().'/test-token.json']);
             config(['spotify.config_dir' => sys_get_temp_dir().'/test-spotify-serve2']);
 
-            $command = $this->app->make(\App\Commands\ServeCommand::class);
+            $command = $this->app->make(ServeCommand::class);
             $reflection = new ReflectionClass($command);
 
-            $input = new \Symfony\Component\Console\Input\ArrayInput([]);
-            $output = new \Symfony\Component\Console\Output\NullOutput;
+            $input = new ArrayInput([]);
+            $output = new NullOutput;
             $command->setInput($input);
-            $command->setOutput(new \Illuminate\Console\OutputStyle($input, $output));
+            $command->setOutput(new OutputStyle($input, $output));
 
             $method = $reflection->getMethod('createHandler');
             $method->setAccessible(true);
@@ -101,13 +105,13 @@ describe('ServeCommand extended', function (): void {
             config(['spotify.token_path' => sys_get_temp_dir().'/test-token.json']);
             config(['spotify.config_dir' => sys_get_temp_dir().'/test-spotify-serve3']);
 
-            $command = $this->app->make(\App\Commands\ServeCommand::class);
+            $command = $this->app->make(ServeCommand::class);
             $reflection = new ReflectionClass($command);
 
-            $input = new \Symfony\Component\Console\Input\ArrayInput([]);
-            $output = new \Symfony\Component\Console\Output\NullOutput;
+            $input = new ArrayInput([]);
+            $output = new NullOutput;
             $command->setInput($input);
-            $command->setOutput(new \Illuminate\Console\OutputStyle($input, $output));
+            $command->setOutput(new OutputStyle($input, $output));
 
             $method = $reflection->getMethod('createHandler');
             $method->setAccessible(true);
@@ -130,13 +134,13 @@ describe('ServeCommand extended', function (): void {
             config(['spotify.token_path' => sys_get_temp_dir().'/test-token.json']);
             config(['spotify.config_dir' => sys_get_temp_dir().'/test-spotify-serve-sec']);
 
-            $command = $this->app->make(\App\Commands\ServeCommand::class);
+            $command = $this->app->make(ServeCommand::class);
             $reflection = new ReflectionClass($command);
 
-            $input = new \Symfony\Component\Console\Input\ArrayInput([]);
-            $output = new \Symfony\Component\Console\Output\NullOutput;
+            $input = new ArrayInput([]);
+            $output = new NullOutput;
             $command->setInput($input);
-            $command->setOutput(new \Illuminate\Console\OutputStyle($input, $output));
+            $command->setOutput(new OutputStyle($input, $output));
 
             $method = $reflection->getMethod('createHandler');
             $method->setAccessible(true);

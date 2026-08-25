@@ -70,7 +70,7 @@ class SessionCommand extends Command
             return $this->runAiSession($session, $description, $duration);
         }
 
-        return $this->runQuickSession($session, $mood ?? 'flow', $duration);
+        return $this->runQuickSession($session, $mood ?: 'flow', $duration);
     }
 
     private function runQuickSession(SessionService $session, string $mood, int $duration): int

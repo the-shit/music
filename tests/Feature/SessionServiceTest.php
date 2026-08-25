@@ -166,7 +166,7 @@ describe('queueTracks edge cases', function (): void {
 
 describe('planFromDescription', function (): void {
     it('parses a valid AI response into a structured plan', function (): void {
-        $parseJson = new ReflectionMethod(\App\Services\SessionService::class, 'parseJson');
+        $parseJson = new ReflectionMethod(SessionService::class, 'parseJson');
         $parseJson->setAccessible(true);
 
         $aiResponse = '{"phases":[{"name":"Focus Time","mood":"flow","duration_minutes":30,"energy":0.6,"valence":0.5,"tempo":120,"description":"Deep work"}],"total_duration":30,"playlist_name":"Deep Focus"}';
@@ -179,7 +179,7 @@ describe('planFromDescription', function (): void {
     });
 
     it('parses multi-phase AI responses', function (): void {
-        $parseJson = new ReflectionMethod(\App\Services\SessionService::class, 'parseJson');
+        $parseJson = new ReflectionMethod(SessionService::class, 'parseJson');
         $parseJson->setAccessible(true);
 
         $aiResponse = '{"phases":[{"name":"Warmup","mood":"chill","duration_minutes":10,"energy":0.3,"valence":0.4,"tempo":90,"description":"Ease in"},{"name":"Peak","mood":"hype","duration_minutes":20,"energy":0.9,"valence":0.8,"tempo":140,"description":"Go hard"}],"total_duration":30,"playlist_name":"Morning Ramp"}';
@@ -194,7 +194,7 @@ describe('planFromDescription', function (): void {
 
 describe('parseJson', function (): void {
     it('parses clean JSON', function (): void {
-        $parseJson = new ReflectionMethod(\App\Services\SessionService::class, 'parseJson');
+        $parseJson = new ReflectionMethod(SessionService::class, 'parseJson');
         $parseJson->setAccessible(true);
 
         $result = $parseJson->invoke($this->session, '{"key": "value"}');
@@ -202,7 +202,7 @@ describe('parseJson', function (): void {
     });
 
     it('strips markdown code fences', function (): void {
-        $parseJson = new ReflectionMethod(\App\Services\SessionService::class, 'parseJson');
+        $parseJson = new ReflectionMethod(SessionService::class, 'parseJson');
         $parseJson->setAccessible(true);
 
         $input = "```json\n{\"key\": \"value\"}\n```";
@@ -211,7 +211,7 @@ describe('parseJson', function (): void {
     });
 
     it('throws on invalid JSON', function (): void {
-        $parseJson = new ReflectionMethod(\App\Services\SessionService::class, 'parseJson');
+        $parseJson = new ReflectionMethod(SessionService::class, 'parseJson');
         $parseJson->setAccessible(true);
 
         $parseJson->invoke($this->session, 'not json at all');
@@ -220,7 +220,7 @@ describe('parseJson', function (): void {
 
 describe('curate response parsing', function (): void {
     it('parses a valid curator response', function (): void {
-        $parseJson = new ReflectionMethod(\App\Services\SessionService::class, 'parseJson');
+        $parseJson = new ReflectionMethod(SessionService::class, 'parseJson');
         $parseJson->setAccessible(true);
 
         $curatorResponse = '{"playlist_name":"Vibes","playlist_description":"Chill","phases":[{"name":"Chill","track_uris":["spotify:track:aaa"],"dj_note":"Smooth"}]}';
@@ -232,7 +232,7 @@ describe('curate response parsing', function (): void {
     });
 
     it('parses multi-phase curated response', function (): void {
-        $parseJson = new ReflectionMethod(\App\Services\SessionService::class, 'parseJson');
+        $parseJson = new ReflectionMethod(SessionService::class, 'parseJson');
         $parseJson->setAccessible(true);
 
         $curatorResponse = '{"playlist_name":"Night Drive","playlist_description":"Late night vibes","phases":[{"name":"Sunset","track_uris":["spotify:track:1","spotify:track:2"],"dj_note":"Ease into it"},{"name":"Midnight","track_uris":["spotify:track:3"],"dj_note":"Deep cuts only"}]}';
@@ -246,7 +246,7 @@ describe('curate response parsing', function (): void {
 
 describe('phaseToAudioFeatures', function (): void {
     it('maps phase values to audio feature targets', function (): void {
-        $method = new ReflectionMethod(\App\Services\SessionService::class, 'phaseToAudioFeatures');
+        $method = new ReflectionMethod(SessionService::class, 'phaseToAudioFeatures');
         $method->setAccessible(true);
 
         $phase = [
@@ -264,7 +264,7 @@ describe('phaseToAudioFeatures', function (): void {
     });
 
     it('merges preset features for known moods', function (): void {
-        $method = new ReflectionMethod(\App\Services\SessionService::class, 'phaseToAudioFeatures');
+        $method = new ReflectionMethod(SessionService::class, 'phaseToAudioFeatures');
         $method->setAccessible(true);
 
         // Phase with mood but missing some features — should pull from preset
@@ -280,7 +280,7 @@ describe('phaseToAudioFeatures', function (): void {
     });
 
     it('handles phase with no mood gracefully', function (): void {
-        $method = new ReflectionMethod(\App\Services\SessionService::class, 'phaseToAudioFeatures');
+        $method = new ReflectionMethod(SessionService::class, 'phaseToAudioFeatures');
         $method->setAccessible(true);
 
         $phase = ['energy' => 0.5];

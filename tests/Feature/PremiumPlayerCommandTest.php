@@ -1,8 +1,14 @@
 <?php
 
 use App\Commands\PremiumPlayerCommand;
+use App\Player\LyricsProvider;
+use App\Player\PlayerViewModel;
 use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyPlayerService;
+use Illuminate\Support\Facades\Http;
+use PhpTui\Term\Event\CharKeyEvent;
+use PhpTui\Term\Event\CodedKeyEvent;
+use PhpTui\Term\KeyCode;
 
 /**
  * WHY these are the only tests: the interactive php-tui loop can't be driven from
@@ -174,7 +180,7 @@ describe('PremiumPlayerCommand', function (): void {
             'status' => '',
             'items' => [['uri' => 'spotify:track:abc']],
         ];
-        $args = [\PhpTui\Term\Event\CharKeyEvent::new('/'), $player, &$queue];
+        $args = [CharKeyEvent::new('/'), $player, &$queue];
         $outcome = $method->invokeArgs($command, $args);
 
         expect($outcome)->toBe('search')
@@ -205,7 +211,7 @@ describe('PremiumPlayerCommand', function (): void {
                 ['uri' => 'spotify:track:b'],
             ],
         ];
-        $args = [\PhpTui\Term\Event\CharKeyEvent::new('n'), $player, &$queue];
+        $args = [CharKeyEvent::new('n'), $player, &$queue];
         $outcome = $method->invokeArgs($command, $args);
 
         expect($outcome)->toBe('refresh')                       // panel refetches now-playing
@@ -229,7 +235,7 @@ describe('PremiumPlayerCommand', function (): void {
             'status' => '',
             'items' => [['uri' => 'spotify:track:abc']],
         ];
-        $args = [\PhpTui\Term\Event\CharKeyEvent::new('n'), $player, &$queue];
+        $args = [CharKeyEvent::new('n'), $player, &$queue];
         $outcome = $method->invokeArgs($command, $args);
 
         expect($outcome)->toBe('none')
@@ -287,8 +293,8 @@ describe('PremiumPlayerCommand', function (): void {
             'scroll' => 0,
         ];
 
-        $down = \PhpTui\Term\Event\CodedKeyEvent::new(\PhpTui\Term\KeyCode::Down);
-        $up = \PhpTui\Term\Event\CodedKeyEvent::new(\PhpTui\Term\KeyCode::Up);
+        $down = CodedKeyEvent::new(KeyCode::Down);
+        $up = CodedKeyEvent::new(KeyCode::Up);
 
         // ↑ at the top is a no-op (clamped at 0).
         $args = [$up, &$lyrics];
@@ -303,12 +309,12 @@ describe('PremiumPlayerCommand', function (): void {
         expect($lyrics['scroll'])->toBe(2);
 
         // esc closes the overlay; Ctrl+C still quits the whole player.
-        $esc = \PhpTui\Term\Event\CodedKeyEvent::new(\PhpTui\Term\KeyCode::Esc);
+        $esc = CodedKeyEvent::new(KeyCode::Esc);
         $args = [$esc, &$lyrics];
         expect($method->invokeArgs($command, $args))->toBe('none')
             ->and($lyrics['active'])->toBeFalse();
 
-        $args = [\PhpTui\Term\Event\CharKeyEvent::new("\x03"), &$lyrics];
+        $args = [CharKeyEvent::new("\x03"), &$lyrics];
         expect($method->invokeArgs($command, $args))->toBe('quit');
     });
 
@@ -319,7 +325,7 @@ describe('PremiumPlayerCommand', function (): void {
         // null lines (no match / failure) → ↓ stays clamped at 0, never errors.
         $lyrics = ['active' => true, 'track' => null, 'lines' => null, 'scroll' => 0];
 
-        $down = \PhpTui\Term\Event\CodedKeyEvent::new(\PhpTui\Term\KeyCode::Down);
+        $down = CodedKeyEvent::new(KeyCode::Down);
         $args = [$down, &$lyrics];
 
         expect($method->invokeArgs($command, $args))->toBe('none')
@@ -334,30 +340,30 @@ describe('PremiumPlayerCommand', function (): void {
      */
     it('skips the lyrics lookup when nothing is playing and fetches by track when playing', function (): void {
         // Fresh provider cache so this test controls its own fetches.
-        (new ReflectionProperty(App\Player\LyricsProvider::class, 'cache'))->setValue(null, []);
-        Illuminate\Support\Facades\Http::fake([
-            'lrclib.net/*' => Illuminate\Support\Facades\Http::response([
+        (new ReflectionProperty(LyricsProvider::class, 'cache'))->setValue(null, []);
+        Http::fake([
+            'lrclib.net/*' => Http::response([
                 'plainLyrics' => 'Is this the real life?',
             ]),
         ]);
 
         $command = new PremiumPlayerCommand;
         $method = new ReflectionMethod($command, 'safeLyrics');
-        $provider = new App\Player\LyricsProvider;
+        $provider = new LyricsProvider;
 
         // No playback (or no VM at all) → null, and lrclib is never consulted.
-        $idle = App\Player\PlayerViewModel::fromPlayback(null);
+        $idle = PlayerViewModel::fromPlayback(null);
         expect($method->invoke($command, $provider, $idle))->toBeNull()
             ->and($method->invoke($command, $provider, null))->toBeNull();
-        Illuminate\Support\Facades\Http::assertNothingSent();
+        Http::assertNothingSent();
 
         // Playing → fetches by artist/title with the duration in SECONDS (354000ms).
-        $playing = App\Player\PlayerViewModel::fromPlayback([
+        $playing = PlayerViewModel::fromPlayback([
             'name' => 'Bohemian Rhapsody', 'artist' => 'Queen', 'album' => 'A Night at the Opera',
             'is_playing' => true, 'progress_ms' => 1_000, 'duration_ms' => 354_000,
         ]);
         expect($method->invoke($command, $provider, $playing))->toBe(['Is this the real life?']);
-        Illuminate\Support\Facades\Http::assertSent(
+        Http::assertSent(
             fn ($request): bool => str_contains($request->url(), 'duration=354')
         );
     });

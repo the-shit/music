@@ -2,6 +2,8 @@
 
 use App\Commands\DaemonCommand;
 use Illuminate\Support\Facades\Config;
+use Symfony\Component\Console\Exception\RuntimeException;
+use Symfony\Component\Console\Input\ArrayInput;
 
 describe('DaemonCommand', function (): void {
 
@@ -16,7 +18,7 @@ describe('DaemonCommand', function (): void {
         Config::set('spotify.token_path', $this->tempDir.'/.config/spotify-cli/token.json');
 
         $this->app->forgetInstance(DaemonCommand::class);
-        $this->app->bind(DaemonCommand::class, function (): \App\Commands\DaemonCommand {
+        $this->app->bind(DaemonCommand::class, function (): DaemonCommand {
             return new DaemonCommand;
         });
 
@@ -164,7 +166,7 @@ describe('DaemonCommand', function (): void {
         });
 
         it('requires action argument', function (): void {
-            $this->expectException(\Symfony\Component\Console\Exception\RuntimeException::class);
+            $this->expectException(RuntimeException::class);
             $this->artisan('daemon');
         });
 
@@ -187,7 +189,7 @@ describe('DaemonCommand', function (): void {
             $command = $this->app->make(DaemonCommand::class);
             $definition = $command->getDefinition();
             expect($definition->hasOption('name'))->toBeTrue();
-            expect($definition->getOption('name')->getDescription())->toBe('Device name for Spotify Connect');
+            expect($definition->getOption('name')->getDescription())->toBe('Device name for Spotify Connect (defaults to hostname)');
         });
 
     });
@@ -380,6 +382,83 @@ describe('DaemonCommand', function (): void {
             expect($plist)->toContain('<key>SuccessfulExit</key>');
             expect($plist)->toContain('<key>ThrottleInterval</key>');
             expect($plist)->toContain('<integer>30</integer>');
+        });
+
+    });
+
+    describe('device name defaults to hostname', function (): void {
+
+        beforeEach(function (): void {
+            $this->bindDaemonInput = function (array $options = []): DaemonCommand {
+                $command = $this->app->make(DaemonCommand::class);
+                $args = ['action' => 'start'];
+                foreach ($options as $key => $value) {
+                    $args['--'.$key] = $value;
+                }
+                $input = new ArrayInput($args);
+                $input->bind($command->getDefinition());
+                $command->setInput($input);
+
+                return $command;
+            };
+
+        });
+
+        it('uses the short hostname when no name is configured', function (): void {
+            $command = ($this->bindDaemonInput)();
+            $deviceResolution = $command->getDeviceResolution();
+            $host = gethostname();
+            expect($host)->not->toBeFalse();
+            $expected = explode('.', (string) $host, 2)[0];
+
+            expect($deviceResolution->resolveDaemonName(null))->toBe($expected);
+        });
+
+        it('lets --name override the hostname', function (): void {
+            $command = ($this->bindDaemonInput)(['name' => 'Kitchen']);
+            $deviceResolution = $command->getDeviceResolution();
+
+            expect($deviceResolution->resolveDaemonName('Kitchen'))->toBe('Kitchen');
+        });
+
+        it('replaces a leftover Work Mac config with the hostname', function (): void {
+            mkdir($this->configDir, 0755, true);
+            file_put_contents($this->configDir.'/spotifyd.conf', "device_name = \"Work Mac\"\n");
+
+            $command = ($this->bindDaemonInput)();
+            $deviceResolution = $command->getDeviceResolution();
+            $expected = $deviceResolution->resolveDaemonName();
+
+            expect($expected)->not->toBe('Work Mac');
+
+            $command->writeSpotifydConfig('/bin/true');
+            expect(file_get_contents($this->configDir.'/spotifyd.conf'))
+                ->toContain('device_name = "'.$expected.'"')
+                ->not->toContain('Work Mac');
+        });
+
+        it('keeps a custom device name already in spotifyd.conf', function (): void {
+            mkdir($this->configDir, 0755, true);
+            file_put_contents($this->configDir.'/spotifyd.conf', "device_name = \"Kitchen\"\n");
+
+            $command = ($this->bindDaemonInput)();
+            $deviceResolution = $command->getDeviceResolution();
+
+            expect($deviceResolution->resolveDaemonName())->toBe('Kitchen');
+
+            $command->writeSpotifydConfig('/bin/true');
+            expect(file_get_contents($this->configDir.'/spotifyd.conf'))
+                ->toContain('device_name = "Kitchen"');
+        });
+
+        it('writes the hostname into a new spotifyd.conf', function (): void {
+            $command = ($this->bindDaemonInput)();
+            $deviceResolution = $command->getDeviceResolution();
+            $expected = $deviceResolution->resolveDaemonName();
+
+            $command->writeSpotifydConfig('/bin/true');
+            expect(file_get_contents($this->configDir.'/spotifyd.conf'))
+                ->toContain('device_name = "'.$expected.'"');
         });
 
     });

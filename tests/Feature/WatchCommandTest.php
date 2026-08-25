@@ -1,5 +1,6 @@
 <?php
 
+use App\Commands\WatchCommand;
 use App\Services\SpotifyAuthManager;
 
 it('requires configuration', function (): void {
@@ -12,7 +13,7 @@ it('requires configuration', function (): void {
 });
 
 it('has correct signature options', function (): void {
-    $command = $this->app->make(\App\Commands\WatchCommand::class);
+    $command = $this->app->make(WatchCommand::class);
     $definition = $command->getDefinition();
 
     expect($definition->hasOption('interval'))->toBeTrue();
@@ -26,18 +27,18 @@ describe('WatchCommand extended', function (): void {
     describe('command metadata', function (): void {
 
         it('has correct command name', function (): void {
-            $command = $this->app->make(\App\Commands\WatchCommand::class);
+            $command = $this->app->make(WatchCommand::class);
             expect($command->getName())->toBe('watch');
         });
 
         it('has a description', function (): void {
-            $command = $this->app->make(\App\Commands\WatchCommand::class);
+            $command = $this->app->make(WatchCommand::class);
             expect($command->getDescription())->not->toBeEmpty();
         });
 
         it('enforces minimum interval of 3 seconds', function (): void {
             // interval option exists and has default
-            $command = $this->app->make(\App\Commands\WatchCommand::class);
+            $command = $this->app->make(WatchCommand::class);
             $definition = $command->getDefinition();
             expect((int) $definition->getOption('interval')->getDefault())->toBeGreaterThanOrEqual(3);
         });

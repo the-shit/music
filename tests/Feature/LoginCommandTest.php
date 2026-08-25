@@ -1,5 +1,8 @@
 <?php
 
+use App\Commands\LoginCommand;
+use Illuminate\Support\Facades\Http;
+
 describe('LoginCommand', function (): void {
 
     beforeEach(function (): void {
@@ -64,12 +67,12 @@ describe('LoginCommand', function (): void {
     describe('command metadata', function (): void {
 
         it('has correct command name', function (): void {
-            $command = $this->app->make(\App\Commands\LoginCommand::class);
+            $command = $this->app->make(LoginCommand::class);
             expect($command->getName())->toBe('login');
         });
 
         it('has a description', function (): void {
-            $command = $this->app->make(\App\Commands\LoginCommand::class);
+            $command = $this->app->make(LoginCommand::class);
             expect($command->getDescription())->not->toBeEmpty();
         });
 
@@ -78,7 +81,7 @@ describe('LoginCommand', function (): void {
     describe('findAvailablePort', function (): void {
 
         it('returns a port in the expected range', function (): void {
-            $command = $this->app->make(\App\Commands\LoginCommand::class);
+            $command = $this->app->make(LoginCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('findAvailablePort');
             $method->setAccessible(true);
@@ -93,7 +96,7 @@ describe('LoginCommand', function (): void {
     describe('createCallbackServer', function (): void {
 
         it('creates a PHP callback server script in temp dir', function (): void {
-            $command = $this->app->make(\App\Commands\LoginCommand::class);
+            $command = $this->app->make(LoginCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('createCallbackServer');
             $method->setAccessible(true);
@@ -119,7 +122,7 @@ describe('LoginCommand', function (): void {
             $codeFile = sys_get_temp_dir().'/spotify_code.txt';
             @unlink($codeFile);
 
-            $command = $this->app->make(\App\Commands\LoginCommand::class);
+            $command = $this->app->make(LoginCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('waitForAuthCode');
             $method->setAccessible(true);
@@ -139,7 +142,7 @@ describe('LoginCommand', function (): void {
             // Start background writer — waits 0.2s (2 poll cycles) then writes
             $pid = (int) shell_exec('(sleep 0.2 && printf "auth_code_xyz" > '.escapeshellarg($codeFile).') > /dev/null 2>&1 & echo $!');
 
-            $command = $this->app->make(\App\Commands\LoginCommand::class);
+            $command = $this->app->make(LoginCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('waitForAuthCode');
             $method->setAccessible(true);
@@ -157,11 +160,11 @@ describe('LoginCommand', function (): void {
     describe('exchangeCodeForToken', function (): void {
 
         it('returns null when HTTP request fails', function (): void {
-            \Illuminate\Support\Facades\Http::fake([
-                'accounts.spotify.com/*' => \Illuminate\Support\Facades\Http::response([], 400),
+            Http::fake([
+                'accounts.spotify.com/*' => Http::response([], 400),
             ]);
 
-            $command = $this->app->make(\App\Commands\LoginCommand::class);
+            $command = $this->app->make(LoginCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('exchangeCodeForToken');
             $method->setAccessible(true);
@@ -171,15 +174,15 @@ describe('LoginCommand', function (): void {
         });
 
         it('returns token array on successful exchange', function (): void {
-            \Illuminate\Support\Facades\Http::fake([
-                'accounts.spotify.com/*' => \Illuminate\Support\Facades\Http::response([
+            Http::fake([
+                'accounts.spotify.com/*' => Http::response([
                     'access_token' => 'access_tok_123',
                     'refresh_token' => 'refresh_tok_456',
                     'expires_in' => 3600,
                 ], 200),
             ]);
 
-            $command = $this->app->make(\App\Commands\LoginCommand::class);
+            $command = $this->app->make(LoginCommand::class);
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('exchangeCodeForToken');
             $method->setAccessible(true);

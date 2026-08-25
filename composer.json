@@ -44,7 +44,10 @@
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
-        }
+        },
+        "exclude-from-classmap": [
+            "vendor/laravel/framework/src/Illuminate/Foundation"
+        ]
     },
     "autoload-dev": {
         "psr-4": {

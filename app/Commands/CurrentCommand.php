@@ -45,6 +45,11 @@ class CurrentCommand extends Command
         $this->line("  <fg=cyan>Artist:</> {$current['artist']}");
         $this->line("  <fg=cyan>Album:</> {$current['album']}");
 
+        $trackId = $current['uri'] ?? '';
+        if ($trackId && preg_match('/track:([A-Za-z0-9]+)/', $trackId, $matches)) {
+            $this->line("  <fg=yellow>https://open.spotify.com/track/{$matches[1]}</>");
+        }
+
         // Format time
         $progressMin = floor($current['progress_ms'] / 60000);
         $progressSec = floor(($current['progress_ms'] % 60000) / 1000);

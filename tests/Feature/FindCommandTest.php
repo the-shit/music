@@ -3,6 +3,7 @@
 use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyDiscoveryService;
 use App\Services\SpotifyPlayerService;
+use Laravel\Prompts\Prompt;
 
 describe('FindCommand', function (): void {
 
@@ -22,12 +23,12 @@ describe('FindCommand', function (): void {
 
     afterEach(function (): void {
         $this->app['env'] = $this->originalEnv;
-        \Laravel\Prompts\Prompt::interactive(false);
+        Prompt::interactive(false);
 
         // Prompt::fallbackWhen() is a latch (`$condition || $shouldFallback`) with no
         // public way back to false, so reset the shared static directly. Otherwise
         // the fallback stays enabled process-wide and breaks later prompt tests.
-        $fallback = new ReflectionProperty(\Laravel\Prompts\Prompt::class, 'shouldFallback');
+        $fallback = new ReflectionProperty(Prompt::class, 'shouldFallback');
         $fallback->setValue(null, false);
     });
 

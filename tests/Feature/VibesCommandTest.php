@@ -1,5 +1,6 @@
 <?php
 
+use App\Commands\VibesCommand;
 use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyDiscoveryService;
 use Illuminate\Support\Facades\Artisan;
@@ -8,12 +9,12 @@ use Illuminate\Support\Facades\Process;
 describe('VibesCommand', function (): void {
 
     it('has the correct command signature', function (): void {
-        $command = $this->app->make(\App\Commands\VibesCommand::class);
+        $command = $this->app->make(VibesCommand::class);
         expect($command->getName())->toBe('vibes');
     });
 
     it('has a description', function (): void {
-        $command = $this->app->make(\App\Commands\VibesCommand::class);
+        $command = $this->app->make(VibesCommand::class);
         expect($command->getDescription())->not->toBeEmpty();
     });
 

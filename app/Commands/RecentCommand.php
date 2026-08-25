@@ -4,6 +4,7 @@ namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyDiscoveryService;
+use Carbon\Carbon;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -49,7 +50,7 @@ class RecentCommand extends Command
             foreach ($tracks as $i => $track) {
                 $this->line('  '.($i + 1).". <fg=cyan>{$track['name']}</> by {$track['artist']}");
                 if ($track['played_at']) {
-                    $time = \Carbon\Carbon::parse($track['played_at'])->diffForHumans();
+                    $time = Carbon::parse($track['played_at'])->diffForHumans();
                     $this->line("     Played {$time}");
                 }
             }

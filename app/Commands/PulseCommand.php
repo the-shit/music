@@ -240,7 +240,7 @@ class PulseCommand extends Command
      */
     private function maybeReset(): void
     {
-        if (! $this->nextResetAt instanceof \Carbon\CarbonInterface) {
+        if (! $this->nextResetAt instanceof CarbonInterface) {
             $this->nextResetAt = $this->computeNextReset();
 
             return;

@@ -32,7 +32,7 @@ class PlayTool extends Tool
 
     public function handle(Request $request, SpotifyDiscoveryService $discovery, SpotifyPlayerService $player): Response
     {
-        return $this->withAuthHandling(function () use ($request, $discovery, $player): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($request, $discovery, $player): Response {
             $query = $request->get('query');
             $queue = $request->get('queue', false);
 

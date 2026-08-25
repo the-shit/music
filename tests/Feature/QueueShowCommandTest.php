@@ -1,5 +1,6 @@
 <?php
 
+use App\Commands\QueueShowCommand;
 use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyPlayerService;
 use Illuminate\Support\Facades\Artisan;
@@ -193,12 +194,12 @@ describe('QueueShowCommand', function (): void {
     });
 
     it('has the correct command name', function (): void {
-        $command = $this->app->make(\App\Commands\QueueShowCommand::class);
+        $command = $this->app->make(QueueShowCommand::class);
         expect($command->getName())->toBe('queue:show');
     });
 
     it('has a description', function (): void {
-        $command = $this->app->make(\App\Commands\QueueShowCommand::class);
+        $command = $this->app->make(QueueShowCommand::class);
         expect($command->getDescription())->not->toBeEmpty();
     });
 

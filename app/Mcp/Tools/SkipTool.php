@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\HandlesAuthErrors;
@@ -29,7 +31,7 @@ class SkipTool extends Tool
 
     public function handle(Request $request, SpotifyPlayerService $player): Response
     {
-        return $this->withAuthHandling(function () use ($request, $player): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($request, $player): Response {
             $direction = $request->get('direction', 'next');
 
             if ($direction === 'previous') {

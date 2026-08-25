@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use TheShit\Vector\Data\Point;
 use TheShit\Vector\Qdrant;
 use TheShit\Vector\QdrantConnector;
@@ -112,12 +113,12 @@ class QdrantEventSink
 
     private function generateId(): string
     {
-        return (string) \Illuminate\Support\Str::uuid();
+        return (string) Str::uuid();
     }
 
     private function getClient(): Qdrant
     {
-        if (! $this->client instanceof \TheShit\Vector\Qdrant) {
+        if (! $this->client instanceof Qdrant) {
             $this->client = new Qdrant(
                 new QdrantConnector(
                     baseUrl: config('spotify.qdrant.url'),

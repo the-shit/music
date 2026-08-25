@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\HandlesAuthErrors;
@@ -27,7 +29,7 @@ class ShuffleTool extends Tool
 
     public function handle(Request $request, SpotifyPlayerService $player): Response
     {
-        return $this->withAuthHandling(function () use ($request, $player): \Laravel\Mcp\Response {
+        return $this->withAuthHandling(function () use ($request, $player): Response {
             $enabled = $request->get('enabled');
 
             if ($enabled === null) {

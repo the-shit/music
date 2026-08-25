@@ -1,7 +1,11 @@
 <?php
 
 use App\Commands\DaemonSetupCommand;
+use Illuminate\Console\OutputStyle;
 use Illuminate\Support\Facades\Config;
+use Laravel\Prompts\Prompt;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 
 describe('DaemonSetupCommand', function (): void {
 
@@ -50,10 +54,10 @@ describe('DaemonSetupCommand', function (): void {
 
         it('outputs the setup banner text', function (): void {
             $command = $this->app->make(DaemonSetupCommand::class);
-            $input = new \Symfony\Component\Console\Input\ArrayInput([]);
-            $output = new \Symfony\Component\Console\Output\BufferedOutput;
+            $input = new ArrayInput([]);
+            $output = new BufferedOutput;
             $command->setInput($input);
-            $command->setOutput(new \Illuminate\Console\OutputStyle($input, $output));
+            $command->setOutput(new OutputStyle($input, $output));
 
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('banner');
@@ -69,13 +73,13 @@ describe('DaemonSetupCommand', function (): void {
 
         it('shows setup complete and usage instructions', function (): void {
             $command = $this->app->make(DaemonSetupCommand::class);
-            $input = new \Symfony\Component\Console\Input\ArrayInput([]);
-            $output = new \Symfony\Component\Console\Output\BufferedOutput;
+            $input = new ArrayInput([]);
+            $output = new BufferedOutput;
             $command->setInput($input);
-            $command->setOutput(new \Illuminate\Console\OutputStyle($input, $output));
+            $command->setOutput(new OutputStyle($input, $output));
 
             // Route Laravel Prompts output to our buffer
-            \Laravel\Prompts\Prompt::setOutput($output);
+            Prompt::setOutput($output);
 
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('displaySuccess');
@@ -101,13 +105,13 @@ describe('DaemonSetupCommand', function (): void {
             ]));
 
             $command = $this->app->make(DaemonSetupCommand::class);
-            $input = new \Symfony\Component\Console\Input\ArrayInput([]);
-            $output = new \Symfony\Component\Console\Output\BufferedOutput;
+            $input = new ArrayInput([]);
+            $output = new BufferedOutput;
             $command->setInput($input);
-            $command->setOutput(new \Illuminate\Console\OutputStyle($input, $output));
+            $command->setOutput(new OutputStyle($input, $output));
 
             // Route Laravel Prompts output to our buffer
-            \Laravel\Prompts\Prompt::setOutput($output);
+            Prompt::setOutput($output);
 
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('authenticateSpotifyd');
@@ -126,10 +130,10 @@ describe('DaemonSetupCommand', function (): void {
             file_put_contents($cachePath.'/credentials.json', json_encode(['username' => 'test']));
 
             $command = $this->app->make(DaemonSetupCommand::class);
-            $input = new \Symfony\Component\Console\Input\ArrayInput([]);
-            $output = new \Symfony\Component\Console\Output\BufferedOutput;
+            $input = new ArrayInput([]);
+            $output = new BufferedOutput;
             $command->setInput($input);
-            $command->setOutput(new \Illuminate\Console\OutputStyle($input, $output));
+            $command->setOutput(new OutputStyle($input, $output));
 
             $reflection = new ReflectionClass($command);
             $method = $reflection->getMethod('authenticateSpotifyd');
