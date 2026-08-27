@@ -7,7 +7,7 @@ use Prism\Prism\PrismServiceProvider;
 
 return [
     'name' => 'Spotify',
-    'version' => 'v1.1.0',
+    'version' => 'v1.2.0',
     'env' => env('APP_ENV', 'production'),
     'providers' => [
         AppServiceProvider::class,

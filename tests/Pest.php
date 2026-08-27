@@ -66,7 +66,7 @@ if (! function_exists('mb_strimwidth')) {
 |
 */
 
-uses(TestCase::class)->in('Feature', 'Unit/Agents');
+uses(TestCase::class)->in('Feature', 'Unit/Agents', 'Unit/Daemon');
 
 /*
 | Terminal & process safety net for the whole suite.

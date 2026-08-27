@@ -2,6 +2,7 @@
 
 namespace App\Commands\Concerns;
 
+use App\Services\Daemon\Process;
 use App\Services\SpotifyPlayerService;
 
 use function Laravel\Prompts\info;
@@ -36,12 +37,40 @@ trait ResolvesDevice
 
         $devices = $player->getDevices();
         $match = $this->findDevice($devices, $daemonName);
+        $alive = app(Process::class)->isAlive();
 
-        if ($match) {
+        // Connect often still lists the speaker after spotifyd is killed.
+        // Missing from Connect OR process dead → one heal, then retry lookup.
+        if (! $match || ! $alive) {
+            $this->healLocalDaemon();
+            $devices = $player->getDevices();
+            $match = $this->findDevice($devices, $daemonName);
+        }
+
+        if ($match && ! $this->option('json')) {
             info("Using daemon device: {$match['name']}");
         }
 
         return $match;
+    }
+
+    /**
+     * Restart the local Connect speaker once, then let the caller retry lookup.
+     */
+    private function healLocalDaemon(): void
+    {
+        $arguments = [
+            'action' => 'health',
+            '--heal' => true,
+        ];
+
+        if ($this->option('json')) {
+            $this->callSilently('daemon', $arguments);
+
+            return;
+        }
+
+        $this->call('daemon', $arguments);
     }
 
     /**
