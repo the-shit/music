@@ -2,8 +2,19 @@
 
 use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyPlayerService;
+use Tests\DaemonHealSpyCommand;
 
 describe('ResumeCommand', function (): void {
+
+    beforeEach(function (): void {
+        $this->previousHome = getenv('HOME') ?: '/tmp/spotify-cli-test';
+        $this->tempDir = DaemonHealSpyCommand::isolateHome();
+        DaemonHealSpyCommand::bind($this->app);
+    });
+
+    afterEach(function (): void {
+        DaemonHealSpyCommand::restoreHome($this->previousHome, $this->tempDir);
+    });
 
     it('resumes playback without device specified', function (): void {
         $this->mock(SpotifyAuthManager::class, function ($mock): void {
@@ -321,6 +332,39 @@ describe('ResumeCommand', function (): void {
         $this->artisan('resume', ['--device' => 'Kitchen'])
             ->expectsOutputToContain('🔊 Using device: Kitchen Speaker')
             ->assertExitCode(0);
+    });
+
+    describe('daemon heal', function (): void {
+
+        it('heals the daemon when its Connect device is missing then resumes on retry', function (): void {
+            DaemonHealSpyCommand::writeConf($this->tempDir, 'Thor');
+
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
+                $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            });
+            $this->mock(SpotifyPlayerService::class, function ($mock): void {
+                $mock->shouldReceive('getDevices')->twice()->andReturn(
+                    [],
+                    [['id' => 'daemon-id', 'name' => 'Thor']],
+                );
+                $mock->shouldReceive('transferPlayback')->once()->with('daemon-id', true);
+                $mock->shouldReceive('getCurrentPlayback')->once()->andReturn([
+                    'name' => 'Test Song',
+                    'artist' => 'Test Artist',
+                    'album' => 'Test Album',
+                ]);
+            });
+
+            $this->artisan('resume')
+                ->expectsOutputToContain('Using daemon device: Thor')
+                ->expectsOutputToContain('🎵 Resumed: Test Song by Test Artist')
+                ->assertExitCode(0);
+
+            expect(DaemonHealSpyCommand::$calls)->toBe([
+                ['action' => 'health', 'heal' => true],
+            ]);
+        });
+
     });
 
 });

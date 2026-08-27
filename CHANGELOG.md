@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## v1.2.0 — 2026-08-26
+
+### Fixed
+
+- `spotify play` / `spotify resume` restart a dead local spotifyd even when Connect still lists the speaker (kill the process, then play — it comes back)
+
 ## v1.1.0 — 2026-06-11
 
 ### Highlights
