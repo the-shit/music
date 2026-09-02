@@ -4,6 +4,7 @@ namespace App\Commands\Concerns;
 
 use App\Services\Daemon\Process;
 use App\Services\SpotifyPlayerService;
+use App\Support\DeviceMatcher;
 
 use function Laravel\Prompts\info;
 
@@ -21,7 +22,7 @@ trait ResolvesDevice
             $devices = $player->getDevices();
             $match = $this->findDevice($devices, $deviceName);
 
-            if ($match) {
+            if ($match && ! $this->option('json')) {
                 info("🔊 Using device: {$match['name']}");
             }
 
@@ -81,13 +82,7 @@ trait ResolvesDevice
      */
     private function findDevice(array $devices, string $search): ?array
     {
-        foreach ($devices as $device) {
-            if (stripos($device['name'], $search) !== false || $device['id'] === $search) {
-                return ['id' => $device['id'], 'name' => $device['name']];
-            }
-        }
-
-        return null;
+        return DeviceMatcher::find($devices, $search);
     }
 
     /**

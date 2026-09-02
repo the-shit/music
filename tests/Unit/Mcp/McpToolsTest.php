@@ -192,7 +192,7 @@ describe('PlayTool', function (): void {
         $this->mock(SpotifyPlayerService::class, function ($mock): void {
             $mock->shouldReceive('play')
                 ->once()
-                ->with('spotify:track:abc123');
+                ->with('spotify:track:abc123', null);
         });
 
         SpotifyServer::tool(PlayTool::class, ['query' => 'Bohemian Rhapsody'])
@@ -220,6 +220,54 @@ describe('PlayTool', function (): void {
         SpotifyServer::tool(PlayTool::class, ['query' => 'Bohemian Rhapsody', 'queue' => true])
             ->assertOk()
             ->assertSee('Queued: Bohemian Rhapsody by Queen');
+    });
+
+    it('plays on a named device', function (): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
+            $mock->shouldReceive('search')
+                ->once()
+                ->with('Bohemian Rhapsody')
+                ->andReturn([
+                    'uri' => 'spotify:track:abc123',
+                    'name' => 'Bohemian Rhapsody',
+                    'artist' => 'Queen',
+                ]);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
+            $mock->shouldReceive('getDevices')->once()->andReturn([
+                ['id' => 'thor-id', 'name' => 'Thor Speaker'],
+            ]);
+            $mock->shouldReceive('play')
+                ->once()
+                ->with('spotify:track:abc123', 'thor-id');
+        });
+
+        SpotifyServer::tool(PlayTool::class, ['query' => 'Bohemian Rhapsody', 'device' => 'Thor'])
+            ->assertOk()
+            ->assertSee('Now playing: Bohemian Rhapsody by Queen');
+    });
+
+    it('returns an error when the named device is missing', function (): void {
+        $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
+            $mock->shouldReceive('search')
+                ->once()
+                ->with('Bohemian Rhapsody')
+                ->andReturn([
+                    'uri' => 'spotify:track:abc123',
+                    'name' => 'Bohemian Rhapsody',
+                    'artist' => 'Queen',
+                ]);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
+            $mock->shouldReceive('getDevices')->once()->andReturn([
+                ['id' => 'phone-id', 'name' => 'Phone'],
+            ]);
+            $mock->shouldReceive('play')->never();
+        });
+
+        SpotifyServer::tool(PlayTool::class, ['query' => 'Bohemian Rhapsody', 'device' => 'Thor'])
+            ->assertHasErrors()
+            ->assertSee("Device 'Thor' not found");
     });
 
     it('returns an error response when no results found', function (): void {
