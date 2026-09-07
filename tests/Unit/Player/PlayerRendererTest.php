@@ -136,18 +136,18 @@ describe('PlayerRenderer', function (): void {
             ->toContain('▶ Day N Nite')           // selection marker on the chosen row
             ->toContain('select')                 // footer hint
             ->toContain('play')
-            ->toContain('queue');                 // add-to-queue action (a queue)
+            ->toContain('tab queue');             // add-to-queue action (not a letter)
     });
 
     it('advertises the add-to-queue action and shows a queued confirm at the inline viewport', function (): void {
         $renderer = new PlayerRenderer(PlayerTheme::forMood('chill'));
         $results = [['uri' => 'spotify:track:1', 'name' => 'Daylight', 'artist' => 'Taylor Swift']];
 
-        // Default footer advertises both the ⏎ play and `a` queue actions.
+        // Default footer advertises both the ⏎ play and Tab queue actions.
         $out = renderPremiumPlayerInline($renderer->searchOverlay('day', $results, 0));
-        expect($out)->toContain('play')->toContain('queue');
+        expect($out)->toContain('play')->toContain('tab queue')->not->toContain('a queue');
 
-        // After `a`, a brief inline confirm is shown (status arg); palette stays up.
+        // After Tab, a brief inline confirm is shown (status arg); palette stays up.
         $confirm = renderPremiumPlayerInline($renderer->searchOverlay('day', $results, 0, '+ queued'));
         expect($confirm)->toContain('+ queued')->toContain('Daylight');
     });

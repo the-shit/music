@@ -552,6 +552,12 @@ class PremiumPlayerCommand extends Command
                 KeyCode::Up => $this->moveSelection($search, -1),
                 KeyCode::Down => $this->moveSelection($search, 1),
                 KeyCode::Backspace => $this->backspaceQuery($search),
+                // Tab queues the highlighted row. WHY not a letter: `a` used to
+                // be this action, which made it impossible to type "Ice Cube"
+                // (or any query with an a) into the palette. Tab is not a
+                // search character, so play (⏎) and queue both stay bound
+                // without eating the alphabet.
+                KeyCode::Tab => $this->queueSelected($player, $search),
                 default => self::NONE,
             };
         }
@@ -572,18 +578,8 @@ class PremiumPlayerCommand extends Command
             return $this->backspaceQuery($search);
         }
 
-        // `a` is a dedicated ACTION key here (add the highlighted result to the
-        // queue), per the footer "a queue" — so it is intercepted BEFORE the
-        // printable-append below and never lands in the query. WHY this trade-off:
-        // play-now (⏎) and add-to-queue both needed a binding on the selected row,
-        // and a single-letter action reads cleanly in the footer; the cost is that
-        // a literal 'a' can't be typed into the query (a future iteration could move
-        // this to Tab if that ever matters).
-        if ($char === 'a') {
-            return $this->queueSelected($player, $search);
-        }
-
         // Append printable input only; ignore stray control characters.
+        // Tab is a coded key (see above), so it never lands here as "\t".
         if ($char !== '' && ord($char[0]) >= 32) {
             $search['query'] .= $char;
             $search['status'] = '';

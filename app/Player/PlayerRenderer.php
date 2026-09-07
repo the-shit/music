@@ -355,8 +355,8 @@ final class PlayerRenderer
         }
 
         // Footer: unified `↑↓ select · ⏎ <act> · esc close` shape (search adds the
-        // extra `a queue` action), prefixed with any inline status / "+ queued".
-        $footer = $this->modalFooter('↑↓ select · ⏎ play · a queue · esc close', $status);
+        // extra `tab queue` action), prefixed with any inline status / "+ queued".
+        $footer = $this->modalFooter('↑↓ select · ⏎ play · tab queue · esc close', $status);
 
         // WHY a Grid (not one Paragraph): with a full 8-row result list the footer
         // would be pushed past the modal's bottom and clipped — taking any inline

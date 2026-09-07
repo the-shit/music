@@ -114,7 +114,7 @@ describe('PremiumPlayerCommand', function (): void {
     });
 
     /**
-     * The search palette gained a second action: `a` adds the highlighted result to
+     * The search palette gained a second action: Tab adds the highlighted result to
      * the queue and KEEPS the palette open (so several can be queued), with a brief
      * inline confirm. Drive the handler directly, like the queue tests above.
      */
@@ -161,6 +161,90 @@ describe('PremiumPlayerCommand', function (): void {
         expect($outcome)->toBe('none')
             ->and($search['active'])->toBeTrue()
             ->and($search['status'])->toBe('No active device');
+    });
+
+    /**
+     * Typing must keep every letter, including `a`. Queue-add used to steal `a`
+     * as an action key, so "ice cube" (and anything else with an a) could not
+     * be searched. Drive handleSearchEvent: letters append, Tab queues.
+     */
+    it('appends the letter a to the search query instead of queueing', function (): void {
+        $player = Mockery::mock(SpotifyPlayerService::class);
+        $player->shouldNotReceive('addToQueue');
+
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'handleSearchEvent');
+
+        $search = [
+            'active' => true,
+            'query' => '',
+            'results' => [['uri' => 'spotify:track:abc']],
+            'selected' => 0,
+            'status' => '',
+            'dirty' => false,
+            'lastQueried' => 0.0,
+            'returnTo' => null,
+        ];
+        $args = [CharKeyEvent::new('a'), $player, &$search];
+        $outcome = $method->invokeArgs($command, $args);
+
+        expect($outcome)->toBe('none')
+            ->and($search['query'])->toBe('a')
+            ->and($search['dirty'])->toBeTrue()
+            ->and($search['active'])->toBeTrue();
+    });
+
+    it('types a full query that contains the letter a', function (): void {
+        $player = Mockery::mock(SpotifyPlayerService::class);
+        $player->shouldNotReceive('addToQueue');
+
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'handleSearchEvent');
+
+        $search = [
+            'active' => true,
+            'query' => '',
+            'results' => [],
+            'selected' => 0,
+            'status' => '',
+            'dirty' => false,
+            'lastQueried' => 0.0,
+            'returnTo' => null,
+        ];
+
+        foreach (str_split('ice cube') as $char) {
+            $args = [CharKeyEvent::new($char), $player, &$search];
+            $method->invokeArgs($command, $args);
+        }
+
+        expect($search['query'])->toBe('ice cube')
+            ->and($search['dirty'])->toBeTrue();
+    });
+
+    it('queues the highlighted search result on Tab without eating the query', function (): void {
+        $player = Mockery::mock(SpotifyPlayerService::class);
+        $player->shouldReceive('addToQueue')->once()->with('spotify:track:abc');
+
+        $command = new PremiumPlayerCommand;
+        $method = new ReflectionMethod($command, 'handleSearchEvent');
+
+        $search = [
+            'active' => true,
+            'query' => 'ice cube',
+            'results' => [['uri' => 'spotify:track:abc']],
+            'selected' => 0,
+            'status' => '',
+            'dirty' => false,
+            'lastQueried' => 0.0,
+            'returnTo' => null,
+        ];
+        $args = [CodedKeyEvent::new(KeyCode::Tab), $player, &$search];
+        $outcome = $method->invokeArgs($command, $args);
+
+        expect($outcome)->toBe('none')
+            ->and($search['query'])->toBe('ice cube')
+            ->and($search['active'])->toBeTrue()
+            ->and($search['status'])->toBe('+ queued');
     });
 
     /**
