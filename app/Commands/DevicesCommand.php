@@ -6,6 +6,7 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Commands\Concerns\ResolvesDevice;
 use App\Services\SpotifyPlayerService;
 use App\Support\SpotifyRateLimit;
+use App\Support\Stdin;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -122,7 +123,12 @@ class DevicesCommand extends Command
     private function switchPlayback(SpotifyPlayerService $player, ?string $target): int
     {
         $json = (bool) $this->option('json');
-        $canPrompt = ! $json && $this->input->isInteractive() && $target === null;
+        $canPrompt = Stdin::allowsPrompt(
+            $json,
+            $this->input->isInteractive(),
+            app(Stdin::class)->isTty(),
+            $target !== null,
+        );
 
         if ($canPrompt) {
             return $this->promptAndTransfer($player);

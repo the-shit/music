@@ -4,6 +4,7 @@ use App\Services\Daemon\Process;
 use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyPlayerService;
 use App\Support\SpotifyRateLimit;
+use App\Support\Stdin;
 use Illuminate\Support\Facades\Config;
 use Tests\DaemonHealSpyCommand;
 
@@ -232,6 +233,108 @@ describe('DevicesCommand', function (): void {
         $this->artisan('devices', ['--switch' => true, '--json' => true])
             ->expectsOutputToContain('No active device. Pass a name or ID')
             ->assertExitCode(1);
+    });
+
+    it('uses the daemon device for a piped --switch without calling select', function (): void {
+        // Symfony keeps Input interactive when stdin is a pipe. select()
+        // then spins on EOF. A non-TTY must transfer to the daemon instead.
+        $this->mock(Stdin::class, function ($mock): void {
+            $mock->shouldReceive('isTty')->once()->andReturn(false);
+        });
+        DaemonHealSpyCommand::writeConf($this->tempDir, 'Thor');
+        $this->mock(Process::class, function ($mock): void {
+            $mock->shouldReceive('isAlive')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
+            $mock->shouldReceive('getDevices')->once()->andReturn([
+                [
+                    'id' => 'thor-id',
+                    'name' => 'Thor Speaker',
+                    'type' => 'Speaker',
+                    'is_active' => false,
+                    'volume_percent' => 50,
+                ],
+            ]);
+            $mock->shouldReceive('transferPlayback')->once()->with('thor-id');
+        });
+
+        $this->artisan('devices', ['--switch' => true])
+            ->expectsOutputToContain('Playback transferred')
+            ->assertExitCode(0);
+    });
+
+    it('does not call select under --json even when stdin is a tty', function (): void {
+        $this->mock(Stdin::class, function ($mock): void {
+            $mock->shouldReceive('isTty')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
+            $mock->shouldReceive('transferPlayback')->never();
+        });
+
+        $this->artisan('devices', ['--switch' => true, '--json' => true])
+            ->expectsOutputToContain('No active device. Pass a name or ID')
+            ->assertExitCode(1);
+    });
+
+    it('still prompts on an interactive tty when --switch has no name', function (): void {
+        $this->mock(Stdin::class, function ($mock): void {
+            $mock->shouldReceive('isTty')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
+            $mock->shouldReceive('getDevices')->once()->andReturn([
+                [
+                    'id' => 'thor-id',
+                    'name' => 'Thor',
+                    'type' => 'Speaker',
+                    'is_active' => false,
+                    'volume_percent' => 40,
+                ],
+                [
+                    'id' => 'phone-id',
+                    'name' => 'Phone',
+                    'type' => 'Smartphone',
+                    'is_active' => true,
+                    'volume_percent' => 20,
+                ],
+            ]);
+            $mock->shouldReceive('transferPlayback')->once()->with('thor-id');
+        });
+
+        $this->artisan('devices', ['--switch' => true])
+            ->expectsQuestion('🎵 Select a device to switch to:', 'thor-id')
+            ->expectsOutputToContain('Playback transferred')
+            ->assertExitCode(0);
+    });
+
+    it('transfers to a device id with --switch and --json', function (): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+        });
+        $this->mock(SpotifyPlayerService::class, function ($mock): void {
+            $mock->shouldReceive('getDevices')->once()->andReturn([
+                [
+                    'id' => 'abc123',
+                    'name' => 'Kitchen',
+                    'type' => 'Speaker',
+                    'is_active' => false,
+                    'volume_percent' => 30,
+                ],
+            ]);
+            $mock->shouldReceive('transferPlayback')->once()->with('abc123');
+        });
+
+        $this->artisan('devices --switch abc123 --json')
+            ->expectsOutputToContain('"device_id":"abc123"')
+            ->assertExitCode(0);
     });
 
     it('lists json without transferring', function (): void {
