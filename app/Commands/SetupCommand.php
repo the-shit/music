@@ -251,7 +251,7 @@ class SetupCommand extends Command
         $daemonSetupResult = $this->call('daemon:setup');
 
         if ($daemonSetupResult !== self::SUCCESS) {
-            warning('Daemon setup had issues — you can retry with: spotify daemon:setup');
+            warning('Daemon setup had issues — you can retry with: spotify daemon setup');
 
             return;
         }

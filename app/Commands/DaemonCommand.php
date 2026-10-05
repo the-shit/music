@@ -3,7 +3,10 @@
 namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
+use App\Services\Daemon\AudioBackend;
 use App\Services\Daemon\DeviceResolution;
+use App\Services\Daemon\HealthStatus;
+use App\Services\Daemon\UserUnit;
 use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyPlayerService;
 use LaravelZero\Framework\Commands\Command;
@@ -17,7 +20,7 @@ class DaemonCommand extends Command
 {
     use RequiresSpotifyConfig;
 
-    protected $signature = 'daemon {action : start, stop, status, health, install, or uninstall} {--name= : Device name for Spotify Connect (defaults to hostname)} {--audio-device= : Audio output device (e.g. "Wave Link Stream")} {--heal : Auto-heal when health check detects issues} {--json : Output health status as JSON}';
+    protected $signature = 'daemon {action? : setup, start, stop, status, health, install, or uninstall} {--name= : Device name for Spotify Connect (defaults to hostname)} {--audio-device= : Audio output device (e.g. "Wave Link Stream")} {--heal : Auto-heal when health check detects issues} {--json : Output health status as JSON}';
 
     protected $description = 'Manage the Spotify daemon for terminal playback';
 
@@ -32,6 +35,23 @@ class DaemonCommand extends Command
      */
     private const LOG_TAIL_LINES = 500;
 
+    /**
+     * Printed by `spotify daemon` with no action. One line each.
+     *
+     * @var array<string, string>
+     */
+    private const ACTIONS = [
+        'setup' => 'Install spotifyd and authenticate the local speaker',
+        'start' => 'Start the local Connect speaker',
+        'stop' => 'Stop the local Connect speaker',
+        'status' => 'Show whether the speaker is running',
+        'health' => 'Check the speaker and its PipeWire sink',
+        'install' => 'Enable the user service that keeps the speaker alive',
+        'uninstall' => 'Remove the user service',
+    ];
+
+    private string $home;
+
     private string $pidFile;
 
     private string $configDir;
@@ -42,7 +62,8 @@ class DaemonCommand extends Command
     {
         parent::__construct();
 
-        $this->configDir = ($_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp').'/.config/spotify-cli';
+        $this->home = $_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp';
+        $this->configDir = $this->home.'/.config/spotify-cli';
         $this->pidFile = $this->configDir.'/daemon.pid';
         $this->deviceResolution = new DeviceResolution;
     }
@@ -57,9 +78,25 @@ class DaemonCommand extends Command
         return $this->deviceResolution;
     }
 
-    private SpotifyAuthManager $auth;
+    private ?SpotifyAuthManager $auth = null;
 
-    private SpotifyPlayerService $player;
+    private ?SpotifyPlayerService $player = null;
+
+    /** @var null|callable(): bool */
+    private $connectPlayingProbe = null;
+
+    /** @var null|callable(): bool */
+    private $sinkInputProbe = null;
+
+    /**
+     * @param  null|callable(): bool  $connectPlaying
+     * @param  null|callable(): bool  $hasSinkInput
+     */
+    public function setAudioGraphProbes(?callable $connectPlaying, ?callable $hasSinkInput): void
+    {
+        $this->connectPlayingProbe = $connectPlaying;
+        $this->sinkInputProbe = $hasSinkInput;
+    }
 
     public function handle(SpotifyAuthManager $auth, SpotifyPlayerService $player): int
     {
@@ -67,7 +104,12 @@ class DaemonCommand extends Command
         $this->player = $player;
         $action = $this->argument('action');
 
+        if (! is_string($action) || $action === '') {
+            return $this->catalog();
+        }
+
         return match ($action) {
+            'setup' => $this->setup(),
             'start' => $this->start(),
             'stop' => $this->stop(),
             'status' => $this->status(),
@@ -76,6 +118,20 @@ class DaemonCommand extends Command
             'uninstall' => $this->uninstall(),
             default => $this->invalidAction($action),
         };
+    }
+
+    private function catalog(): int
+    {
+        foreach (self::ACTIONS as $name => $description) {
+            $this->line(str_pad($name, 10).$description);
+        }
+
+        return self::SUCCESS;
+    }
+
+    private function setup(): int
+    {
+        return $this->call('daemon:setup');
     }
 
     private function start(): int
@@ -111,6 +167,10 @@ class DaemonCommand extends Command
             return self::FAILURE;
         }
 
+        if ($this->userUnitInstalled()) {
+            return $this->startUserUnit();
+        }
+
         // Detect orphaned spotifyd processes using our config
         $configFile = $this->configDir.'/spotifyd.conf';
         $orphanPid = trim((string) shell_exec("pgrep -f 'spotifyd.*{$configFile}' 2>/dev/null | head -1"));
@@ -132,7 +192,8 @@ class DaemonCommand extends Command
             $this->newLine();
             info('To install:');
             info('  macOS: brew install spotifyd');
-            info('  Linux: apt install spotifyd');
+            info('  Linux: omarchy pkg add spotifyd');
+            info('         or: sudo pacman -S spotifyd');
             info('');
             info('Or use existing devices instead:');
             info('  spotify devices  # list available devices');
@@ -154,7 +215,7 @@ class DaemonCommand extends Command
             info('Troubleshooting:');
             info('1. Make sure spotifyd is properly authenticated');
             info('2. Check ~/.config/spotify-cli/spotifyd.log for errors');
-            info('3. Try running: spotifyd authenticate');
+            info('3. Try: spotify daemon setup');
             info('');
             info('Alternative: Use existing devices');
             info('  spotify devices');
@@ -189,6 +250,10 @@ class DaemonCommand extends Command
             info('To stop permanently: spotify daemon uninstall');
 
             return self::SUCCESS;
+        }
+
+        if ($this->userUnitInstalled()) {
+            return $this->stopUserUnit();
         }
 
         if (! $this->isDaemonRunning()) {
@@ -242,16 +307,22 @@ class DaemonCommand extends Command
             info('📋 LaunchAgent: installed'.($loaded ? ' (loaded)' : ' (not loaded)'));
         }
 
+        if ($this->userUnitInstalled()) {
+            $active = $this->systemctlUser('is-active '.UserUnit::NAME) === 'active';
+            info('📋 User unit: installed'.($active ? ' (active)' : ' (inactive)'));
+        }
+
         return self::SUCCESS;
     }
 
     private function install(): int
     {
+        if (PHP_OS_FAMILY === 'Linux') {
+            return $this->installLinux();
+        }
+
         if (PHP_OS_FAMILY !== 'Darwin') {
-            error('LaunchAgent is only supported on macOS');
-            info('On Linux, use systemd:');
-            info('  systemctl --user enable spotifyd');
-            info('  systemctl --user start spotifyd');
+            error('Daemon install supports Linux systemd and macOS LaunchAgent');
 
             return self::FAILURE;
         }
@@ -267,7 +338,7 @@ class DaemonCommand extends Command
 
         $spotifyd = $this->findSpotifyd();
         if (! $spotifyd) {
-            error('spotifyd not found — run: spotify daemon:setup');
+            error('spotifyd not found — run: spotify daemon setup');
 
             return self::FAILURE;
         }
@@ -300,8 +371,12 @@ class DaemonCommand extends Command
 
     private function uninstall(): int
     {
+        if (PHP_OS_FAMILY === 'Linux') {
+            return $this->uninstallLinux();
+        }
+
         if (PHP_OS_FAMILY !== 'Darwin') {
-            error('LaunchAgent is only supported on macOS');
+            error('Daemon install supports Linux systemd and macOS LaunchAgent');
 
             return self::FAILURE;
         }
@@ -330,7 +405,7 @@ class DaemonCommand extends Command
 
     private function findSpotifyd(): ?string
     {
-        $rodioPath = ($_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp').'/.local/bin/spotifyd-rodio';
+        $rodioPath = $this->home.'/.local/bin/spotifyd-rodio';
         if (file_exists($rodioPath)) {
             return $rodioPath;
         }
@@ -356,10 +431,13 @@ class DaemonCommand extends Command
         }
 
         $deviceName = $this->resolveDeviceName();
+        $existing = is_file($configFile) ? (string) file_get_contents($configFile) : '';
+        $helpOutput = '';
+        if (PHP_OS_FAMILY !== 'Linux' && ! str_contains($existing, 'backend = "pulseaudio"')) {
+            $helpOutput = (string) shell_exec(escapeshellarg($daemonPath).' --help 2>&1');
+        }
 
-        // Detect backend from binary capabilities
-        $helpOutput = (string) shell_exec("{$daemonPath} --help 2>&1");
-        $backend = str_contains($helpOutput, 'rodio') ? 'rodio' : 'portaudio';
+        $backend = AudioBackend::resolve(PHP_OS_FAMILY, $existing, $helpOutput);
 
         $config = "[global]\n".
                   "backend = \"{$backend}\"\n".
@@ -370,8 +448,9 @@ class DaemonCommand extends Command
                   "credentials_cache = \"{$this->configDir}/cache/oauth\"\n";
 
         $audioDevice = $this->option('audio-device');
-        if ($audioDevice) {
-            $config .= "device = \"{$audioDevice}\"\n";
+        $deviceLine = AudioBackend::deviceLine(PHP_OS_FAMILY, is_string($audioDevice) ? $audioDevice : null);
+        if ($deviceLine !== null) {
+            $config .= $deviceLine."\n";
         }
 
         file_put_contents($configFile, $config);
@@ -573,6 +652,10 @@ XML;
     {
         try {
 
+            if (! $this->auth instanceof SpotifyAuthManager || ! $this->player instanceof SpotifyPlayerService) {
+                return;
+            }
+
             if (! $this->auth->isConfigured()) {
                 return;
             }
@@ -637,6 +720,10 @@ XML;
             note("Cache size: {$diagnosis['cache_size_mb']} MB");
         }
 
+        if ($diagnosis['playing_without_sink']) {
+            warning('Connect says this device is playing, but spotifyd has no sink-input');
+        }
+
         if ($diagnosis['status'] !== 'healthy' && $this->option('heal')) {
             return $this->heal($diagnosis);
         }
@@ -651,7 +738,7 @@ XML;
     /**
      * Diagnose daemon health by checking process status and log errors.
      *
-     * @return array{status: string, pid: int|null, errors: array<string, int>, cache_size_mb: float|null, log_lines: int}
+     * @return array{status: string, pid: int|null, errors: array<string, int>, cache_size_mb: float|null, log_lines: int, playing_without_sink: bool}
      */
     public function diagnose(): array
     {
@@ -662,22 +749,15 @@ XML;
         $errors = $this->scanLogErrors($logFile);
         $totalErrors = array_sum($errors);
         $cacheSize = $this->getCacheSizeMb($cachePath);
-
-        // Determine status
-        if (! $pid) {
-            $status = 'dead';
-        } elseif ($totalErrors > 10 || $cacheSize > 500) {
-            $status = 'degraded';
-        } else {
-            $status = 'healthy';
-        }
+        $playingWithoutSink = $pid !== null && $this->playingWithoutSinkInput();
 
         return [
-            'status' => $status,
+            'status' => HealthStatus::resolve($pid, $totalErrors, $cacheSize, $playingWithoutSink),
             'pid' => $pid,
             'errors' => $errors,
             'cache_size_mb' => $cacheSize,
             'log_lines' => $this->countLogLines($logFile),
+            'playing_without_sink' => $playingWithoutSink,
         ];
     }
 
@@ -697,6 +777,17 @@ XML;
     private function heal(array $diagnosis): int
     {
         info('Healing daemon...');
+
+        if (($diagnosis['playing_without_sink'] ?? false) === true) {
+            note('Connect is playing but spotifyd has no sink-input. Restarting so the stream comes back.');
+
+            return $this->restartSpeaker(
+                AudioBackend::logShowsDeviceNotAvailable($this->recentLog()),
+                is_int($diagnosis['pid'] ?? null) ? $diagnosis['pid'] : null,
+            );
+        }
+
+        $deviceUnavailable = AudioBackend::logShowsDeviceNotAvailable($this->recentLog());
 
         // 1. Clear audio cache (preserve auth directories and credentials)
         $cachePath = $this->configDir.'/cache';
@@ -750,42 +841,10 @@ XML;
         if ($diagnosis['pid']) {
             info('Restarting daemon...');
 
-            if ($this->isLaunchAgentLoaded()) {
-                shell_exec('launchctl stop '.self::LAUNCH_AGENT_LABEL.' 2>&1');
-                sleep(2);
-                shell_exec('launchctl start '.self::LAUNCH_AGENT_LABEL.' 2>&1');
-            } else {
-                posix_kill($diagnosis['pid'], SIGTERM);
-                sleep(2);
-
-                if (@posix_kill($diagnosis['pid'], 0)) {
-                    posix_kill($diagnosis['pid'], SIGKILL);
-                    sleep(1);
-                }
-
-                $spotifyd = $this->findSpotifyd();
-                if ($spotifyd) {
-                    $pid = $this->startSpotifyd($spotifyd);
-                    if ($pid) {
-                        $this->savePid($pid);
-                    }
-                }
-            }
-
-            // Verify restart
-            sleep(2);
-            if ($this->getDaemonPid()) {
-                info('Daemon restarted successfully');
-
-                $deviceName = $this->resolveDeviceName();
-                $this->transferPlaybackToDaemon($deviceName);
-
-                return self::SUCCESS;
-            }
-
-            error('Daemon failed to restart');
-
-            return self::FAILURE;
+            return $this->restartSpeaker(
+                $deviceUnavailable,
+                is_int($diagnosis['pid']) ? $diagnosis['pid'] : null,
+            );
         }
 
         // Daemon was dead — try starting fresh
@@ -803,8 +862,9 @@ XML;
             return [];
         }
 
+        // "context is not available" is a single-track WARN (no album context).
+        // Counting it marks every solo play degraded and heal restarts the speaker.
         $patterns = [
-            'context is not available' => 0,
             'out of range integral' => 0,
             'failed to handle request' => 0,
             'Invalid start position' => 0,
@@ -873,8 +933,271 @@ XML;
     private function invalidAction(string $action): int
     {
         error("Invalid action: {$action}");
-        info('Available actions: start, stop, status, health, install, uninstall');
+        info('Available actions: '.implode(', ', array_keys(self::ACTIONS)));
 
         return self::FAILURE;
+    }
+
+    private function installLinux(): int
+    {
+        $spotifyd = $this->findSpotifyd();
+        if (! $spotifyd) {
+            error('spotifyd not found — run: spotify daemon setup');
+
+            return self::FAILURE;
+        }
+
+        $this->noteDeviceUnavailable();
+        $this->writeSpotifydConfig($spotifyd);
+
+        $unit = new UserUnit;
+        $path = $unit->path($this->home);
+        $dir = dirname($path);
+        if (! is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        file_put_contents($path, $unit->contents($spotifyd));
+        info('Wrote '.$path);
+
+        if (! $this->enableAndStartUserUnit()) {
+            error('User unit was written but is not active');
+            info('Check: systemctl --user status '.UserUnit::NAME);
+
+            return self::FAILURE;
+        }
+
+        info('✅ User unit installed');
+        $deviceName = $this->resolveDeviceName();
+        info("📱 Daemon started as \"{$deviceName}\"");
+
+        return self::SUCCESS;
+    }
+
+    private function uninstallLinux(): int
+    {
+        $path = (new UserUnit)->path($this->home);
+        if (! is_file($path)) {
+            warning('User unit is not installed');
+
+            return self::SUCCESS;
+        }
+
+        $this->systemctlUser('disable --now '.UserUnit::NAME);
+        @unlink($path);
+        $this->systemctlUser('daemon-reload');
+        @unlink($this->pidFile);
+
+        info('✅ User unit removed');
+        info('Daemon will no longer start with the session');
+
+        return self::SUCCESS;
+    }
+
+    private function startUserUnit(): int
+    {
+        $spotifyd = $this->findSpotifyd();
+        if ($spotifyd) {
+            $this->noteDeviceUnavailable();
+            $this->writeSpotifydConfig($spotifyd);
+        }
+
+        $this->systemctlUser('start '.UserUnit::NAME);
+
+        if ($this->systemctlUser('is-active '.UserUnit::NAME) === 'active' || $this->getDaemonPid()) {
+            info('✅ Daemon started via user unit');
+            $this->transferPlaybackToDaemon($this->resolveDeviceName());
+
+            return self::SUCCESS;
+        }
+
+        error('User unit failed to start');
+        info('Check: systemctl --user status '.UserUnit::NAME);
+        info('Log: ~/.config/spotify-cli/spotifyd.log');
+
+        return self::FAILURE;
+    }
+
+    private function stopUserUnit(): int
+    {
+        $active = $this->systemctlUser('is-active '.UserUnit::NAME) === 'active';
+        if (! $active && ! $this->isDaemonRunning() && $this->getDaemonPid() === null) {
+            warning('Daemon is not running');
+
+            return self::SUCCESS;
+        }
+
+        $this->systemctlUser('stop '.UserUnit::NAME);
+        @unlink($this->pidFile);
+        info('✅ Daemon stopped');
+        info('The user unit stays installed. Remove it with: spotify daemon uninstall');
+
+        return self::SUCCESS;
+    }
+
+    private function userUnitInstalled(): bool
+    {
+        return is_file((new UserUnit)->path($this->home));
+    }
+
+    private function enableAndStartUserUnit(): bool
+    {
+        $this->systemctlUser('daemon-reload');
+        $this->systemctlUser('enable --now '.UserUnit::NAME);
+
+        return $this->systemctlUser('is-active '.UserUnit::NAME) === 'active';
+    }
+
+    private function systemctlUser(string $arguments): string
+    {
+        return trim((string) shell_exec('systemctl --user '.$arguments.' 2>/dev/null'));
+    }
+
+    /**
+     * @param  bool  $deviceUnavailable  Log already showed librespot could not open the card.
+     */
+    private function restartSpeaker(bool $deviceUnavailable, ?int $pid): int
+    {
+        $spotifyd = $this->findSpotifyd();
+        if ($spotifyd !== null && (PHP_OS_FAMILY === 'Linux' || $deviceUnavailable)) {
+            if ($deviceUnavailable) {
+                note('Audio device unavailable — rewriting backend to pulseaudio');
+            }
+            $this->writeSpotifydConfig($spotifyd);
+        }
+
+        if ($this->userUnitInstalled()) {
+            $this->systemctlUser('restart '.UserUnit::NAME);
+            if ($this->systemctlUser('is-active '.UserUnit::NAME) === 'active') {
+                info('Daemon restarted successfully');
+                $this->transferPlaybackToDaemon($this->resolveDeviceName());
+
+                return self::SUCCESS;
+            }
+
+            error('Daemon failed to restart');
+
+            return self::FAILURE;
+        }
+
+        if ($this->isLaunchAgentLoaded()) {
+            shell_exec('launchctl stop '.self::LAUNCH_AGENT_LABEL.' 2>&1');
+            sleep(2);
+            shell_exec('launchctl start '.self::LAUNCH_AGENT_LABEL.' 2>&1');
+        } elseif ($pid) {
+            posix_kill($pid, SIGTERM);
+            sleep(2);
+
+            if (@posix_kill($pid, 0)) {
+                posix_kill($pid, SIGKILL);
+                sleep(1);
+            }
+
+            if ($spotifyd) {
+                $newPid = $this->startSpotifyd($spotifyd);
+                if ($newPid) {
+                    $this->savePid($newPid);
+                }
+            }
+        } elseif ($spotifyd) {
+            $newPid = $this->startSpotifyd($spotifyd);
+            if ($newPid) {
+                $this->savePid($newPid);
+            }
+        }
+
+        sleep(2);
+        if ($this->getDaemonPid()) {
+            info('Daemon restarted successfully');
+            $this->transferPlaybackToDaemon($this->resolveDeviceName());
+
+            return self::SUCCESS;
+        }
+
+        error('Daemon failed to restart');
+
+        return self::FAILURE;
+    }
+
+    private function noteDeviceUnavailable(): void
+    {
+        if (AudioBackend::logShowsDeviceNotAvailable($this->recentLog())) {
+            note('Audio device unavailable — rewriting backend to pulseaudio');
+        }
+    }
+
+    private function recentLog(): string
+    {
+        $logFile = $this->configDir.'/spotifyd.log';
+        if (! is_file($logFile)) {
+            return '';
+        }
+
+        return (string) shell_exec('tail -n '.self::LOG_TAIL_LINES.' '.escapeshellarg($logFile).' 2>/dev/null');
+    }
+
+    private function playingWithoutSinkInput(): bool
+    {
+        if ($this->connectPlayingProbe === null && PHP_OS_FAMILY !== 'Linux') {
+            return false;
+        }
+
+        return $this->connectSaysThisDeviceIsPlaying() && ! $this->spotifydSinkInputPresent();
+    }
+
+    private function connectSaysThisDeviceIsPlaying(): bool
+    {
+        $probe = $this->connectPlayingProbe;
+        if ($probe !== null) {
+            return $probe();
+        }
+
+        if (! $this->auth instanceof SpotifyAuthManager || ! $this->player instanceof SpotifyPlayerService) {
+            return false;
+        }
+
+        try {
+            if (! $this->auth->isConfigured()) {
+                return false;
+            }
+
+            $playback = $this->player->getCurrentPlayback();
+            if (! is_array($playback) || ($playback['is_playing'] ?? false) !== true) {
+                return false;
+            }
+
+            $device = $playback['device'] ?? null;
+            $deviceName = is_array($device) ? ($device['name'] ?? null) : null;
+            if (! is_string($deviceName) || $deviceName === '') {
+                return false;
+            }
+
+            return $deviceName === $this->resolveDeviceName();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function spotifydSinkInputPresent(): bool
+    {
+        $probe = $this->sinkInputProbe;
+        if ($probe !== null) {
+            return $probe();
+        }
+
+        $dump = [];
+        $exitCode = 1;
+        exec('pactl list sink-inputs 2>/dev/null', $dump, $exitCode);
+        if ($exitCode !== 0) {
+            $dump = [];
+            exec('pactl list short sink-inputs 2>/dev/null', $dump, $exitCode);
+        }
+
+        // No pactl (or it cannot talk to the session) is not a missing stream.
+        if ($exitCode !== 0) {
+            return true;
+        }
+
+        return str_contains(strtolower(implode("\n", $dump)), 'spotifyd');
     }
 }
