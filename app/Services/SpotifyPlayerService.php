@@ -58,8 +58,7 @@ class SpotifyPlayerService
         }
 
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
-            ->put($this->baseUri.'me/player/play', [
-                'device_id' => $deviceId,
+            ->put($this->playbackPlayUrl($deviceId), [
                 'uris' => [$uri],
             ]));
 
@@ -93,10 +92,8 @@ class SpotifyPlayerService
             $deviceId = $device['id'];
         }
 
-        $body = $deviceId ? ['device_id' => $deviceId] : [];
-
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
-            ->put($this->baseUri.'me/player/play', $body));
+            ->put($this->playbackPlayUrl($deviceId)));
 
         if (! $response?->successful()) {
             $error = $response?->json();
@@ -392,6 +389,20 @@ class SpotifyPlayerService
     }
 
     /**
+     * Connect play/resume target device as a query param — never in the JSON body.
+     * Body `device_id` 404s/500s against spotifyd ("No active device" / "Server error").
+     */
+    private function playbackPlayUrl(?string $deviceId): string
+    {
+        $url = $this->baseUri.'me/player/play';
+        if ($deviceId) {
+            $url .= '?'.http_build_query(['device_id' => $deviceId]);
+        }
+
+        return $url;
+    }
+
+    /**
      * Play a playlist
      */
     public function playPlaylist(string $playlistId, ?string $deviceId = null): bool
@@ -403,8 +414,7 @@ class SpotifyPlayerService
         $device = $deviceId ?: $this->getActiveDevice()['id'] ?? null;
 
         $response = SpotifyRateLimit::guard(fn () => Http::withToken($this->auth->getAccessToken())
-            ->put($this->baseUri.'me/player/play', [
-                'device_id' => $device,
+            ->put($this->playbackPlayUrl($device), [
                 'context_uri' => "spotify:playlist:{$playlistId}",
             ]));
 

@@ -56,4 +56,21 @@ class Config
     {
         return $this->configDir.'/cache';
     }
+
+    public function configPath(): string
+    {
+        return $this->configFile;
+    }
+
+    public function oauthCredentialsPath(): string
+    {
+        return $this->cachePath().'/oauth/credentials.json';
+    }
+
+    public function hasOauthCredentials(): bool
+    {
+        $path = $this->oauthCredentialsPath();
+
+        return is_file($path) && filesize($path) > 0;
+    }
 }

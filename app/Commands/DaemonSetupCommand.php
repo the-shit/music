@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Services\Daemon\Config;
+use App\Services\Daemon\DeviceResolution;
+use App\Services\Daemon\Provision;
+use Illuminate\Support\Facades\Process;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\confirm;
-use function Laravel\Prompts\error;
-use function Laravel\Prompts\info;
-use function Laravel\Prompts\warning;
+use function Termwind\render;
+use function Termwind\renderUsing;
 
 class DaemonSetupCommand extends Command
 {
@@ -17,12 +20,24 @@ class DaemonSetupCommand extends Command
 
     protected $description = 'Set up the Spotify daemon with all dependencies';
 
+    private Provision $provision;
+
+    private Config $config;
+
+    private DeviceResolution $deviceResolution;
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->provision = new Provision;
+        $this->config = new Config;
+        $this->deviceResolution = new DeviceResolution;
+    }
+
     public function handle(): int
     {
         $this->banner();
-
-        info('This will set up the headless Spotify daemon for CLI playback.');
-        $this->newLine();
 
         if (($result = $this->checkDependencies()) !== null) {
             return $result;
@@ -32,7 +47,9 @@ class DaemonSetupCommand extends Command
             return $result;
         }
 
-        $this->startDaemon();
+        if (($result = $this->startDaemon()) !== null) {
+            return $result;
+        }
 
         $this->displaySuccess();
 
@@ -41,49 +58,40 @@ class DaemonSetupCommand extends Command
 
     private function banner(): void
     {
-        $this->newLine();
-        $this->line('  ╔═══════════════════════════════════════════╗');
-        $this->line('  ║     🎵 Spotify Daemon Setup               ║');
-        $this->line('  ╚═══════════════════════════════════════════╝');
-        $this->newLine();
+        $this->title('Spotify daemon setup');
+
+        renderUsing($this->output);
+        render('<div class="ml-1 mb-1 text-gray-400">Headless Connect speaker. No desktop app.</div>');
     }
 
     private function checkDependencies(): ?int
     {
-        info('📦 Checking dependencies...');
-        $this->newLine();
+        $soxOk = $this->task('Checking sox', function (): bool {
+            $sox = trim((string) shell_exec('which play 2>/dev/null'));
 
-        $issues = [];
+            return $sox !== '' && $sox !== '0';
+        });
 
-        // Check sox
-        $sox = trim((string) shell_exec('which play 2>/dev/null'));
-        if ($sox === '' || $sox === '0') {
-            warning('❌ sox not found (required for audio playback)');
-            $issues[] = 'sox';
-        } else {
-            info('✅ sox installed');
-        }
+        $spotifydOk = $this->task('Checking spotifyd', function (): bool {
+            return $this->provision->findSpotifyd() !== null;
+        });
 
-        // Check spotifyd
-        $spotifyd = trim((string) shell_exec('which spotifyd 2>/dev/null'));
-        if ($spotifyd === '' || $spotifyd === '0') {
-            warning('❌ spotifyd not found (required for Spotify Connect)');
-            $issues[] = 'spotifyd';
-        } else {
-            info('✅ spotifyd installed');
-        }
-
-        if ($issues === []) {
+        if ($soxOk && $spotifydOk) {
             return null;
         }
 
-        $this->newLine();
-        $install = confirm('Install missing dependencies now?', true);
+        $issues = [];
+        if (! $soxOk) {
+            $issues[] = 'sox';
+        }
+        if (! $spotifydOk) {
+            $issues[] = 'spotifyd';
+        }
 
-        if (! $install) {
-            error('Setup cancelled. Install dependencies manually:');
-            info('  macOS: brew install spotifyd sox');
-            info('  Linux: apt install spotifyd sox');
+        if (! confirm('Install missing dependencies now?', true)) {
+            $this->error('Setup cancelled. Install dependencies manually:');
+            $this->line('  macOS: brew install '.implode(' ', $issues));
+            $this->line('  Linux: apt install '.implode(' ', $issues));
 
             return self::FAILURE;
         }
@@ -100,95 +108,139 @@ class DaemonSetupCommand extends Command
         } elseif ($os === 'Linux') {
             $cmd = 'sudo apt install -y '.implode(' ', $issues);
         } else {
-            error("Unsupported OS: {$os}");
+            $this->error("Unsupported OS: {$os}");
 
             return self::FAILURE;
         }
 
-        info("Running: {$cmd}");
-        $this->newLine();
-
+        $this->info("Running: {$cmd}");
         passthru($cmd);
 
-        // Verify
-        foreach ($issues as $dep) {
-            if ($dep === 'sox') {
-                $check = trim((string) shell_exec('which play 2>/dev/null'));
-            } else {
-                $check = trim((string) shell_exec('which '.$dep.' 2>/dev/null'));
+        $ok = $this->task('Verifying dependencies', function () use ($issues): bool {
+            foreach ($issues as $dep) {
+                if ($dep === 'sox') {
+                    $check = trim((string) shell_exec('which play 2>/dev/null'));
+                    if ($check === '' || $check === '0') {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                if ($this->provision->findSpotifyd() === null) {
+                    return false;
+                }
             }
 
-            if ($check === '' || $check === '0') {
-                error("❌ Failed to install {$dep}");
+            return true;
+        });
 
-                return self::FAILURE;
-            }
+        if (! $ok) {
+            $this->error('Failed to install dependencies');
+
+            return self::FAILURE;
         }
-
-        info('✅ All dependencies installed');
 
         return null;
     }
 
     private function authenticateSpotifyd(): ?int
     {
-        $this->newLine();
-        info('🔐 Setting up Spotify authentication...');
-        $this->newLine();
-
-        $cachePath = ($_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp').'/.config/spotify-cli/cache';
+        $cachePath = $this->config->cachePath();
         if (! is_dir($cachePath)) {
             mkdir($cachePath, 0755, true);
         }
 
-        // Check if already authenticated
-        $credFile = $cachePath.'/credentials.json';
-        if (file_exists($credFile)) {
-            info('✅ Already authenticated with Spotify');
+        if ($this->config->hasOauthCredentials()) {
+            $this->task('Already authenticated with Spotify', fn (): bool => true);
 
             return null;
         }
 
-        warning('You will be asked to authenticate with Spotify in your browser.');
-        info('After authenticating, return here.');
-        $this->newLine();
+        $spotifyd = $this->provision->findSpotifyd();
+        if ($spotifyd === null) {
+            $this->error('Could not locate spotifyd binary');
 
-        $spotifyd = trim((string) shell_exec('which spotifyd')) ?: '/opt/homebrew/opt/spotifyd/bin/spotifyd';
-
-        passthru("{$spotifyd} authenticate --cache-path {$cachePath}");
-
-        if (file_exists($credFile)) {
-            info('✅ Spotify authentication successful!');
-
-            return null;
+            return self::FAILURE;
         }
 
-        error('❌ Authentication failed');
+        $this->info('A browser window will open. Approve Spotify, then come back.');
 
-        return self::FAILURE;
+        $ok = $this->task('Waiting for Spotify login', function () use ($spotifyd, $cachePath): bool {
+            return $this->waitForOauth($spotifyd, $cachePath);
+        });
+
+        if (! $ok) {
+            $this->error('Authentication failed');
+
+            return self::FAILURE;
+        }
+
+        return null;
     }
 
-    private function startDaemon(): void
+    private function waitForOauth(string $spotifyd, string $cachePath): bool
     {
-        $this->newLine();
-        info('🚀 Starting Spotify daemon...');
-        $this->newLine();
+        $command = [
+            $spotifyd,
+            'authenticate',
+            '--cache-path',
+            $cachePath,
+        ];
 
-        $this->call('daemon', ['action' => 'start']);
+        if ($this->config->exists()) {
+            $command[] = '--config-path';
+            $command[] = $this->config->configPath();
+        }
+
+        $process = Process::timeout(180)->start($command);
+        $oauthFile = $this->config->oauthCredentialsPath();
+
+        while ($process->running()) {
+            if (is_file($oauthFile) && filesize($oauthFile) > 0) {
+                $process->stop();
+
+                return true;
+            }
+
+            usleep(200000);
+        }
+
+        return is_file($oauthFile) && filesize($oauthFile) > 0;
+    }
+
+    private function startDaemon(): ?int
+    {
+        $name = $this->deviceResolution->resolveDaemonName();
+
+        $ok = $this->task("Starting daemon as {$name}", function () use ($name): bool {
+            return $this->callSilent('daemon', [
+                'action' => 'start',
+                '--name' => $name,
+            ]) === self::SUCCESS;
+        });
+
+        if (! $ok) {
+            $this->error('Daemon failed to start. Check ~/.config/spotify-cli/spotifyd.log');
+
+            return self::FAILURE;
+        }
+
+        return null;
     }
 
     private function displaySuccess(): void
     {
-        $this->newLine();
-        $this->line('  ╔═══════════════════════════════════════════╗');
-        $this->line('  ║     ✅ Setup Complete!                    ║');
-        $this->line('  ╚═══════════════════════════════════════════╝');
-        $this->newLine();
+        $name = $this->deviceResolution->resolveDaemonName();
 
-        info('Usage:');
-        info('  spotify daemon start --name="My Device"');
-        info('  spotify play "song name" --device="My Device"');
-        info('  spotify daemon stop');
-        $this->newLine();
+        renderUsing($this->output);
+        render(<<<HTML
+<div class="mt-1">
+    <div class="px-1 bg-green-600 text-white">Setup complete</div>
+    <div class="ml-1 mt-1 text-gray-400">spotify daemon start --name="{$name}"</div>
+    <div class="ml-1 text-gray-400">spotify play "a song" --device="{$name}"</div>
+    <div class="ml-1 text-gray-400">spotify daemon stop</div>
+</div>
+HTML);
     }
 }

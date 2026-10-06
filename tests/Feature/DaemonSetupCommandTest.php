@@ -3,6 +3,7 @@
 use App\Commands\DaemonSetupCommand;
 use Illuminate\Console\OutputStyle;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Process;
 use Laravel\Prompts\Prompt;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\BufferedOutput;
@@ -64,7 +65,7 @@ describe('DaemonSetupCommand', function (): void {
             $method->setAccessible(true);
             $method->invoke($command);
 
-            expect($output->fetch())->toContain('Spotify Daemon Setup');
+            expect($output->fetch())->toContain('Spotify daemon setup');
         });
 
     });
@@ -87,7 +88,7 @@ describe('DaemonSetupCommand', function (): void {
             $method->invoke($command);
 
             $text = $output->fetch();
-            expect($text)->toContain('Setup Complete');
+            expect($text)->toContain('Setup complete');
             expect($text)->toContain('spotify daemon start');
             expect($text)->toContain('spotify daemon stop');
         });
@@ -98,8 +99,8 @@ describe('DaemonSetupCommand', function (): void {
 
         it('returns early and shows already-authenticated when credentials file exists', function (): void {
             $cachePath = $this->tempDir.'/.config/spotify-cli/cache';
-            mkdir($cachePath, 0755, true);
-            file_put_contents($cachePath.'/credentials.json', json_encode([
+            mkdir($cachePath.'/oauth', 0755, true);
+            file_put_contents($cachePath.'/oauth/credentials.json', json_encode([
                 'username' => 'testuser',
                 'auth_data' => 'sometoken',
             ]));
@@ -121,13 +122,38 @@ describe('DaemonSetupCommand', function (): void {
             expect($output->fetch())->toContain('Already authenticated with Spotify');
         });
 
+        it('does not treat cache/credentials.json as spotifyd oauth', function (): void {
+            Process::fake();
+
+            $cachePath = $this->tempDir.'/.config/spotify-cli/cache';
+            mkdir($cachePath, 0755, true);
+            file_put_contents($cachePath.'/credentials.json', json_encode([
+                'username' => 'testuser',
+                'auth_data' => 'sometoken',
+            ]));
+
+            $command = $this->app->make(DaemonSetupCommand::class);
+            $input = new ArrayInput([]);
+            $output = new BufferedOutput;
+            $command->setInput($input);
+            $command->setOutput(new OutputStyle($input, $output));
+
+            $reflection = new ReflectionClass($command);
+            $method = $reflection->getMethod('authenticateSpotifyd');
+            $method->setAccessible(true);
+            $method->invoke($command);
+
+            $text = $output->fetch();
+            expect($text)->not->toContain('Already authenticated with Spotify')
+                ->and($text)->toContain('Authentication failed');
+        });
+
         it('creates the cache directory when it does not exist', function (): void {
             $cachePath = $this->tempDir.'/.config/spotify-cli/cache';
             expect(is_dir($cachePath))->toBeFalse();
 
-            // Pre-create credentials.json so the method returns before passthru
-            mkdir($cachePath, 0755, true);
-            file_put_contents($cachePath.'/credentials.json', json_encode(['username' => 'test']));
+            mkdir($cachePath.'/oauth', 0755, true);
+            file_put_contents($cachePath.'/oauth/credentials.json', json_encode(['username' => 'test']));
 
             $command = $this->app->make(DaemonSetupCommand::class);
             $input = new ArrayInput([]);
