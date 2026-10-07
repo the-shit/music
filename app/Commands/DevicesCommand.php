@@ -4,6 +4,7 @@ namespace App\Commands;
 
 use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Services\SpotifyPlayerService;
+use App\Support\SpotifyRateLimit;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -27,6 +28,28 @@ class DevicesCommand extends Command
 
         try {
             $devices = $player->getDevices();
+
+            if ($devices === [] && ($reason = SpotifyRateLimit::describe()) !== null) {
+                // An empty list here means the request never went out (or got a 429),
+                // not that no speakers exist. Say so instead of "No devices found".
+                if ($this->option('json')) {
+                    $this->line((string) json_encode([
+                        'error' => 'rate_limited',
+                        'message' => $reason,
+                        'resumes_at' => SpotifyRateLimit::resumesAt(),
+                    ]));
+                } else {
+                    error('⏳ '.$reason);
+                }
+
+                return self::FAILURE;
+            }
+
+            if ($devices === [] && $this->option('json')) {
+                $this->line('[]');
+
+                return self::SUCCESS;
+            }
 
             if ($devices === []) {
                 warning('📱 No devices found');
