@@ -1,0 +1,74 @@
+#!/bin/bash
+# Super+M: show Music on its hidden workspace, or on the workspace Jordan last moved it to.
+set -euo pipefail
+STATE="${HOME}/.local/state/the-shit-music-workspace"
+TARGET="special:music"
+if [[ -f "$STATE" ]]; then
+  TARGET="$(tr -d '[:space:]' < "$STATE")"
+  [[ -z "$TARGET" ]] && TARGET="special:music"
+fi
+
+client_json() {
+  hyprctl clients -j | python3 -c '
+import json, sys
+for c in json.load(sys.stdin):
+    if c.get("class") == "the-shit.music":
+        ws = (c.get("workspace") or {}).get("name") or ""
+        print(c["address"])
+        print(ws)
+        raise SystemExit(0)
+raise SystemExit(1)
+'
+}
+
+if ! ADDR_WS="$(client_json)"; then
+  setsid -f "${HOME}/.local/bin/the-shit.music" >/dev/null 2>&1
+  ADDR_WS=""
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    sleep 0.2
+    if ADDR_WS="$(client_json)"; then
+      break
+    fi
+  done
+fi
+
+if [[ -z "${ADDR_WS}" ]]; then
+  exit 1
+fi
+ADDR="$(printf '%s\n' "$ADDR_WS" | sed -n '1p')"
+CURRENT="$(printf '%s\n' "$ADDR_WS" | sed -n '2p')"
+
+move_to() {
+  hyprctl dispatch "hl.dsp.window.move({ window = \"address:${ADDR}\", workspace = \"${1}\", follow = true })" >/dev/null
+}
+
+special_name() {
+  hyprctl monitors -j | python3 -c '
+import json, sys
+for m in json.load(sys.stdin):
+    if m.get("focused"):
+        print((m.get("specialWorkspace") or {}).get("name") or "")
+        raise SystemExit(0)
+print("")
+'
+}
+
+if [[ "$CURRENT" != "$TARGET" ]]; then
+  move_to "$TARGET"
+fi
+
+if [[ "$TARGET" == "special:music" ]]; then
+  SHOWN="$(special_name)"
+  ACTIVE="$(hyprctl activewindow -j | python3 -c 'import json,sys; print(json.load(sys.stdin).get("class") or "")' 2>/dev/null || true)"
+  if [[ "$SHOWN" == "special:music" && "$ACTIVE" == "the-shit.music" ]]; then
+    hyprctl dispatch 'hl.dsp.workspace.toggle_special("music")' >/dev/null
+  elif [[ "$SHOWN" != "special:music" ]]; then
+    hyprctl dispatch 'hl.dsp.workspace.toggle_special("music")' >/dev/null
+  fi
+else
+  if [[ "$(special_name)" == "special:music" ]]; then
+    hyprctl dispatch 'hl.dsp.workspace.toggle_special("music")' >/dev/null
+  fi
+fi
+
+hyprctl dispatch "hl.dsp.focus({ window = \"address:${ADDR}\" })" >/dev/null
