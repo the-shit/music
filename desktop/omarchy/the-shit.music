@@ -1,0 +1,1699 @@
+#!/usr/bin/env python3
+"""Tiled music window. Class the-shit.music. Chrome follows Omamail and the live theme."""
+
+import base64
+import faulthandler
+import json
+import os
+import subprocess
+import threading
+import time
+import traceback
+import urllib.error
+import urllib.parse
+import urllib.request
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Gdk", "4.0")
+gi.require_version("GdkWayland", "4.0")
+
+from gi.repository import Gdk, GdkWayland, GLib, Gtk, Pango
+import dbus
+from dbus.mainloop.glib import DBusGMainLoop
+
+DBusGMainLoop(set_as_default=True)
+LOG_PATH = os.path.expanduser("~/.local/state/the-shit-music.log")
+
+APP_ID = "the-shit.music"
+SPOTIFY = os.path.expanduser("~/.config/composer/vendor/bin/spotify")
+CONFIG = os.path.expanduser("~/.config/spotify-cli")
+FONT = '"JetBrainsMono Nerd Font", monospace'
+ZOOM_PATH = os.path.expanduser("~/.local/state/the-shit-music-zoom")
+ZOOM_MIN = 0.85
+ZOOM_MAX = 2.0
+ZOOM_STEP = 0.15
+
+FALLBACK = {
+    "background": "#140c18",
+    "dark_background": "#0c0810",
+    "foreground": "#f0e2d0",
+    "dark_foreground": "#8a7088",
+    "accent": "#e46592",
+    "selection": "#3a2438",
+    "muted": "#7a5e78",
+}
+
+
+def theme_colors():
+    colors = dict(FALLBACK)
+    path = os.path.expanduser("~/.local/state/omarchy/current/theme/colors.toml")
+    try:
+        lines = open(path, encoding="utf-8")
+    except OSError:
+        return colors
+    with lines:
+        for line in lines:
+            if "=" not in line or line.lstrip().startswith("#"):
+                continue
+            key, value = line.split("=", 1)
+            value = value.strip().strip('"')
+            if value.startswith("#") and len(value) >= 7:
+                colors[key.strip()] = value[:7]
+    return colors
+
+
+def rgba(hex_color, alpha):
+    red = int(hex_color[1:3], 16)
+    green = int(hex_color[3:5], 16)
+    blue = int(hex_color[5:7], 16)
+    return f"rgba({red},{green},{blue},{alpha})"
+
+
+def load_zoom():
+    try:
+        value = float(open(ZOOM_PATH, encoding="utf-8").read().strip())
+    except (OSError, ValueError):
+        return 1.25
+    return min(ZOOM_MAX, max(ZOOM_MIN, value))
+
+
+def px(size, scale):
+    return max(11, round(size * scale))
+
+
+def stylesheet(colors, scale):
+    bg = colors["background"]
+    ink = colors["foreground"]
+    dim = colors["muted"]
+    accent = colors["accent"]
+    rail = colors["dark_background"]
+    selected = colors["selection"]
+    return f"""
+    window {{ background: {bg}; }}
+    label {{ font-family: {FONT}; font-size: {px(16, scale)}px; color: {ink}; }}
+    .mark {{ color: {accent}; font-size: {px(22, scale)}px; }}
+    .wordmark {{ color: {ink}; font-size: {px(20, scale)}px; }}
+    .status {{ color: {dim}; font-size: {px(16, scale)}px; }}
+    .caption {{ color: {dim}; font-size: {px(14, scale)}px; }}
+    .track {{ color: {ink}; font-size: {px(28, scale)}px; }}
+    .song {{ color: {ink}; font-size: {px(18, scale)}px; }}
+    .artist {{ color: {dim}; font-size: {px(16, scale)}px; }}
+    .line {{
+      padding: 10px 8px;
+      border-bottom: 1px solid {rgba(ink, 0.14)};
+    }}
+    progressbar {{ font-size: 0; }}
+    progressbar trough {{
+      min-height: 8px;
+      background: {rgba(ink, 0.16)};
+      border-radius: 0;
+    }}
+    progressbar progress {{
+      background: {accent};
+      border-radius: 0;
+      min-height: 8px;
+    }}
+    .rule {{ background: {rgba(ink, 0.16)}; min-width: 1px; min-height: 1px; }}
+    .rail {{ background: {rail}; }}
+    entry {{
+      background: {rail};
+      color: {ink};
+      caret-color: {accent};
+      border: 1px solid {rgba(ink, 0.22)};
+      border-radius: 0;
+      padding: 6px 10px;
+      min-height: 0;
+      font-family: {FONT};
+      font-size: {px(16, scale)}px;
+    }}
+    entry placeholder {{ color: {dim}; }}
+    entry:focus {{ border-color: {accent}; }}
+    button {{
+      background: transparent;
+      color: {dim};
+      border: 1px solid {rgba(ink, 0.22)};
+      border-radius: 0;
+      padding: 6px 12px;
+      font-family: {FONT};
+      font-size: {px(15, scale)}px;
+    }}
+    button:hover {{ color: {ink}; border-color: {accent}; }}
+    button.rail {{
+      border: none;
+      padding: 8px 14px;
+      margin: 0;
+    }}
+    button.rail label {{ color: {dim}; }}
+    button.rail:hover {{ background: {rgba(ink, 0.06)}; }}
+    button.rail:hover label {{ color: {ink}; }}
+    button.rail.selected {{ background: {selected}; }}
+    button.rail.selected label {{ color: {ink}; }}
+    """.encode()
+
+
+def device_name():
+    path = os.path.expanduser("~/.config/spotify-cli/spotifyd.conf")
+    try:
+        lines = open(path, encoding="utf-8")
+    except OSError:
+        return "Thor"
+    with lines:
+        for line in lines:
+            if line.strip().startswith("device_name"):
+                return line.split("=", 1)[1].strip().strip('"') or "Thor"
+    return "Thor"
+
+
+def spawn(*args):
+    if not os.path.isfile(SPOTIFY):
+        return
+    subprocess.Popen(
+        [SPOTIFY, *args],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+def read_json(path):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_token(data):
+    path = os.path.join(CONFIG, "token.json")
+    temporary = path + ".tmp"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump({
+            "access_token": data.get("access_token"),
+            "refresh_token": data.get("refresh_token"),
+            "expires_at": data.get("expires_at"),
+        }, handle, indent=4)
+        handle.write("\n")
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+
+
+def access_token():
+    token = read_json(os.path.join(CONFIG, "token.json"))
+    expires = token.get("expires_at") or 0
+    if token.get("access_token") and expires > time.time() + 60:
+        return token["access_token"]
+    creds = read_json(os.path.join(CONFIG, "credentials.json"))
+    refresh = token.get("refresh_token")
+    client_id = creds.get("client_id")
+    client_secret = creds.get("client_secret")
+    if not refresh or not client_id or not client_secret:
+        return token.get("access_token")
+    basic = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+    request = urllib.request.Request(
+        "https://accounts.spotify.com/api/token",
+        data=urllib.parse.urlencode({
+            "grant_type": "refresh_token",
+            "refresh_token": refresh,
+        }).encode(),
+        headers={
+            "Authorization": f"Basic {basic}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            payload = json.load(response)
+    except (OSError, json.JSONDecodeError, urllib.error.URLError):
+        return token.get("access_token")
+    token["access_token"] = payload.get("access_token")
+    token["expires_at"] = int(time.time()) + int(payload.get("expires_in") or 3600)
+    if payload.get("refresh_token"):
+        token["refresh_token"] = payload["refresh_token"]
+    if token.get("access_token"):
+        save_token(token)
+    return token.get("access_token")
+
+
+RATE_LIMIT = os.path.join(CONFIG, "rate-limit.json")
+
+
+def rate_limited():
+    # Shared with the PHP CLI (SpotifyRateLimit): one 429 pauses every client of this app.
+    return int(read_json(RATE_LIMIT).get("resumes_at") or 0) > time.time()
+
+
+def note_rate_limit(retry_after):
+    try:
+        seconds = max(1, int(retry_after or 60))
+    except (TypeError, ValueError):
+        seconds = 60
+    temporary = RATE_LIMIT + ".tmp"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        json.dump({"resumes_at": int(time.time()) + seconds}, handle)
+    os.replace(temporary, RATE_LIMIT)
+
+
+def api(method, url, token, body=None):
+    if rate_limited():
+        return None
+    data = b"" if body is None and method in {"POST", "PUT"} else None
+    if body is not None:
+        data = json.dumps(body).encode()
+    request = urllib.request.Request(
+        url,
+        data=data,
+        method=method,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            raw = response.read()
+    except urllib.error.HTTPError as exc:
+        if exc.code == 429:
+            note_rate_limit(exc.headers.get("Retry-After"))
+            return None
+        if exc.code == 401:
+            return None
+        raise
+    if not raw:
+        return {}
+    return json.loads(raw)
+
+
+def account_playlists():
+    token = access_token()
+    if not token:
+        return []
+    url = "https://api.spotify.com/v1/me/playlists?limit=50"
+    found = []
+    while url and len(found) < 200:
+        page = api("GET", url, token)
+        if page is None:
+            token = access_token()
+            page = api("GET", url, token) if token else None
+        if not page:
+            break
+        for item in page.get("items") or []:
+            if item and item.get("id") and item.get("name"):
+                found.append({
+                    "id": item["id"],
+                    "name": str(item["name"]),
+                    "uri": item.get("uri") or f"spotify:playlist:{item['id']}",
+                    "count": int((item.get("tracks") or {}).get("total") or 0),
+                })
+        url = page.get("next")
+    return found
+
+
+def playlist_tracks(playlist_id):
+    token = access_token()
+    if not token:
+        return []
+    url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks?limit=100"
+    rows = []
+    while url and len(rows) < 200:
+        page = api("GET", url, token) or {}
+        for item in page.get("items") or []:
+            track = item.get("track") or {}
+            uri = track.get("uri") or ""
+            if not uri.startswith("spotify:track:"):
+                continue
+            artists = track.get("artists") or []
+            rows.append({
+                "uri": uri,
+                "name": str(track.get("name") or "Track"),
+                "artist": str(artists[0].get("name")) if artists else "",
+            })
+        url = page.get("next")
+    return rows
+
+
+def add_to_playlist(playlist_id, uri):
+    token = access_token()
+    if not token:
+        return False
+    return api(
+        "POST",
+        f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
+        token,
+        {"uris": [uri]},
+    ) is not None
+
+
+def remove_from_playlist(playlist_id, uri):
+    token = access_token()
+    if not token:
+        return False
+    return api(
+        "DELETE",
+        f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
+        token,
+        {"tracks": [{"uri": uri}]},
+    ) is not None
+
+
+def thor_device(token):
+    devices = api("GET", "https://api.spotify.com/v1/me/player/devices", token) or {}
+    chosen = None
+    for device in devices.get("devices") or []:
+        if device.get("name") == device_name():
+            chosen = device
+            break
+    if chosen is None:
+        for device in devices.get("devices") or []:
+            if device.get("is_active"):
+                chosen = device
+                break
+    if not chosen:
+        return None, False
+    return chosen.get("id"), bool(chosen.get("is_active"))
+
+
+def start_on_thor(body):
+    token = access_token()
+    if not token:
+        return False
+    device_id, active = thor_device(token)
+    if device_id and not active:
+        api("PUT", "https://api.spotify.com/v1/me/player", token, {
+            "device_ids": [device_id],
+            "play": False,
+        })
+    url = "https://api.spotify.com/v1/me/player/play"
+    if device_id:
+        url += "?device_id=" + urllib.parse.quote(device_id)
+    return api("PUT", url, token, body) is not None
+
+
+def play_playlist(uri):
+    return start_on_thor({"context_uri": uri})
+
+
+def search_tracks(query):
+    token = access_token()
+    if not token:
+        return []
+    url = "https://api.spotify.com/v1/search?" + urllib.parse.urlencode({
+        "q": query,
+        "type": "track",
+        "limit": 5,
+    })
+    payload = api("GET", url, token) or {}
+    return (payload.get("tracks") or {}).get("items") or []
+
+
+def search_catalog(query):
+    token = access_token()
+    if not token:
+        return []
+    url = "https://api.spotify.com/v1/search?" + urllib.parse.urlencode({
+        "q": query,
+        "type": "track,artist,playlist",
+        "limit": 5,
+    })
+    payload = api("GET", url, token) or {}
+    rows = []
+    for track in (payload.get("tracks") or {}).get("items") or []:
+        artists = track.get("artists") or []
+        album = track.get("album") or {}
+        detail = " · ".join(part for part in (
+            artists[0].get("name") if artists else "",
+            album.get("name") or "",
+        ) if part)
+        rows.append({
+            "kind": "Track",
+            "name": str(track.get("name") or "Track"),
+            "detail": detail,
+            "uri": track.get("uri") or "",
+            "track": track,
+        })
+    for artist in (payload.get("artists") or {}).get("items") or []:
+        rows.append({
+            "kind": "Artist",
+            "name": str(artist.get("name") or "Artist"),
+            "detail": "Artist",
+            "uri": artist.get("uri") or "",
+            "artist_id": artist.get("id") or "",
+        })
+    for playlist in (payload.get("playlists") or {}).get("items") or []:
+        if not playlist or not playlist.get("uri"):
+            continue
+        count = (playlist.get("tracks") or {}).get("total")
+        detail = f"{count} songs" if isinstance(count, int) else "Playlist"
+        rows.append({
+            "kind": "Playlist",
+            "name": str(playlist.get("name") or "Playlist"),
+            "detail": detail,
+            "uri": playlist.get("uri") or "",
+        })
+    return rows
+
+
+def artist_top_track(artist_id):
+    token = access_token()
+    if not token or not artist_id:
+        return None
+    url = f"https://api.spotify.com/v1/artists/{artist_id}/top-tracks?market=US"
+    payload = api("GET", url, token) or {}
+    tracks = payload.get("tracks") or []
+    return tracks[0] if tracks else None
+
+
+def seek_to(ms):
+    token = access_token()
+    if not token:
+        return False
+    device_id, _active = thor_device(token)
+    url = "https://api.spotify.com/v1/me/player/seek?position_ms=" + str(max(0, int(ms)))
+    if device_id:
+        url += "&device_id=" + urllib.parse.quote(device_id)
+    return api("PUT", url, token) is not None
+
+
+def set_stream_volume(percent):
+    token = access_token()
+    if not token:
+        return False
+    device_id, _active = thor_device(token)
+    bounded = max(0, min(100, int(percent)))
+    url = "https://api.spotify.com/v1/me/player/volume?volume_percent=" + str(bounded)
+    if device_id:
+        url += "&device_id=" + urllib.parse.quote(device_id)
+    return api("PUT", url, token) is not None
+
+
+def clock(ms):
+    seconds = max(0, int(ms) // 1000)
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+def play_in_album(track):
+    uri = track.get("uri") or ""
+    album = (track.get("album") or {}).get("uri") or ""
+    if album.startswith("spotify:album:") and uri:
+        return start_on_thor({"context_uri": album, "offset": {"uri": uri}})
+    if uri:
+        return start_on_thor({"uris": [uri]})
+    return False
+
+
+def upcoming():
+    token = access_token()
+    if not token:
+        return []
+    payload = api("GET", "https://api.spotify.com/v1/me/player/queue", token) or {}
+    current = (payload.get("currently_playing") or {}).get("uri") or ""
+    seen = {current} if current else set()
+    rows = []
+    for item in payload.get("queue") or []:
+        uri = item.get("uri") or ""
+        if not uri or uri in seen or not uri.startswith("spotify:track:"):
+            continue
+        seen.add(uri)
+        artists = item.get("artists") or []
+        artist = artists[0].get("name") if artists else ""
+        label = item.get("name") or "Track"
+        if artist:
+            label = f"{label} — {artist}"
+        rows.append({"uri": uri, "label": label})
+        if len(rows) == 20:
+            break
+    return rows
+
+
+def enqueue(uri):
+    if not uri:
+        return "missing"
+    current_rows = upcoming()
+    token = access_token()
+    if not token:
+        return "missing"
+    player = api("GET", "https://api.spotify.com/v1/me/player", token) or {}
+    current = ((player.get("item") or {}).get("uri")) or ""
+    if uri == current or any(row["uri"] == uri for row in current_rows):
+        return "already"
+    device_id, _active = thor_device(token)
+    url = "https://api.spotify.com/v1/me/player/queue?uri=" + urllib.parse.quote(uri)
+    if device_id:
+        url += "&device_id=" + urllib.parse.quote(device_id)
+    api("POST", url, token)
+    return "added"
+
+
+def playing_context():
+    token = access_token()
+    if not token:
+        return ""
+    player = api("GET", "https://api.spotify.com/v1/me/player", token) or {}
+    context = player.get("context") or {}
+    return str(context.get("uri") or "")
+
+
+def note_failure():
+    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+    with open(LOG_PATH, "a", encoding="utf-8") as handle:
+        handle.write(time.strftime("%Y-%m-%d %H:%M:%S\n"))
+        traceback.print_exc(file=handle)
+
+
+def note_line(text):
+    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+    with open(LOG_PATH, "a", encoding="utf-8") as handle:
+        handle.write(time.strftime("%H:%M:%S ") + text + "\n")
+
+
+def spotify():
+    bus = dbus.SessionBus()
+    names = [name for name in bus.list_names() if name.startswith("org.mpris.MediaPlayer2.spotify")]
+    names.sort(key=lambda name: (0 if "spotifyd" in name else 1, name))
+    if not names:
+        return None, None
+    obj = bus.get_object(names[0], "/org/mpris/MediaPlayer2")
+    props = dbus.Interface(obj, "org.freedesktop.DBus.Properties")
+    player = dbus.Interface(obj, "org.mpris.MediaPlayer2.Player")
+    return props, player
+
+
+def meta_text(props):
+    empty = ("Nothing playing", "Thor", "", "Play", "Paused")
+    if props is None:
+        return empty
+    try:
+        metadata = props.Get("org.mpris.MediaPlayer2.Player", "Metadata")
+        status = str(props.Get("org.mpris.MediaPlayer2.Player", "PlaybackStatus"))
+    except dbus.DBusException:
+        return empty
+    title = str(metadata.get("xesam:title") or "Nothing playing")
+    artists = metadata.get("xesam:artist") or []
+    artist = str(artists[0]) if artists else device_name()
+    album = str(metadata.get("xesam:album") or "")
+    play = "Pause" if status == "Playing" else "Play"
+    state = "Playing" if status == "Playing" else "Paused"
+    return title, artist, album, play, state
+
+
+class Music:
+    def __init__(self):
+        self.title = None
+        self.artist = None
+        self.album = None
+        self.play = None
+        self.play_buttons = []
+        self.status = None
+        self.rails = {}
+        self.rail_box = None
+        self.selected = None
+        self.stack = None
+        self.track_box = None
+        self.playlist_title = None
+        self.playlist_meta = None
+        self.search = None
+        self.zoom_label = None
+        self.provider = None
+        self.colors = None
+        self.scale = 1.25
+        self.note = None
+        self.queue_box = None
+        self.art = None
+        self.art_url = ""
+        self.progress = None
+        self.next_label = None
+        self.results = []
+        self.result_index = 0
+        self.results_box = None
+        self.results_scroll = None
+        self.search_timer = 0
+        self.message_timer = 0
+        self.track_length_ms = 0
+        self.time_label = None
+        self.seek = None
+        self.volume = None
+        self.device_label = None
+        self.bar_art = None
+        self.bar_title = None
+        self.bar_artist = None
+        self.queue_button = None
+        self.add_button = None
+        self.rail_scroll = None
+        self.seen_workspace = None
+        self.hot_slots = []
+        self.hotkey_bar = None
+        self.viz = None
+        self.levels = [0.0] * 32
+        self.stop_audio = False
+        self.audio_proc = None
+        self.loop = GLib.MainLoop()
+
+    def run(self):
+        GLib.set_prgname(APP_ID)
+        colors = theme_colors()
+        self.colors = colors
+        self.scale = load_zoom()
+        provider = Gtk.CssProvider()
+        self.provider = provider
+        provider.load_from_data(stylesheet(colors, self.scale))
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
+
+        win = Gtk.Window(title="Music")
+        win.set_default_size(980, 720)
+
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        root.append(self.header())
+        self.results_scroll = Gtk.ScrolledWindow()
+        self.results_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.results_scroll.set_max_content_height(320)
+        self.results_scroll.set_propagate_natural_height(True)
+        self.results_scroll.set_visible(False)
+        self.results_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.results_scroll.set_child(self.results_box)
+        root.append(self.results_scroll)
+        rule = Gtk.Box(css_classes=["rule"])
+        rule.set_size_request(-1, 1)
+        root.append(rule)
+        middle = self.body()
+        middle.set_vexpand(True)
+        root.append(middle)
+        rule2 = Gtk.Box(css_classes=["rule"])
+        rule2.set_size_request(-1, 1)
+        root.append(rule2)
+        root.append(self.hotkey_strip())
+        root.append(self.player_bar())
+        win.set_child(root)
+
+        keys = Gtk.EventControllerKey()
+        keys.connect("key-pressed", self.on_window_key)
+        keys.connect("key-released", self.on_window_key_release)
+        win.add_controller(keys)
+        wheel = Gtk.EventControllerScroll.new(
+            Gtk.EventControllerScrollFlags.VERTICAL | Gtk.EventControllerScrollFlags.DISCRETE
+        )
+        wheel.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        wheel.connect("scroll", self.on_zoom_scroll)
+        win.add_controller(wheel)
+        win.connect("realize", self.on_realize)
+        win.connect("map", self.on_realize)
+        win.connect("close-request", self.on_close)
+        note_line("present")
+        win.present()
+        GLib.timeout_add(1000, self.remember_workspace)
+        GLib.idle_add(lambda: win.set_focus(None))
+        GLib.idle_add(self.load_playlists)
+        GLib.idle_add(self.paint_queue)
+        GLib.timeout_add(1000, self.refresh)
+        GLib.timeout_add(15000, self.paint_queue)
+        GLib.timeout_add(33, self.tick_viz)
+        threading.Thread(target=self.listen, daemon=True).start()
+        self.refresh()
+        self.loop.run()
+
+    def header(self):
+        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        bar.set_margin_start(14)
+        bar.set_margin_end(14)
+        bar.set_margin_top(10)
+        bar.set_margin_bottom(10)
+
+        mark = Gtk.Label(label="♪", css_classes=["mark"])
+        mark.set_valign(Gtk.Align.CENTER)
+        word = Gtk.Label(label="Music", css_classes=["wordmark"])
+        word.set_valign(Gtk.Align.CENTER)
+        bar.append(mark)
+        bar.append(word)
+
+        slot = Gtk.Box()
+        slot.set_hexpand(True)
+        slot.set_halign(Gtk.Align.CENTER)
+        slot.set_valign(Gtk.Align.CENTER)
+        search = Gtk.Entry()
+        self.search = search
+        search.set_placeholder_text("Search tracks, artists, playlists")
+        search.set_size_request(360, -1)
+        search.set_max_width_chars(36)
+        search.set_valign(Gtk.Align.CENTER)
+        search.connect("activate", self.on_search)
+        search.connect("changed", self.on_query_changed)
+        search_keys = Gtk.EventControllerKey()
+        search_keys.connect("key-pressed", self.on_search_key)
+        search.add_controller(search_keys)
+        self.queue_button = Gtk.Button(label="Queue")
+        self.queue_button.set_valign(Gtk.Align.CENTER)
+        self.queue_button.connect("clicked", lambda *_: self.queue_selected())
+        self.add_button = Gtk.Button(label="Add to playlist")
+        self.add_button.set_valign(Gtk.Align.CENTER)
+        self.add_button.connect("clicked", lambda *_: self.add_selected_to_playlist())
+        slot.set_spacing(8)
+        slot.append(search)
+        slot.append(self.queue_button)
+        slot.append(self.add_button)
+        bar.append(slot)
+
+        smaller = Gtk.Button(label="A−")
+        smaller.add_css_class("zoom")
+        smaller.set_valign(Gtk.Align.CENTER)
+        smaller.connect("clicked", lambda *_: self.bump_zoom(-1))
+        self.zoom_label = Gtk.Label(label=f"{round(self.scale * 100)}%", css_classes=["status"])
+        self.zoom_label.set_valign(Gtk.Align.CENTER)
+        self.zoom_label.set_width_chars(4)
+        larger = Gtk.Button(label="A+")
+        larger.add_css_class("zoom")
+        larger.set_valign(Gtk.Align.CENTER)
+        larger.connect("clicked", lambda *_: self.bump_zoom(1))
+        bar.append(smaller)
+        bar.append(self.zoom_label)
+        bar.append(larger)
+
+        self.status = Gtk.Label(label="Paused", css_classes=["status"])
+        self.status.set_valign(Gtk.Align.CENTER)
+        bar.append(self.status)
+        return bar
+
+    def player_bar(self):
+        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        bar.set_margin_start(14)
+        bar.set_margin_end(14)
+        bar.set_margin_top(8)
+        bar.set_margin_bottom(8)
+
+        self.bar_art = Gtk.Picture()
+        self.bar_art.set_size_request(64, 64)
+        self.bar_art.set_content_fit(Gtk.ContentFit.COVER)
+        bar.append(self.bar_art)
+
+        names = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        names.set_size_request(280, -1)
+        self.bar_title = Gtk.Label(label="Nothing playing", css_classes=["song"])
+        self.bar_title.set_halign(Gtk.Align.START)
+        self.bar_title.set_ellipsize(Pango.EllipsizeMode.END)
+        self.bar_artist = Gtk.Label(label="", css_classes=["artist"])
+        self.bar_artist.set_halign(Gtk.Align.START)
+        self.bar_artist.set_ellipsize(Pango.EllipsizeMode.END)
+        self.note = Gtk.Label(label="", css_classes=["caption"])
+        self.note.set_halign(Gtk.Align.START)
+        self.note.set_ellipsize(Pango.EllipsizeMode.END)
+        names.append(self.bar_title)
+        names.append(self.bar_artist)
+        names.append(self.note)
+        bar.append(names)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        actions.set_valign(Gtk.Align.CENTER)
+        for label, handler in (
+            ("Previous", self.on_previous),
+            ("Play", self.on_toggle),
+            ("Next", self.on_next),
+        ):
+            button = Gtk.Button(label=label)
+            button.connect("clicked", handler)
+            actions.append(button)
+            if label == "Play":
+                self.play_buttons.append(button)
+                self.play = button
+        bar.append(actions)
+
+        clock = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        clock.set_hexpand(True)
+        clock.set_valign(Gtk.Align.CENTER)
+        self.time_label = Gtk.Label(label="0:00 / 0:00", css_classes=["artist"])
+        self.time_label.set_halign(Gtk.Align.START)
+        self.seek = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 1000, 1)
+        self.seek.set_draw_value(False)
+        self.seek.set_hexpand(True)
+        self.seek.connect("change-value", self.on_seek)
+        clock.append(self.time_label)
+        clock.append(self.seek)
+        bar.append(clock)
+
+        volume_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        volume_box.set_valign(Gtk.Align.CENTER)
+        volume_box.set_size_request(140, -1)
+        volume_caption = Gtk.Label(label="Volume", css_classes=["caption"])
+        volume_caption.set_halign(Gtk.Align.START)
+        self.volume = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+        self.volume.set_draw_value(False)
+        self.volume.connect("change-value", self.on_volume)
+        volume_box.append(volume_caption)
+        volume_box.append(self.volume)
+        bar.append(volume_box)
+
+        self.device_label = Gtk.Label(label=f"Playing on {device_name()}", css_classes=["artist"])
+        self.device_label.set_valign(Gtk.Align.CENTER)
+        bar.append(self.device_label)
+        return bar
+
+    def hotkey_strip(self):
+        self.hotkey_bar = Gtk.FlowBox()
+        self.hotkey_bar.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.hotkey_bar.set_max_children_per_line(6)
+        self.hotkey_bar.set_column_spacing(16)
+        self.hotkey_bar.set_row_spacing(6)
+        self.hotkey_bar.set_margin_start(14)
+        self.hotkey_bar.set_margin_end(14)
+        self.hotkey_bar.set_margin_top(8)
+        self.hotkey_bar.set_margin_bottom(8)
+        self.hotkey_bar.set_visible(False)
+        return self.hotkey_bar
+
+    def paint_hotkeys(self):
+        if self.hotkey_bar is None:
+            return
+        self.clear_box(self.hotkey_bar)
+        chips = [(f"Alt+{number}", title) for number, title, _handler in self.hot_slots]
+        chips.extend([("Alt+←", "Previous"), ("Alt+→", "Next")])
+        for chord, title in chips:
+            chip = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            key = Gtk.Label(label=chord, css_classes=["mark"])
+            name = Gtk.Label(label=title, css_classes=["song"])
+            name.set_ellipsize(Pango.EllipsizeMode.END)
+            name.set_max_width_chars(22)
+            chip.append(key)
+            chip.append(name)
+            self.hotkey_bar.append(chip)
+
+    def set_hotkeys_visible(self, visible):
+        if self.hotkey_bar is None:
+            return
+        if visible:
+            self.paint_hotkeys()
+        self.hotkey_bar.set_visible(visible)
+
+    def activate_hot_slot(self, index):
+        if index < 0 or index >= len(self.hot_slots):
+            return
+        _number, _title, handler = self.hot_slots[index]
+        handler(None)
+
+    def body(self):
+        body = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        body.set_vexpand(True)
+
+        rail = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, css_classes=["rail"])
+        rail.set_size_request(320, -1)
+        rail.set_hexpand(False)
+        rail.set_margin_top(8)
+        self.rail_box = rail
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_child(rail)
+        scroll.set_size_request(int(260 * self.scale), -1)
+        self.rail_scroll = scroll
+        scroll.set_hexpand(False)
+        scroll.set_vexpand(True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.add_css_class("rail")
+        body.append(scroll)
+
+        split = Gtk.Box(css_classes=["rule"])
+        split.set_size_request(1, -1)
+        body.append(split)
+
+        self.stack = Gtk.Stack()
+        self.stack.set_hexpand(True)
+        self.stack.set_vexpand(True)
+        self.stack.add_named(self.playing_page(), "playing")
+        self.stack.add_named(self.playlist_page(), "playlist")
+        self.stack.set_visible_child_name("playing")
+        body.append(self.stack)
+        return body
+
+    def playing_page(self):
+        main = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        main.set_margin_top(24)
+        main.set_margin_bottom(18)
+        main.set_margin_start(28)
+        main.set_margin_end(28)
+        main.set_vexpand(True)
+        main.set_hexpand(True)
+
+        stage = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        stage.set_halign(Gtk.Align.CENTER)
+        stage.set_valign(Gtk.Align.CENTER)
+        stage.set_vexpand(True)
+        stage.set_size_request(640, -1)
+
+        self.art = Gtk.Picture()
+        self.art.set_size_request(560, 560)
+        self.art.set_hexpand(True)
+        self.art.set_vexpand(True)
+        self.art.set_can_shrink(True)
+        self.art.set_content_fit(Gtk.ContentFit.CONTAIN)
+        self.title = Gtk.Label(label="Nothing playing", css_classes=["track"])
+        self.title.set_halign(Gtk.Align.CENTER)
+        self.title.set_justify(Gtk.Justification.CENTER)
+        self.title.set_wrap(True)
+        self.title.set_max_width_chars(22)
+        self.artist = Gtk.Label(label="", css_classes=["song"])
+        self.artist.set_halign(Gtk.Align.CENTER)
+        self.album = Gtk.Label(label="", css_classes=["artist"])
+        self.album.set_halign(Gtk.Align.CENTER)
+        self.progress = Gtk.ProgressBar()
+        self.progress.set_hexpand(True)
+        self.progress.set_fraction(0)
+
+        actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        actions.set_halign(Gtk.Align.CENTER)
+        for label, handler in (
+            ("Previous", self.on_previous),
+            ("Play", self.on_toggle),
+            ("Next", self.on_next),
+        ):
+            button = Gtk.Button(label=label)
+            button.connect("clicked", handler)
+            actions.append(button)
+            if label == "Play":
+                self.play_buttons.append(button)
+                self.play = button
+
+        self.note = Gtk.Label(label="", css_classes=["artist"])
+        self.note.set_halign(Gtk.Align.CENTER)
+        self.next_label = Gtk.Label(label="", css_classes=["artist"])
+        self.next_label.set_halign(Gtk.Align.CENTER)
+        self.next_label.set_ellipsize(Pango.EllipsizeMode.END)
+        self.next_label.set_max_width_chars(48)
+
+        for widget in (self.art, self.title, self.artist, self.album, self.progress, actions, self.note, self.next_label):
+            stage.append(widget)
+        main.append(stage)
+
+        self.viz = Gtk.DrawingArea()
+        self.viz.set_hexpand(True)
+        self.viz.set_size_request(-1, 160)
+        self.viz.set_draw_func(self.draw_viz)
+        main.append(self.viz)
+        return main
+
+    def draw_viz(self, _area, ctx, width, height):
+        ink = (self.colors or FALLBACK)["accent"]
+        red = int(ink[1:3], 16) / 255
+        green = int(ink[3:5], 16) / 255
+        blue = int(ink[5:7], 16) / 255
+        levels = self.levels
+        count = len(levels) or 1
+        gap = 6
+        bar_w = max(2, (width - gap * (count + 1)) / count)
+        for index, level in enumerate(levels):
+            bar_h = max(3, min(1.0, level) * (height - 10))
+            ctx.set_source_rgba(red, green, blue, 0.35 + 0.65 * min(1.0, level))
+            ctx.rectangle(gap + index * (bar_w + gap), height - bar_h, bar_w, bar_h)
+            ctx.fill()
+
+    def tick_viz(self):
+        if self.viz is not None:
+            self.viz.queue_draw()
+        return True
+
+    def listen(self):
+        try:
+            import numpy as np
+        except ImportError:
+            note_line("no numpy, bars stay down")
+            return
+        while not self.stop_audio:
+            proc = None
+            try:
+                sink = subprocess.check_output(["pactl", "get-default-sink"], text=True).strip()
+                proc = subprocess.Popen(
+                    ["pw-cat", "-r", "--target", sink + ".monitor", "--format", "s16", "--rate", "44100", "--channels", "2", "-"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                )
+                self.audio_proc = proc
+                frame = 2048 * 2 * 2
+                window = np.hanning(2048).astype(np.float32)
+                while not self.stop_audio:
+                    data = b""
+                    while len(data) < frame and not self.stop_audio:
+                        chunk = proc.stdout.read(frame - len(data))
+                        if not chunk:
+                            break
+                        data += chunk
+                    if len(data) < frame:
+                        break
+                    samples = np.frombuffer(data, dtype=np.int16).astype(np.float32)
+                    samples = samples.reshape(-1, 2).mean(axis=1) * window
+                    spec = np.abs(np.fft.rfft(samples))
+                    edges = np.geomspace(2, max(3, len(spec) - 1), 33).astype(int)
+                    peaks = []
+                    for start, stop in zip(edges, edges[1:]):
+                        stop = max(int(stop), int(start) + 1)
+                        peaks.append(float(spec[start:stop].mean()))
+                    loud = max(peaks) or 1.0
+                    old = self.levels
+                    self.levels = [
+                        max(min(1.0, peak / loud), (old[index] if index < len(old) else 0) * 0.72)
+                        for index, peak in enumerate(peaks)
+                    ]
+            except Exception:
+                note_line("visual fell off the monitor, retrying")
+                time.sleep(1)
+            finally:
+                if proc is not None and proc.poll() is None:
+                    proc.kill()
+
+    def show_art(self, url):
+        if not url or url == self.art_url:
+            return
+        self.art_url = url
+
+        def fetch():
+            try:
+                request = urllib.request.Request(url, headers={"User-Agent": "the-shit.music"})
+                with urllib.request.urlopen(request, timeout=8) as response:
+                    data = response.read()
+                path = "/tmp/the-shit-music-art"
+                with open(path, "wb") as handle:
+                    handle.write(data)
+            except Exception:
+                return
+
+            def apply():
+                if url != self.art_url or self.art is None:
+                    return False
+                try:
+                    texture = Gdk.Texture.new_from_filename(path)
+                    self.art.set_paintable(texture)
+                    if self.bar_art is not None:
+                        self.bar_art.set_paintable(texture)
+                except Exception:
+                    note_failure()
+                return False
+
+            GLib.idle_add(apply)
+
+        threading.Thread(target=fetch, daemon=True).start()
+
+    def playlist_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        page.set_margin_top(18)
+        page.set_margin_start(18)
+        page.set_margin_end(18)
+        page.set_vexpand(True)
+        page.set_hexpand(True)
+        self.playlist_title = Gtk.Label(label="Playlist", css_classes=["track"])
+        self.playlist_title.set_halign(Gtk.Align.START)
+        self.playlist_title.set_wrap(True)
+        self.playlist_title.set_xalign(0)
+        self.playlist_meta = Gtk.Label(label="", css_classes=["artist"])
+        self.playlist_meta.set_halign(Gtk.Align.START)
+        play = Gtk.Button(label="Play")
+        play.set_halign(Gtk.Align.START)
+        play.connect("clicked", self.on_play_selected)
+        self.track_box = Gtk.FlowBox()
+        self.track_box.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.track_box.set_min_children_per_line(1)
+        self.track_box.set_max_children_per_line(3)
+        self.track_box.set_homogeneous(True)
+        self.track_box.set_column_spacing(24)
+        self.track_box.set_row_spacing(0)
+        self.track_box.set_hexpand(True)
+        self.track_box.set_vexpand(True)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_child(self.track_box)
+        scroll.set_vexpand(True)
+        scroll.set_hexpand(True)
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        page.append(self.playlist_title)
+        page.append(self.playlist_meta)
+        page.append(play)
+        page.append(scroll)
+        return page
+
+    def load_playlists(self):
+        try:
+            playlists = account_playlists()
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            playlists = []
+        if self.rail_box is None:
+            return False
+        while self.rail_box.get_first_child() is not None:
+            self.rail_box.remove(self.rail_box.get_first_child())
+        self.rails = {}
+        self.hot_slots = []
+        self.rail_button("playing", "Playing", "", self.show_playing)
+        if not playlists:
+            missing = Gtk.Label(label="No playlists", css_classes=["artist"])
+            missing.set_margin_start(14)
+            missing.set_halign(Gtk.Align.START)
+            self.rail_box.append(missing)
+            self.show_playing()
+            return False
+        for playlist in playlists:
+            songs = playlist["count"]
+            detail = f"{songs} song" if songs == 1 else f"{songs} songs"
+            self.rail_button(
+                playlist["uri"],
+                playlist["name"],
+                detail,
+                lambda _button, item=playlist: self.show_playlist(item),
+            )
+        self.show_playing()
+        self.name_add_button()
+        return False
+
+    def rail_button(self, key, title, detail, handler):
+        button = Gtk.Button(css_classes=["rail"])
+        lines = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+        name = Gtk.Label(label=title, css_classes=["song"])
+        name.set_xalign(0)
+        name.set_hexpand(True)
+        name.set_ellipsize(Pango.EllipsizeMode.END)
+        name.set_max_width_chars(36)
+        lines.append(name)
+        if detail:
+            meta = Gtk.Label(label=detail, css_classes=["caption"])
+            meta.set_xalign(0)
+            meta.set_ellipsize(Pango.EllipsizeMode.END)
+            lines.append(meta)
+        button.set_child(lines)
+        button.set_halign(Gtk.Align.FILL)
+        button.set_hexpand(True)
+        button.connect("clicked", handler)
+        self.rail_box.append(button)
+        self.rails[key] = button
+        if len(self.hot_slots) < 10:
+            number = "0" if len(self.hot_slots) == 9 else str(len(self.hot_slots) + 1)
+            self.hot_slots.append((number, title, handler))
+
+    def show_playing(self, *_args):
+        self.selected = None
+        self.mark_rail("playing")
+        if self.stack is not None:
+            self.stack.set_visible_child_name("playing")
+        self.name_add_button()
+
+    def show_playlist(self, playlist):
+        self.selected = playlist
+        self.mark_rail(playlist["uri"])
+        if self.playlist_title is not None:
+            self.playlist_title.set_label(playlist["name"])
+            songs = playlist["count"]
+            detail = f"{songs} song" if songs == 1 else f"{songs} songs"
+            self.playlist_meta.set_label(detail)
+        if self.stack is not None:
+            self.stack.set_visible_child_name("playlist")
+        self.name_add_button()
+        self.clear_box(self.track_box)
+        waiting = Gtk.Label(label="Loading songs", css_classes=["artist"])
+        waiting.set_halign(Gtk.Align.START)
+        self.track_box.append(waiting)
+        GLib.idle_add(self.fill_tracks, playlist)
+
+    def fill_tracks(self, playlist):
+        if self.selected is None or self.selected.get("uri") != playlist["uri"]:
+            return False
+        try:
+            rows = playlist_tracks(playlist["id"])
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            rows = []
+        if self.selected is None or self.selected.get("uri") != playlist["uri"]:
+            return False
+        self.clear_box(self.track_box)
+        if not rows:
+            empty = Gtk.Label(label="No songs", css_classes=["artist"])
+            empty.set_halign(Gtk.Align.START)
+            self.track_box.append(empty)
+            return False
+        for row in rows:
+            self.track_box.append(self.track_row(playlist, row))
+        return False
+
+    def track_row(self, playlist, row):
+        line = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8, css_classes=["line"])
+        line.set_hexpand(True)
+        text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        text.set_hexpand(True)
+        name = Gtk.Label(label=row["name"], css_classes=["song"])
+        name.set_xalign(0)
+        name.set_ellipsize(Pango.EllipsizeMode.END)
+        name.set_max_width_chars(42)
+        artist = Gtk.Label(label=row["artist"], css_classes=["artist"])
+        artist.set_xalign(0)
+        artist.set_ellipsize(Pango.EllipsizeMode.END)
+        text.append(name)
+        text.append(artist)
+        play = Gtk.Button(label="Play")
+        play.connect("clicked", lambda _button, item=row: self.on_play_track(playlist, item))
+        remove = Gtk.Button(label="Remove")
+        remove.connect("clicked", lambda _button, item=row: self.on_remove_track(playlist, item))
+        line.append(text)
+        line.append(play)
+        line.append(remove)
+        return line
+
+    def on_play_selected(self, _button):
+        if not self.selected:
+            return
+        try:
+            play_playlist(self.selected["uri"])
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            self.say("Couldn't start that playlist")
+            return
+        self.say(f"Playing {self.selected['name']}")
+
+    def on_play_track(self, playlist, row):
+        try:
+            start_on_thor({
+                "context_uri": playlist["uri"],
+                "offset": {"uri": row["uri"]},
+            })
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            self.say("Couldn't start that song")
+            return
+        self.say(f"Playing {row['name']}")
+
+    def on_remove_track(self, playlist, row):
+        try:
+            removed = remove_from_playlist(playlist["id"], row["uri"])
+        except urllib.error.HTTPError:
+            self.say("Can't change this playlist")
+            return
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            self.say("Couldn't remove that")
+            return
+        if not removed:
+            self.say("Couldn't remove that")
+            return
+        playlist["count"] = max(0, int(playlist.get("count") or 1) - 1)
+        if self.playlist_meta is not None and self.selected and self.selected.get("uri") == playlist["uri"]:
+            songs = playlist["count"]
+            detail = f"{songs} song" if songs == 1 else f"{songs} songs"
+            self.playlist_meta.set_label(detail)
+        self.fill_tracks(playlist)
+        self.say(f"Removed {row['name']}")
+
+    def mark_rail(self, uri):
+        for key, button in self.rails.items():
+            if key == uri:
+                button.add_css_class("selected")
+            else:
+                button.remove_css_class("selected")
+
+    def clear_box(self, box):
+        if box is None:
+            return
+        while box.get_first_child() is not None:
+            box.remove(box.get_first_child())
+
+    def name_add_button(self):
+        if self.add_button is None:
+            return
+        if self.selected:
+            self.add_button.set_label(f"Add to {self.selected['name']}")
+        else:
+            self.add_button.set_label("Add to playlist")
+
+    def on_query_changed(self, entry):
+        if self.search_timer:
+            GLib.source_remove(self.search_timer)
+            self.search_timer = 0
+        text = entry.get_text().strip()
+        if not text:
+            self.results = []
+            self.result_index = 0
+            self.paint_results()
+            return
+        self.search_timer = GLib.timeout_add(220, lambda query=text: self.run_search(query))
+
+    def run_search(self, query):
+        self.search_timer = 0
+        if self.search is None or self.search.get_text().strip() != query:
+            return False
+        try:
+            self.results = search_catalog(query)
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            self.results = []
+            self.say("Search failed")
+        self.result_index = 0
+        self.paint_results()
+        return False
+
+    def paint_results(self):
+        if self.results_box is None or self.results_scroll is None:
+            return
+        self.clear_box(self.results_box)
+        if not self.results:
+            self.results_scroll.set_visible(False)
+            return
+        self.results_scroll.set_visible(True)
+        for index, row in enumerate(self.results):
+            button = Gtk.Button(css_classes=["rail"])
+            if index == self.result_index:
+                button.add_css_class("selected")
+            label = Gtk.Label(label=f"{row['kind']}    {row['name']}    {row['detail']}")
+            label.set_xalign(0)
+            label.set_hexpand(True)
+            label.set_ellipsize(Pango.EllipsizeMode.END)
+            button.set_child(label)
+            button.set_halign(Gtk.Align.FILL)
+            button.connect("clicked", lambda _button, item=index: self.choose_result(item))
+            self.results_box.append(button)
+
+    def move_result(self, step):
+        if not self.results:
+            return
+        self.result_index = (self.result_index + step) % len(self.results)
+        self.paint_results()
+
+    def selected_result(self):
+        if not self.results:
+            return None
+        return self.results[min(self.result_index, len(self.results) - 1)]
+
+    def choose_result(self, index):
+        self.result_index = index
+        self.paint_results()
+        self.play_selected()
+
+    def play_selected(self):
+        row = self.selected_result()
+        if row is None:
+            self.say("Nothing matched")
+            return
+        try:
+            if row["kind"] == "Track":
+                play_in_album(row["track"])
+                album = (row["track"].get("album") or {}).get("name") or "the album"
+                self.say(f"Playing {row['name']} from {album}")
+            elif row["kind"] == "Playlist":
+                play_playlist(row["uri"])
+                self.say(f"Playing {row['name']}")
+            else:
+                track = artist_top_track(row.get("artist_id") or "")
+                if not track:
+                    self.say(f"No songs for {row['name']}")
+                    return
+                play_in_album(track)
+                self.say(f"Playing {track.get('name') or row['name']}")
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            self.say("Couldn't start that")
+            return
+        GLib.timeout_add(700, self.paint_queue)
+
+    def queue_selected(self):
+        row = self.selected_result()
+        if row is None or row["kind"] != "Track":
+            self.say("Queue a track")
+            return
+        try:
+            result = enqueue(row["uri"])
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            self.say("Couldn't queue that")
+            return
+        if result == "already":
+            self.say(f"{row['name']} is already queued")
+        elif result == "added":
+            self.say(f"Queued {row['name']}")
+        GLib.timeout_add(700, self.paint_queue)
+
+    def add_selected_to_playlist(self):
+        row = self.selected_result()
+        if row is None or row["kind"] != "Track":
+            self.say("Add a track")
+            return
+        if not self.selected:
+            self.say("Pick a playlist in the rail first")
+            return
+        try:
+            added = add_to_playlist(self.selected["id"], row["uri"])
+        except urllib.error.HTTPError:
+            self.say(f"Can't change {self.selected['name']}")
+            return
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            self.say("Couldn't add that")
+            return
+        if not added:
+            self.say("Couldn't add that")
+            return
+        self.selected["count"] = int(self.selected.get("count") or 0) + 1
+        if self.playlist_meta is not None:
+            songs = self.selected["count"]
+            noun = "song" if songs == 1 else "songs"
+            self.playlist_meta.set_label(f"{songs} {noun}")
+        if self.stack is not None and self.stack.get_visible_child_name() == "playlist":
+            self.fill_tracks(self.selected)
+        self.say(f"Added {row['name']} to {self.selected['name']}")
+
+    def on_search(self, _entry):
+        self.play_selected()
+
+    def on_search_key(self, _controller, keyval, _keycode, state):
+        if keyval == Gdk.KEY_Escape:
+            self.search.set_text("")
+            self.results = []
+            self.paint_results()
+            root = self.search.get_root()
+            if root is not None:
+                root.set_focus(None)
+            return True
+        if keyval == Gdk.KEY_Up:
+            self.move_result(-1)
+            return True
+        if keyval == Gdk.KEY_Down:
+            self.move_result(1)
+            return True
+        if keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and (
+            state & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK)
+        ):
+            self.queue_selected()
+            return True
+        return False
+
+    def search_focused(self):
+        return self.search is not None and self.search.has_focus()
+
+    def bump_zoom(self, direction):
+        self.set_zoom(self.scale + (ZOOM_STEP * direction))
+
+    def set_zoom(self, scale):
+        self.scale = min(ZOOM_MAX, max(ZOOM_MIN, scale))
+        if self.provider is not None and self.colors is not None:
+            self.provider.load_from_data(stylesheet(self.colors, self.scale))
+        if self.zoom_label is not None:
+            self.zoom_label.set_label(f"{round(self.scale * 100)}%")
+        if self.rail_scroll is not None:
+            self.rail_scroll.set_size_request(int(260 * self.scale), -1)
+        try:
+            os.makedirs(os.path.dirname(ZOOM_PATH), exist_ok=True)
+            with open(ZOOM_PATH, "w", encoding="utf-8") as handle:
+                handle.write(f"{self.scale:.2f}\n")
+        except OSError:
+            pass
+
+    def on_zoom_scroll(self, controller, _dx, dy):
+        state = controller.get_current_event_state()
+        if not (state & Gdk.ModifierType.CONTROL_MASK) or dy == 0:
+            return False
+        self.bump_zoom(-1 if dy > 0 else 1)
+        return True
+
+    def on_window_key_release(self, _controller, keyval, _keycode, _state):
+        if keyval in (Gdk.KEY_Alt_L, Gdk.KEY_Alt_R):
+            self.set_hotkeys_visible(False)
+        return False
+
+    def on_window_key(self, _controller, keyval, _keycode, state):
+        ctrl = bool(state & Gdk.ModifierType.CONTROL_MASK)
+        alt = bool(state & Gdk.ModifierType.ALT_MASK)
+        if keyval in (Gdk.KEY_Alt_L, Gdk.KEY_Alt_R):
+            self.set_hotkeys_visible(True)
+            return False
+        if alt and not ctrl:
+            number = None
+            if Gdk.KEY_1 <= keyval <= Gdk.KEY_9:
+                number = keyval - Gdk.KEY_1
+            elif keyval == Gdk.KEY_0:
+                number = 9
+            if number is not None:
+                self.activate_hot_slot(number)
+                return True
+        if ctrl and keyval in (Gdk.KEY_plus, Gdk.KEY_equal, Gdk.KEY_KP_Add):
+            self.bump_zoom(1)
+            return True
+        if ctrl and keyval in (Gdk.KEY_minus, Gdk.KEY_KP_Subtract):
+            self.bump_zoom(-1)
+            return True
+        if ctrl and keyval in (Gdk.KEY_0, Gdk.KEY_KP_0):
+            self.set_zoom(1.25)
+            return True
+        if self.search_focused():
+            return False
+        if keyval == Gdk.KEY_slash or (ctrl and keyval == Gdk.KEY_f):
+            if self.search is not None:
+                self.search.grab_focus()
+            return True
+        if keyval == Gdk.KEY_space:
+            self.on_toggle(None)
+            return True
+        if alt and keyval == Gdk.KEY_Left:
+            self.on_previous(None)
+            return True
+        if alt and keyval == Gdk.KEY_Right:
+            self.on_next(None)
+            return True
+        if keyval in (Gdk.KEY_q, Gdk.KEY_Q):
+            self.queue_selected()
+            return True
+        if keyval in (Gdk.KEY_a, Gdk.KEY_A):
+            self.add_selected_to_playlist()
+            return True
+        if keyval == Gdk.KEY_Escape:
+            if self.results:
+                self.results = []
+                self.paint_results()
+                if self.search is not None:
+                    self.search.set_text("")
+            elif self.stack is not None:
+                self.show_playing()
+            return True
+        return False
+
+    def say(self, text):
+        if self.note is None:
+            return
+        self.note.set_label(text)
+        if self.message_timer:
+            GLib.source_remove(self.message_timer)
+        def clear():
+            if self.note is not None and self.note.get_label() == text:
+                self.note.set_label("")
+            self.message_timer = 0
+            return False
+        self.message_timer = GLib.timeout_add(2500, clear)
+
+    def paint_queue(self):
+        try:
+            rows = upcoming()
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            return True
+        if self.next_label is not None:
+            self.next_label.set_label("Next   " + rows[0]["label"] if rows else "")
+        return True
+
+    def remember_workspace(self):
+        try:
+            clients = json.loads(subprocess.check_output(["hyprctl", "clients", "-j"], text=True))
+            active = json.loads(subprocess.check_output(["hyprctl", "activewindow", "-j"], text=True))
+        except (OSError, json.JSONDecodeError):
+            return True
+        workspace = ""
+        for client in clients:
+            if client.get("class") == "the-shit.music":
+                workspace = str((client.get("workspace") or {}).get("name") or "")
+                break
+        if not workspace:
+            return True
+        if self.seen_workspace is None:
+            self.seen_workspace = workspace
+            return True
+        if workspace != self.seen_workspace:
+            if (active or {}).get("class") == "the-shit.music":
+                path = os.path.expanduser("~/.local/state/the-shit-music-workspace")
+                try:
+                    os.makedirs(os.path.dirname(path), exist_ok=True)
+                    with open(path, "w", encoding="utf-8") as handle:
+                        handle.write(workspace + "\n")
+                    note_line(f"home {workspace}")
+                except OSError:
+                    pass
+            self.seen_workspace = workspace
+        return True
+
+    def on_close(self, _win):
+        note_line("close-request")
+        self.stop_audio = True
+        if self.audio_proc is not None and self.audio_proc.poll() is None:
+            self.audio_proc.kill()
+        self.loop.quit()
+        return False
+
+    def on_realize(self, win):
+        surface = win.get_native().get_surface()
+        try:
+            surface.set_application_id(APP_ID)
+        except Exception:
+            pass
+
+    def refresh(self):
+        try:
+            props, _player = spotify()
+            title, artist, album, play, state = meta_text(props)
+            if self.title is not None:
+                self.title.set_label(title)
+                self.artist.set_label(artist)
+                self.album.set_label(album)
+                for button in self.play_buttons:
+                    button.set_label(play)
+                self.status.set_label(state)
+            if self.bar_title is not None:
+                self.bar_title.set_label(title)
+                self.bar_artist.set_label(artist)
+            if props is not None:
+                metadata = props.Get("org.mpris.MediaPlayer2.Player", "Metadata")
+                length = int(metadata.get("mpris:length") or 0)
+                position = int(props.Get("org.mpris.MediaPlayer2.Player", "Position") or 0)
+                self.track_length_ms = length
+                fraction = min(1.0, position / length) if length else 0
+                if self.progress is not None:
+                    self.progress.set_fraction(fraction)
+                if self.seek is not None and not self.seek.has_focus():
+                    self.seek.set_value(fraction * 1000)
+                if self.time_label is not None:
+                    self.time_label.set_label(f"{clock(position)} / {clock(length)}")
+                self.show_art(str(metadata.get("mpris:artUrl") or ""))
+        except Exception:
+            note_failure()
+        return True
+
+    def on_seek(self, _scale, _scroll, value):
+        if self.track_length_ms:
+            try:
+                seek_to(self.track_length_ms * (float(value) / 1000))
+            except (OSError, urllib.error.URLError, json.JSONDecodeError):
+                self.say("Couldn't seek")
+        return False
+
+    def on_volume(self, _scale, _scroll, value):
+        try:
+            set_stream_volume(value)
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            self.say("Couldn't set volume")
+        return False
+
+    def on_previous(self, _button):
+        _props, player = spotify()
+        if player is not None:
+            player.Previous()
+
+    def on_next(self, _button):
+        _props, player = spotify()
+        if player is not None:
+            player.Next()
+
+    def on_toggle(self, _button):
+        _props, player = spotify()
+        if player is not None:
+            player.PlayPause()
+            GLib.timeout_add(200, self.refresh)
+
+
+def main():
+    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+    log = open(LOG_PATH, "a", encoding="utf-8")
+    faulthandler.enable(log, all_threads=True)
+    try:
+        Music().run()
+    except Exception:
+        note_failure()
+        raise
+
+
+if __name__ == "__main__":
+    main()
