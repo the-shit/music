@@ -29,7 +29,7 @@ class SpotifyPlayerService
         if (! $deviceId) {
             $device = $this->getActiveDevice();
             if (! $device) {
-                throw new Exception('No Spotify devices available. Open Spotify on any device.');
+                throw new Exception(SpotifyRateLimit::describe() ?? 'No Spotify devices available. Open Spotify on any device.');
             }
 
             // If device exists but not active, activate it
@@ -80,7 +80,7 @@ class SpotifyPlayerService
         if (! $deviceId) {
             $device = $this->getActiveDevice();
             if (! $device) {
-                throw new Exception('No Spotify devices available. Open Spotify on any device.');
+                throw new Exception(SpotifyRateLimit::describe() ?? 'No Spotify devices available. Open Spotify on any device.');
             }
 
             // If device exists but not active, activate it

@@ -6,6 +6,7 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\HandlesAuthErrors;
 use App\Services\SpotifyPlayerService;
+use App\Support\SpotifyRateLimit;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -28,7 +29,7 @@ class DevicesTool extends Tool
             $devices = $player->getDevices();
 
             if ($devices === []) {
-                return Response::text('No Spotify devices available. Open Spotify on any device.');
+                return Response::text(SpotifyRateLimit::describe() ?? 'No Spotify devices available. Open Spotify on any device.');
             }
 
             $lines = ['Available devices:'];

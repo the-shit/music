@@ -4,6 +4,7 @@ namespace App\Commands\Concerns;
 
 use App\Services\Daemon\Process;
 use App\Services\SpotifyPlayerService;
+use App\Support\SpotifyRateLimit;
 
 use function Laravel\Prompts\info;
 
@@ -41,7 +42,9 @@ trait ResolvesDevice
 
         // Connect often still lists the speaker after spotifyd is killed.
         // Missing from Connect OR process dead → one heal, then retry lookup.
-        if (! $match || ! $alive) {
+        // A 429 makes the device list come back empty; that says nothing about
+        // spotifyd, so don't restart a healthy speaker because of it.
+        if ((! $match || ! $alive) && ! (! $match && $alive && SpotifyRateLimit::active())) {
             $this->healLocalDaemon();
             $devices = $player->getDevices();
             $match = $this->findDevice($devices, $daemonName);
