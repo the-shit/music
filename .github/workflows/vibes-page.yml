@@ -32,7 +32,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # full history — the page is built from commit metadata
 
@@ -50,17 +50,17 @@ jobs:
       # Idempotently switches the Pages source to "GitHub Actions" if it isn't
       # already — no manual repo-settings toggle required.
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
         with:
           enablement: true
 
       # Publish the whole docs/ tree (index, commands, mcp, style + the freshly
       # generated vibes.html) so every existing page is preserved.
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

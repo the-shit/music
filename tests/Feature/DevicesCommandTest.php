@@ -2,6 +2,8 @@
 
 use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyPlayerService;
+use App\Support\SpotifyRateLimit;
+use Illuminate\Support\Facades\Config;
 
 describe('DevicesCommand', function (): void {
 
@@ -81,4 +83,46 @@ describe('DevicesCommand', function (): void {
             ->assertExitCode(1);
     });
 
+    describe('when Spotify rate-limits the app', function (): void {
+        beforeEach(function (): void {
+            $this->rateDir = sys_get_temp_dir().'/spotify-devices-429-'.uniqid();
+            mkdir($this->rateDir, 0755, true);
+            Config::set('spotify.token_path', $this->rateDir.'/token.json');
+
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
+                $mock->shouldReceive('isConfigured')->once()->andReturn(true);
+            });
+            $this->mock(SpotifyPlayerService::class, function ($mock): void {
+                $mock->shouldReceive('getDevices')->once()->andReturn([]);
+            });
+        });
+
+        afterEach(function (): void {
+            SpotifyRateLimit::clear();
+            @rmdir($this->rateDir);
+        });
+
+        it('reports the rate limit instead of "No devices found"', function (): void {
+            SpotifyRateLimit::hit('3600');
+
+            $this->artisan('devices')
+                ->expectsOutputToContain('rate-limiting this app (HTTP 429)')
+                ->doesntExpectOutputToContain('No devices found')
+                ->assertExitCode(1);
+        });
+
+        it('returns a JSON error with --json', function (): void {
+            SpotifyRateLimit::hit('3600');
+
+            $this->artisan('devices', ['--json' => true])
+                ->expectsOutputToContain('"error":"rate_limited"')
+                ->assertExitCode(1);
+        });
+
+        it('prints an empty JSON array when there really are no devices', function (): void {
+            $this->artisan('devices', ['--json' => true])
+                ->expectsOutput('[]')
+                ->assertExitCode(0);
+        });
+    });
 });

@@ -99,6 +99,27 @@ final class SpotifyRateLimit
     }
 
     /**
+     * Human-readable reason when the breaker is open, or null when it is not.
+     *
+     * WHY: callers turn a short-circuited request into a graceful empty (no
+     * devices, no playback). Without this the user sees "No devices found"
+     * while the real problem is a 429 with a Retry-After that can be hours.
+     */
+    public static function describe(): ?string
+    {
+        $resumesAt = self::resumesAt();
+
+        if ($resumesAt === null) {
+            return null;
+        }
+
+        return sprintf(
+            'Spotify is rate-limiting this app (HTTP 429) until %s. Device and playback calls are paused until then.',
+            date('Y-m-d H:i T', $resumesAt),
+        );
+    }
+
+    /**
      * Forget the deadline (used by tests; production expiry is automatic).
      */
     public static function clear(): void
