@@ -36,6 +36,7 @@ describe('DaemonSetupCommand', function (): void {
         it('has correct command name', function (): void {
             $command = $this->app->make(DaemonSetupCommand::class);
             expect($command->getName())->toBe('daemon:setup');
+            expect($command->isHidden())->toBeTrue();
         });
 
         it('has a description', function (): void {
@@ -96,8 +97,8 @@ describe('DaemonSetupCommand', function (): void {
 
     describe('authenticateSpotifyd internals', function (): void {
 
-        it('returns early and shows already-authenticated when credentials file exists', function (): void {
-            $cachePath = $this->tempDir.'/.config/spotify-cli/cache';
+        it('returns early and shows already-authenticated when oauth credentials exist', function (): void {
+            $cachePath = $this->tempDir.'/.config/spotify-cli/cache/oauth';
             mkdir($cachePath, 0755, true);
             file_put_contents($cachePath.'/credentials.json', json_encode([
                 'username' => 'testuser',
@@ -125,9 +126,8 @@ describe('DaemonSetupCommand', function (): void {
             $cachePath = $this->tempDir.'/.config/spotify-cli/cache';
             expect(is_dir($cachePath))->toBeFalse();
 
-            // Pre-create credentials.json so the method returns before passthru
-            mkdir($cachePath, 0755, true);
-            file_put_contents($cachePath.'/credentials.json', json_encode(['username' => 'test']));
+            mkdir($cachePath.'/oauth', 0755, true);
+            file_put_contents($cachePath.'/oauth/credentials.json', json_encode(['username' => 'test']));
 
             $command = $this->app->make(DaemonSetupCommand::class);
             $input = new ArrayInput([]);
@@ -143,34 +143,94 @@ describe('DaemonSetupCommand', function (): void {
             expect(is_dir($cachePath))->toBeTrue();
         });
 
+        it('does not treat a zeroconf leftover as authenticated', function (): void {
+            $cachePath = $this->tempDir.'/.config/spotify-cli/cache';
+            mkdir($cachePath.'/zeroconf', 0755, true);
+            file_put_contents($cachePath.'/zeroconf/credentials.json', json_encode(['username' => 'leftover']));
+            file_put_contents($cachePath.'/credentials.json', json_encode(['username' => 'old-cache']));
+
+            $binary = $this->tempDir.'/.local/bin/spotifyd-rodio';
+            mkdir(dirname($binary), 0755, true);
+            file_put_contents($binary, "#!/bin/sh\nexit 0\n");
+            chmod($binary, 0755);
+
+            $seen = null;
+            $command = $this->app->make(DaemonSetupCommand::class);
+            $command->setAuthenticateRunner(function (string $spotifyd, string $cache) use (&$seen): void {
+                $seen = [$spotifyd, $cache];
+            });
+
+            $input = new ArrayInput([]);
+            $output = new BufferedOutput;
+            $command->setInput($input);
+            $command->setOutput(new OutputStyle($input, $output));
+            Prompt::setOutput($output);
+
+            $reflection = new ReflectionClass($command);
+            $method = $reflection->getMethod('authenticateSpotifyd');
+            $method->setAccessible(true);
+            $result = $method->invoke($command);
+
+            $text = $output->fetch();
+            expect($text)->not->toContain('Already authenticated');
+            expect($text)->toContain('Authentication failed');
+            expect($result)->toBe(1);
+            expect($command->hasOauthCredentials())->toBeFalse();
+            expect($command->oauthCredentialsPath())->toEndWith('/cache/oauth/credentials.json');
+            expect($command->oauthCredentialsPath())->not->toContain('zeroconf');
+            expect($seen)->toBe([$binary, $cachePath]);
+        });
+
+        it('succeeds only after oauth credentials are written', function (): void {
+            $cachePath = $this->tempDir.'/.config/spotify-cli/cache';
+            $binary = $this->tempDir.'/.local/bin/spotifyd-rodio';
+            mkdir(dirname($binary), 0755, true);
+            file_put_contents($binary, "#!/bin/sh\nexit 0\n");
+            chmod($binary, 0755);
+
+            $command = $this->app->make(DaemonSetupCommand::class);
+            $command->setAuthenticateRunner(function (string $spotifyd, string $cache) use ($binary, $cachePath): void {
+                expect($spotifyd)->toBe($binary);
+                expect($cache)->toBe($cachePath);
+                mkdir($cache.'/oauth', 0755, true);
+                file_put_contents($cache.'/oauth/credentials.json', '{"username":"speaker"}');
+            });
+
+            $input = new ArrayInput([]);
+            $output = new BufferedOutput;
+            $command->setInput($input);
+            $command->setOutput(new OutputStyle($input, $output));
+            Prompt::setOutput($output);
+
+            $reflection = new ReflectionClass($command);
+            $method = $reflection->getMethod('authenticateSpotifyd');
+            $method->setAccessible(true);
+            $result = $method->invoke($command);
+
+            expect($result)->toBeNull();
+            expect($output->fetch())->toContain('Spotify authentication successful');
+            expect($command->hasOauthCredentials())->toBeTrue();
+        });
+
     });
 
-    describe('installDependencies internals', function (): void {
+    describe('linux package path', function (): void {
 
-        it('builds correct brew install command on macOS', function (): void {
-            if (PHP_OS_FAMILY !== 'Darwin') {
-                expect(true)->toBeTrue(); // Skip on non-macOS
+        it('points at pacman or omarchy and never apt', function (): void {
+            $spotifyd = trim((string) shell_exec('which spotifyd 2>/dev/null'));
+            $sox = trim((string) shell_exec('which play 2>/dev/null'));
+            if (($spotifyd !== '' && $spotifyd !== '0') && ($sox !== '' && $sox !== '0')) {
+                expect(true)->toBeTrue();
 
                 return;
             }
 
-            // Test that the OS detection logic produces the right command
-            $os = PHP_OS_FAMILY;
-            $issues = ['spotifyd', 'sox'];
-
-            $cmd = match ($os) {
-                'Darwin' => 'brew install '.implode(' ', $issues),
-                'Linux' => 'sudo apt install -y '.implode(' ', $issues),
-                default => null,
-            };
-
-            expect($cmd)->toBe('brew install spotifyd sox');
-        });
-
-        it('builds correct apt install command on Linux', function (): void {
-            $issues = ['spotifyd', 'sox'];
-            $cmd = 'sudo apt install -y '.implode(' ', $issues);
-            expect($cmd)->toBe('sudo apt install -y spotifyd sox');
+            $this->artisan('daemon', ['action' => 'setup'])
+                ->expectsConfirmation('Install missing dependencies now?', 'no')
+                ->expectsOutputToContain('omarchy pkg add')
+                ->expectsOutputToContain('pacman -S')
+                ->doesntExpectOutputToContain('apt install')
+                ->assertExitCode(1);
         });
 
     });

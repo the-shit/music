@@ -5,6 +5,7 @@ namespace Tests;
 use App\Commands\DaemonCommand;
 use App\Services\SpotifyAuthManager;
 use App\Services\SpotifyPlayerService;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Foundation\Application;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -66,7 +67,7 @@ class DaemonHealSpyCommand extends DaemonCommand
         $spy = new self;
         $app->forgetInstance(DaemonCommand::class);
         $app->instance(DaemonCommand::class, $spy);
-        $app->make(\Illuminate\Contracts\Console\Kernel::class)->registerCommand($spy);
+        $app->make(Kernel::class)->registerCommand($spy);
 
         return $spy;
     }
