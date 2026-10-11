@@ -1,5 +1,6 @@
 <?php
 
+use App\Commands\DaemonSetupCommand;
 use App\Commands\EventEmitCommand;
 use App\Commands\ServeCommand;
 use App\Commands\WebhookTestCommand;
@@ -103,6 +104,7 @@ return [
         InspectorCommand::class,
         MakeAgentCommand::class,
         Laravel\Ai\Console\Commands\MakeToolCommand::class,
+        DaemonSetupCommand::class,
         ...$devHidden,
     ],
 
