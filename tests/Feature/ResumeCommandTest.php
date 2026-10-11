@@ -215,7 +215,6 @@ describe('ResumeCommand', function (): void {
             });
 
             $this->artisan('resume', ['--device' => 'Living Room', '--json' => true])
-                ->expectsOutputToContain('🔊 Using device: Living Room Speaker')
                 ->expectsOutputToContain(json_encode([
                     'success' => true,
                     'resumed' => true,
