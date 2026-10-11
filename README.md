@@ -113,8 +113,10 @@ Three optional background services, each managed via `launchd` with auto-restart
 
 **spotifyd** — headless Spotify Connect speaker:
 ```bash
-spotify daemon:setup && spotify daemon install
+spotify daemon setup && spotify daemon install
 ```
+
+On Arch, `install` enables a systemd user unit aimed at `~/.config/spotify-cli/spotifyd.conf`. It restarts with PipeWire. `spotify daemon` with no arguments lists the speaker verbs.
 
 **Swift Media Bridge** — Control Center + media keys:
 ```bash

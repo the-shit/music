@@ -1,9 +1,14 @@
 <?php
 
 use App\Commands\DaemonCommand;
+use App\Services\Daemon\UserUnit;
+use App\Services\SpotifyAuthManager;
+use App\Services\SpotifyPlayerService;
+use Illuminate\Console\OutputStyle;
 use Illuminate\Support\Facades\Config;
-use Symfony\Component\Console\Exception\RuntimeException;
+use Laravel\Prompts\Prompt;
 use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 
 describe('DaemonCommand', function (): void {
 
@@ -44,14 +49,14 @@ describe('DaemonCommand', function (): void {
         it('handles invalid action', function (): void {
             $this->artisan('daemon', ['action' => 'invalid'])
                 ->expectsOutputToContain('Invalid action: invalid')
-                ->expectsOutputToContain('Available actions: start, stop, status, health, install, uninstall')
+                ->expectsOutputToContain('Available actions: setup, start, stop, status, health, install, uninstall')
                 ->assertExitCode(1);
         });
 
         it('handles restart as invalid action', function (): void {
             $this->artisan('daemon', ['action' => 'restart'])
                 ->expectsOutputToContain('Invalid action: restart')
-                ->expectsOutputToContain('Available actions: start, stop, status, health, install, uninstall')
+                ->expectsOutputToContain('Available actions: setup, start, stop, status, health, install, uninstall')
                 ->assertExitCode(1);
         });
 
@@ -73,19 +78,30 @@ describe('DaemonCommand', function (): void {
         });
 
         it('routes to install action', function (): void {
-            if (PHP_OS_FAMILY !== 'Darwin') {
-                $this->artisan('daemon', ['action' => 'install'])
-                    ->assertExitCode(1);
-            } else {
-                // On macOS, exits 0 (success) or 1 (spotifyd missing)
+            if (PHP_OS_FAMILY === 'Darwin') {
                 $this->artisan('daemon', ['action' => 'install']);
                 expect(true)->toBeTrue();
+
+                return;
             }
+
+            $spotifyd = trim((string) shell_exec('which spotifyd 2>/dev/null'));
+            if ($spotifyd !== '' && $spotifyd !== '0') {
+                expect(true)->toBeTrue();
+
+                return;
+            }
+
+            $this->artisan('daemon', ['action' => 'install'])
+                ->expectsOutputToContain('spotify daemon setup')
+                ->doesntExpectOutputToContain('apt install')
+                ->assertExitCode(1);
         });
 
         it('routes to uninstall action', function (): void {
+            $expected = in_array(PHP_OS_FAMILY, ['Darwin', 'Linux'], true) ? 0 : 1;
             $this->artisan('daemon', ['action' => 'uninstall'])
-                ->assertExitCode(PHP_OS_FAMILY === 'Darwin' ? 0 : 1);
+                ->assertExitCode($expected);
         });
 
     });
@@ -165,9 +181,23 @@ describe('DaemonCommand', function (): void {
             expect($command->getDescription())->toBe('Manage the Spotify daemon for terminal playback');
         });
 
-        it('requires action argument', function (): void {
-            $this->expectException(RuntimeException::class);
-            $this->artisan('daemon');
+        it('lists daemon verbs when no action is given', function (): void {
+            $verbs = [
+                'setup' => 'Install spotifyd and authenticate the local speaker',
+                'start' => 'Start the local Connect speaker',
+                'stop' => 'Stop the local Connect speaker',
+                'status' => 'Show whether the speaker is running',
+                'health' => 'Check the speaker and its PipeWire sink',
+                'install' => 'Enable the user service that keeps the speaker alive',
+                'uninstall' => 'Remove the user service',
+            ];
+
+            $pending = $this->artisan('daemon');
+            foreach ($verbs as $name => $description) {
+                $pending->expectsOutputToContain(str_pad($name, 10).$description);
+            }
+
+            $pending->doesntExpectOutputToContain('Not enough arguments')->assertExitCode(0);
         });
 
         it('accepts start as valid action argument', function (): void {
@@ -308,15 +338,17 @@ describe('DaemonCommand', function (): void {
 
     describe('uninstall action', function (): void {
 
-        it('fails on non-macOS', function (): void {
+        it('reports when the platform service is not installed', function (): void {
             if (PHP_OS_FAMILY === 'Darwin') {
-                // On macOS with no plist, reports not installed
                 $this->artisan('daemon', ['action' => 'uninstall'])
                     ->expectsOutputToContain('LaunchAgent is not installed')
                     ->assertExitCode(0);
+            } elseif (PHP_OS_FAMILY === 'Linux') {
+                $this->artisan('daemon', ['action' => 'uninstall'])
+                    ->expectsOutputToContain('User unit is not installed')
+                    ->assertExitCode(0);
             } else {
                 $this->artisan('daemon', ['action' => 'uninstall'])
-                    ->expectsOutputToContain('LaunchAgent is only supported on macOS')
                     ->assertExitCode(1);
             }
         });
@@ -475,8 +507,191 @@ describe('DaemonCommand', function (): void {
         it('lists valid actions when invalid action provided', function (): void {
             $this->artisan('daemon', ['action' => 'unknown'])
                 ->expectsOutputToContain('Invalid action: unknown')
-                ->expectsOutputToContain('Available actions: start, stop, status, health, install, uninstall')
+                ->expectsOutputToContain('Available actions: setup, start, stop, status, health, install, uninstall')
                 ->assertExitCode(1);
+        });
+
+    });
+
+    describe('linux user unit', function (): void {
+
+        it('writes a pipewire user unit and enables it', function (): void {
+            if (PHP_OS_FAMILY !== 'Linux') {
+                expect(true)->toBeTrue();
+
+                return;
+            }
+
+            $binary = $this->tempDir.'/.local/bin/spotifyd-rodio';
+            mkdir(dirname($binary), 0755, true);
+            file_put_contents($binary, "#!/bin/sh\nexit 0\n");
+            chmod($binary, 0755);
+
+            $log = $this->tempDir.'/systemctl.log';
+            $binDir = $this->tempDir.'/bin';
+            mkdir($binDir, 0755, true);
+            file_put_contents($binDir.'/systemctl', <<<SH
+#!/bin/sh
+echo "\$@" >> {$log}
+if [ "\$2" = "is-active" ]; then
+  echo active
+  exit 0
+fi
+exit 0
+SH);
+            chmod($binDir.'/systemctl', 0755);
+
+            $command = $this->app->make(DaemonCommand::class);
+            $input = new ArrayInput(['action' => 'install']);
+            $input->bind($command->getDefinition());
+            $output = new BufferedOutput;
+            $command->setInput($input);
+            $command->setOutput(new OutputStyle($input, $output));
+            Prompt::setOutput($output);
+
+            $originalPath = getenv('PATH') ?: '';
+            putenv('PATH='.$binDir.':'.$originalPath);
+
+            try {
+                $code = $command->handle(
+                    $this->app->make(SpotifyAuthManager::class),
+                    $this->app->make(SpotifyPlayerService::class),
+                );
+            } finally {
+                putenv('PATH='.$originalPath);
+            }
+
+            expect($code)->toBe(0);
+            expect($output->fetch())->toContain('User unit installed');
+
+            $unitPath = $this->tempDir.'/.config/systemd/user/'.UserUnit::NAME;
+            $unit = (string) file_get_contents($unitPath);
+            expect($unit)->toContain($binary.' --config-path %h/.config/spotify-cli/spotifyd.conf --no-daemon --disable-discovery');
+            expect($unit)->toContain('After=pipewire.service pipewire-pulse.service');
+            expect($unit)->toContain('PartOf=pipewire.service pipewire-pulse.service');
+            expect($unit)->toContain('Restart=always');
+            expect($unit)->toContain('RestartSec=2');
+            expect($unit)->toContain('StartLimitBurst=5');
+            expect($unit)->toContain('StartLimitIntervalSec=60');
+            expect($unit)->not->toContain('hw:');
+
+            $systemctl = (string) file_get_contents($log);
+            expect($systemctl)->toContain('daemon-reload');
+            expect($systemctl)->toContain('enable --now '.UserUnit::NAME);
+            expect($systemctl)->toContain('is-active '.UserUnit::NAME);
+
+            $conf = (string) file_get_contents($this->configDir.'/spotifyd.conf');
+            expect($conf)->toContain('backend = "pulseaudio"');
+            expect($conf)->not->toContain('hw:');
+            expect($conf)->not->toContain('rodio');
+        });
+
+    });
+
+    describe('audio graph health', function (): void {
+
+        it('treats connect playing with no spotifyd sink-input as degraded', function (): void {
+            $command = $this->app->make(DaemonCommand::class);
+            $command->setReportedDaemonPid(4242);
+            $command->setAudioGraphProbes(fn (): bool => true, fn (): bool => false);
+
+            $diagnosis = $command->diagnose();
+
+            expect($diagnosis['status'])->toBe('degraded');
+            expect($diagnosis['playing_without_sink'])->toBeTrue();
+            expect($diagnosis['pid'])->toBe(4242);
+        });
+
+        it('stays healthy when the sink-input is present', function (): void {
+            $command = $this->app->make(DaemonCommand::class);
+            $command->setReportedDaemonPid(4242);
+            $command->setAudioGraphProbes(fn (): bool => true, fn (): bool => true);
+
+            $diagnosis = $command->diagnose();
+
+            expect($diagnosis['status'])->toBe('healthy');
+            expect($diagnosis['playing_without_sink'])->toBeFalse();
+        });
+
+        it('does not treat context-is-not-available as degraded', function (): void {
+            if (! is_dir($this->configDir)) {
+                mkdir($this->configDir, 0755, true);
+            }
+            file_put_contents(
+                $this->configDir.'/spotifyd.log',
+                str_repeat("[WARN] couldn't load context info because: context is not available. type: Default\n", 20)
+            );
+
+            $command = $this->app->make(DaemonCommand::class);
+            $command->setReportedDaemonPid(4242);
+            $command->setAudioGraphProbes(fn (): bool => false, fn (): bool => true);
+            $diagnosis = $command->diagnose();
+
+            expect($diagnosis['status'])->toBe('healthy');
+            expect($diagnosis['errors'])->not->toHaveKey('context is not available');
+        });
+
+        it('restarts the user unit when healing a missing sink-input', function (): void {
+            $log = $this->tempDir.'/systemctl.log';
+            $binDir = $this->tempDir.'/bin';
+            mkdir($binDir, 0755, true);
+            file_put_contents($binDir.'/systemctl', <<<SH
+#!/bin/sh
+echo "\$@" >> {$log}
+if [ "\$2" = "is-active" ]; then
+  echo active
+  exit 0
+fi
+exit 0
+SH);
+            chmod($binDir.'/systemctl', 0755);
+
+            $binary = $this->tempDir.'/.local/bin/spotifyd-rodio';
+            mkdir(dirname($binary), 0755, true);
+            file_put_contents($binary, "#!/bin/sh\nexit 0\n");
+            chmod($binary, 0755);
+
+            $unitDir = $this->tempDir.'/.config/systemd/user';
+            mkdir($unitDir, 0755, true);
+            file_put_contents($unitDir.'/'.UserUnit::NAME, "[Service]\nExecStart=/bin/true\n");
+
+            mkdir($this->configDir, 0755, true);
+            file_put_contents($this->configDir.'/spotifyd.conf', "backend = \"rodio\"\ndevice = \"hw:0,0\"\ndevice_name = \"Kitchen\"\n");
+            file_put_contents($this->configDir.'/spotifyd.log', "DeviceNotAvailable(\"hw:0,0\")\n");
+
+            $command = $this->app->make(DaemonCommand::class);
+            $input = new ArrayInput(['action' => 'health', '--heal' => true]);
+            $input->bind($command->getDefinition());
+            $output = new BufferedOutput;
+            $command->setInput($input);
+            $command->setOutput(new OutputStyle($input, $output));
+            Prompt::setOutput($output);
+
+            $originalPath = getenv('PATH') ?: '';
+            putenv('PATH='.$binDir.':'.$originalPath);
+
+            try {
+                $method = new ReflectionMethod($command, 'heal');
+                $method->setAccessible(true);
+                $result = $method->invoke($command, [
+                    'status' => 'degraded',
+                    'pid' => 999999,
+                    'errors' => [],
+                    'cache_size_mb' => 1.0,
+                    'log_lines' => 1,
+                    'playing_without_sink' => true,
+                ]);
+            } finally {
+                putenv('PATH='.$originalPath);
+            }
+
+            expect($result)->toBe(0);
+            expect((string) file_get_contents($log))->toContain('restart '.UserUnit::NAME);
+            $conf = (string) file_get_contents($this->configDir.'/spotifyd.conf');
+            expect($conf)->toContain('backend = "pulseaudio"');
+            expect($conf)->not->toContain('hw:');
+            expect($conf)->toContain('device_name = "Kitchen"');
+            expect($output->fetch())->toContain('rewriting backend to pulseaudio');
         });
 
     });

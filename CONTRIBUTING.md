@@ -77,7 +77,7 @@ cp .env.example .env          # fill in SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SEC
 ### Optional: daemon for terminal playback (macOS)
 
 ```bash
-./spotify daemon:setup        # installs spotifyd, writes config, starts daemon
+./spotify daemon setup        # installs spotifyd, authenticates, starts the speaker
 ./spotify daemon status       # verify: shows running
 ```
 
