@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Mcp\Concerns\HandlesAuthErrors;
 use App\Services\SpotifyDiscoveryService;
 use App\Services\SpotifyPlayerService;
+use App\Support\DeviceMatcher;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -27,6 +28,8 @@ class PlayTool extends Tool
             'queue' => $schema->boolean()
                 ->description('Add to queue instead of playing immediately')
                 ->default(false),
+            'device' => $schema->string()
+                ->description('Device name or ID to play on'),
         ];
     }
 
@@ -35,6 +38,8 @@ class PlayTool extends Tool
         return $this->withAuthHandling(function () use ($request, $discovery, $player): Response {
             $query = $request->get('query');
             $queue = $request->get('queue', false);
+            $deviceName = $request->get('device');
+            $deviceName = is_string($deviceName) && $deviceName !== '' ? $deviceName : null;
 
             $result = $discovery->search($query);
 
@@ -48,7 +53,16 @@ class PlayTool extends Tool
                 return Response::text("Queued: {$result['name']} by {$result['artist']}");
             }
 
-            $player->play($result['uri']);
+            $deviceId = null;
+            if ($deviceName !== null) {
+                $match = DeviceMatcher::find($player->getDevices(), $deviceName);
+                if ($match === null) {
+                    return Response::error("Device '{$deviceName}' not found");
+                }
+                $deviceId = $match['id'];
+            }
+
+            $player->play($result['uri'], $deviceId);
 
             return Response::text("Now playing: {$result['name']} by {$result['artist']}");
         });
