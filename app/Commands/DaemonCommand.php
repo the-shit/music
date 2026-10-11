@@ -88,6 +88,10 @@ class DaemonCommand extends Command
     /** @var null|callable(): bool */
     private $sinkInputProbe = null;
 
+    private bool $daemonPidIsStubbed = false;
+
+    private ?int $reportedDaemonPid = null;
+
     /**
      * @param  null|callable(): bool  $connectPlaying
      * @param  null|callable(): bool  $hasSinkInput
@@ -96,6 +100,16 @@ class DaemonCommand extends Command
     {
         $this->connectPlayingProbe = $connectPlaying;
         $this->sinkInputProbe = $hasSinkInput;
+    }
+
+    /**
+     * Report a spotifyd pid without a live process. Health tests use this so
+     * they do not depend on copying sleep or PHP just to satisfy `ps comm`.
+     */
+    public function setReportedDaemonPid(?int $pid): void
+    {
+        $this->daemonPidIsStubbed = true;
+        $this->reportedDaemonPid = $pid;
     }
 
     public function handle(SpotifyAuthManager $auth, SpotifyPlayerService $player): int
@@ -525,6 +539,10 @@ class DaemonCommand extends Command
 
     private function getDaemonPid(): ?int
     {
+        if ($this->daemonPidIsStubbed) {
+            return $this->reportedDaemonPid;
+        }
+
         // Check PID file first
         if (file_exists($this->pidFile)) {
             $pid = (int) file_get_contents($this->pidFile);

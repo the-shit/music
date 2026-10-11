@@ -591,58 +591,44 @@ SH);
     describe('audio graph health', function (): void {
 
         it('treats connect playing with no spotifyd sink-input as degraded', function (): void {
-            [$proc] = spawnDaemonSpotifyd($this->tempDir, $this->configDir, $this->pidFile);
+            $command = $this->app->make(DaemonCommand::class);
+            $command->setReportedDaemonPid(4242);
+            $command->setAudioGraphProbes(fn (): bool => true, fn (): bool => false);
 
-            try {
-                $command = $this->app->make(DaemonCommand::class);
-                $command->setAudioGraphProbes(fn (): bool => true, fn (): bool => false);
+            $diagnosis = $command->diagnose();
 
-                $diagnosis = $command->diagnose();
-
-                expect($diagnosis['status'])->toBe('degraded');
-                expect($diagnosis['playing_without_sink'])->toBeTrue();
-                expect($diagnosis['pid'])->not->toBeNull();
-            } finally {
-                proc_terminate($proc);
-                proc_close($proc);
-            }
+            expect($diagnosis['status'])->toBe('degraded');
+            expect($diagnosis['playing_without_sink'])->toBeTrue();
+            expect($diagnosis['pid'])->toBe(4242);
         });
 
         it('stays healthy when the sink-input is present', function (): void {
-            [$proc] = spawnDaemonSpotifyd($this->tempDir, $this->configDir, $this->pidFile);
+            $command = $this->app->make(DaemonCommand::class);
+            $command->setReportedDaemonPid(4242);
+            $command->setAudioGraphProbes(fn (): bool => true, fn (): bool => true);
 
-            try {
-                $command = $this->app->make(DaemonCommand::class);
-                $command->setAudioGraphProbes(fn (): bool => true, fn (): bool => true);
+            $diagnosis = $command->diagnose();
 
-                $diagnosis = $command->diagnose();
-
-                expect($diagnosis['status'])->toBe('healthy');
-                expect($diagnosis['playing_without_sink'])->toBeFalse();
-            } finally {
-                proc_terminate($proc);
-                proc_close($proc);
-            }
+            expect($diagnosis['status'])->toBe('healthy');
+            expect($diagnosis['playing_without_sink'])->toBeFalse();
         });
 
         it('does not treat context-is-not-available as degraded', function (): void {
-            [$proc] = spawnDaemonSpotifyd($this->tempDir, $this->configDir, $this->pidFile);
+            if (! is_dir($this->configDir)) {
+                mkdir($this->configDir, 0755, true);
+            }
             file_put_contents(
                 $this->configDir.'/spotifyd.log',
                 str_repeat("[WARN] couldn't load context info because: context is not available. type: Default\n", 20)
             );
 
-            try {
-                $command = $this->app->make(DaemonCommand::class);
-                $command->setAudioGraphProbes(fn (): bool => false, fn (): bool => true);
-                $diagnosis = $command->diagnose();
+            $command = $this->app->make(DaemonCommand::class);
+            $command->setReportedDaemonPid(4242);
+            $command->setAudioGraphProbes(fn (): bool => false, fn (): bool => true);
+            $diagnosis = $command->diagnose();
 
-                expect($diagnosis['status'])->toBe('healthy');
-                expect($diagnosis['errors'])->not->toHaveKey('context is not available');
-            } finally {
-                proc_terminate($proc);
-                proc_close($proc);
-            }
+            expect($diagnosis['status'])->toBe('healthy');
+            expect($diagnosis['errors'])->not->toHaveKey('context is not available');
         });
 
         it('restarts the user unit when healing a missing sink-input', function (): void {
@@ -711,111 +697,3 @@ SH);
     });
 
 });
-
-/**
- * A live process whose `ps -o comm=` starts with spotifyd.
- *
- * Copying /bin/sleep is not portable. BusyBox selects its applet from argv0, so a
- * copy named spotifyd exits immediately, and some images have no sleep binary at
- * all. A copied PHP binary sleeps under that name. /tmp may be noexec, so the
- * second location sits next to the suite.
- *
- * @return array{0: resource, 1: int}
- */
-function spawnDaemonSpotifyd(string $tempDir, string $configDir, string $pidFile): array
-{
-    $sources = [];
-    $sleep = daemonCoreutilsSleep();
-    if ($sleep !== null) {
-        $sources[] = ['path' => $sleep, 'php' => false];
-    }
-
-    $php = realpath(PHP_BINARY) ?: PHP_BINARY;
-    if (is_file($php)) {
-        $sources[] = ['path' => $php, 'php' => true];
-    }
-
-    $locations = [
-        $tempDir.'/spot-bin',
-        dirname(__DIR__, 2).'/tests/.spotifyd-bin',
-    ];
-
-    $last = 'no sleeper binary';
-
-    foreach ($locations as $binDir) {
-        foreach ($sources as $source) {
-            if (! is_dir($binDir) && ! mkdir($binDir, 0755, true) && ! is_dir($binDir)) {
-                $last = 'cannot create '.$binDir;
-
-                continue;
-            }
-
-            $binary = $binDir.'/spotifyd';
-            if (is_file($binary)) {
-                unlink($binary);
-            }
-
-            if (! @copy($source['path'], $binary)) {
-                $last = 'copy failed for '.$source['path'];
-
-                continue;
-            }
-
-            chmod($binary, 0755);
-
-            $args = $source['php']
-                ? [$binary, '-r', 'sleep(30);']
-                : [$binary, '30'];
-
-            $proc = @proc_open($args, [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);
-            if (! is_resource($proc)) {
-                $last = 'proc_open failed for '.$binary;
-                @unlink($binary);
-
-                continue;
-            }
-
-            usleep(150000);
-            $status = proc_get_status($proc);
-            $pid = (int) ($status['pid'] ?? 0);
-            $comm = $pid > 0 ? trim((string) shell_exec('ps -p '.$pid.' -o comm= 2>/dev/null')) : '';
-
-            if (($status['running'] ?? false) === true && str_starts_with(basename($comm), 'spotifyd')) {
-                if (! is_dir($configDir)) {
-                    mkdir($configDir, 0755, true);
-                }
-                file_put_contents($pidFile, (string) $pid);
-                @unlink($binary);
-                @rmdir($binDir);
-
-                return [$proc, $pid];
-            }
-
-            proc_terminate($proc);
-            proc_close($proc);
-            @unlink($binary);
-            @rmdir($binDir);
-            $last = 'comm=['.$comm.'] running='.((($status['running'] ?? false) === true) ? 'yes' : 'no');
-        }
-    }
-
-    throw new RuntimeException('Could not spawn fake spotifyd: '.$last);
-}
-
-function daemonCoreutilsSleep(): ?string
-{
-    foreach (['/bin/sleep', '/usr/bin/sleep'] as $path) {
-        if (! is_file($path)) {
-            continue;
-        }
-
-        $real = realpath($path) ?: $path;
-        if (str_contains(strtolower(basename($real)), 'busybox')) {
-            continue;
-        }
-
-        return $real;
-    }
-
-    return null;
-}
