@@ -23,6 +23,7 @@ function makeServices(bool $authenticated = true): array
         $mockAuth->shouldReceive('requireAuth')->andThrow(new Exception('Not authenticated. Run "spotify login" first.'));
         $mockAuth->shouldReceive('getAccessToken')->andReturn(null);
         $mockAuth->shouldReceive('isConfigured')->andReturn(false);
+        $mockAuth->shouldReceive('hasCredentials')->andReturn(false);
     }
 
     return [

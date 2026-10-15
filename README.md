@@ -26,6 +26,8 @@ omarchy plugin enable the-shit.music --section right
 
 [`the-shit/omarchy-music`](https://github.com/the-shit/omarchy-music). Requires this CLI on `PATH` plus `spotify login`. Stock `omarchy.media` stays.
 
+That bar plugin is the install path for Omarchy. Separately, this repo ships an optional **GTK tiled music window** under [`desktop/omarchy/`](desktop/omarchy/) for Hyprland (`the-shit.music` + Super+M summon). It is not the `omarchy plugin add` flow — use the QML plugin for the bar chip, and the in-repo desktop app only if you want the full-window player on Omarchy/Hyprland.
+
 ## Quick Start
 
 ```bash
@@ -53,13 +55,13 @@ spotify player:premium
 
 ## And it's a full Spotify CLI
 
-The soundtrack is enforced, but the day-to-day tooling carries its weight too: 30+ commands, 12 MCP tools, mood-aware autopilot, event-driven integrations. Every feature is a layer you opt into — nothing assumes anything else is running.
+The soundtrack is enforced, but the day-to-day tooling carries its weight too: 40+ commands, 15 MCP tools, mood-aware autopilot, event-driven integrations. Every feature is a layer you opt into — nothing assumes anything else is running.
 
 | Layer | What it does | Required? |
 |---|---|---|
 | **CLI commands** | Play, pause, skip, queue, search, volume, shuffle, repeat | Just this |
 | **Premium player** | php-tui player with art, mood theming, search palette | `spotify player:premium` when you want it |
-| **MCP server** | 12 tools for AI assistants (Claude, etc.) to control Spotify | Configure if you use AI tools |
+| **MCP server** | 15 tools for AI assistants (Claude, etc.) to control Spotify | Configure if you use AI tools |
 | **Daemon** | Headless Spotify Connect speaker via spotifyd | Install if you want background playback |
 | **Media bridge** | macOS Control Center + media keys via native Swift | Install if you want media key control |
 | **Autopilot** | Background queue auto-refill with mood presets | Install if you want hands-off listening |
@@ -67,19 +69,19 @@ The soundtrack is enforced, but the day-to-day tooling carries its weight too: 3
 | **Webhooks** | Forward playback events to any URL with HMAC signing | Configure if you want event-driven automation |
 | **Event streaming** | JSON Lines event bus for track changes, state transitions | Enable if you're building on top of this |
 
-See the full [command reference](https://the-shit.github.io/music/commands.html) for all 32 commands.
+See the full [command reference](https://the-shit.github.io/music/commands.html) for all 40+ commands.
 
 ## Why This Instead Of...
 
 **spotify_player / ncspot / spotatui** — Great TUI players. But they only play music. No commit soundtrack, no MCP server, no queue intelligence, no integrations. If you just want a terminal UI, those are solid. If you want Spotify as composable infrastructure — and your git history to have a soundtrack — this is it.
 
-**Standalone MCP servers** — There are a handful on Smithery/GitHub. Most are weekend scripts with 3-5 tools and no maintenance. This is a real application with 12 MCP tools, 2 resources, battle-tested against Spotify's API deprecations, and actively maintained.
+**Standalone MCP servers** — There are a handful on Smithery/GitHub. Most are weekend scripts with 3-5 tools and no maintenance. This is a real application with 15 MCP tools, 2 resources, battle-tested against Spotify's API deprecations, and actively maintained.
 
-**The Spotify desktop app** — 800MB Electron app. This is 30 commands in a single binary.
+**The Spotify desktop app** — 800MB Electron app. This is 40+ commands in a single binary.
 
 ## MCP Server
 
-This CLI doubles as an [MCP server](https://the-shit.github.io/music/mcp.html) — AI assistants like Claude can control your Spotify directly. 12 tools for playback, queue, search, and discovery.
+This CLI doubles as an [MCP server](https://the-shit.github.io/music/mcp.html) — AI assistants like Claude can control your Spotify directly. 15 tools for playback, queue, search, discovery, and AI listening sessions.
 
 ```json
 {
@@ -92,7 +94,7 @@ This CLI doubles as an [MCP server](https://the-shit.github.io/music/mcp.html) �
 }
 ```
 
-See the [MCP setup docs](https://the-shit.github.io/music/mcp.html) for Claude Desktop, Claude Code, and OpenCode configuration.
+OpenCode uses a different shape — see the committed [`opencode.json`](opencode.json) (`mcp.spotify.type: local`). Full setup for Claude Desktop, Claude Code, and OpenCode is in the [MCP docs](https://the-shit.github.io/music/mcp.html).
 
 ## Mood-Aware Queue
 
@@ -159,18 +161,19 @@ CI runs three automated gates on every PR — no manual review bottleneck:
 
 | Gate | What it checks |
 |---|---|
-| **PHPStan** | Static analysis at level 5 (type safety, param mismatches) |
-| **Sentinel Gate** | Test coverage ≥ 50% |
+| **PHPStan** | Static analysis at level 6 (type safety, param mismatches) |
+| **Pint** | Code style (`composer lint:check`) |
+| **Sentinel Gate** | Test coverage ≥ 55% |
 | **Vibe Check** | Every commit has a Spotify track URL |
 
 All must pass. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup.
 
 ## Requirements
 
-- PHP 8.2+
+- PHP 8.4+
 - Composer
 - Spotify Premium account
-- A [Spotify Developer](https://developer.spotify.com/dashboard) application
+- A [Spotify Developer](https://developer.spotify.com/dashboard) application with redirect URI `http://127.0.0.1:8888/callback` (use `127.0.0.1`, not `localhost`)
 
 ## License
 

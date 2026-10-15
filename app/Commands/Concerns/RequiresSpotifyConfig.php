@@ -19,8 +19,15 @@ trait RequiresSpotifyConfig
             return true;
         }
 
-        error('Spotify is not configured');
-        info('Run "spotify setup" first');
+        if (! $auth->hasCredentials()) {
+            error('Spotify is not configured');
+            info('Run "spotify setup" first');
+
+            return false;
+        }
+
+        error('Not authenticated with Spotify');
+        info('Run "spotify login" first');
 
         return false;
     }

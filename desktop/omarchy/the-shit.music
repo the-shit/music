@@ -5,6 +5,7 @@ import base64
 import faulthandler
 import json
 import os
+import shutil
 import subprocess
 import threading
 import time
@@ -27,9 +28,34 @@ DBusGMainLoop(set_as_default=True)
 LOG_PATH = os.path.expanduser("~/.local/state/the-shit-music.log")
 
 APP_ID = "the-shit.music"
-SPOTIFY = os.path.expanduser("~/.config/composer/vendor/bin/spotify")
 CONFIG = os.path.expanduser("~/.config/spotify-cli")
 FONT = '"JetBrainsMono Nerd Font", monospace'
+
+
+def resolve_spotify_bin():
+    """Find the spotify CLI without assuming a Composer global path."""
+    override = os.environ.get("SPOTIFY_BIN")
+    if override and os.path.isfile(override) and os.access(override, os.X_OK):
+        return override
+
+    which = shutil.which("spotify")
+    if which:
+        return which
+
+    home = os.path.expanduser("~")
+    candidates = [
+        os.path.join(home, ".config", "composer", "vendor", "bin", "spotify"),
+        os.path.join(home, ".composer", "vendor", "bin", "spotify"),
+        os.path.join(home, ".local", "bin", "spotify"),
+        "/usr/local/bin/spotify",
+    ]
+    for path in candidates:
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return candidates[0]
+
+
+SPOTIFY = resolve_spotify_bin()
 ZOOM_PATH = os.path.expanduser("~/.local/state/the-shit-music-zoom")
 ZOOM_MIN = 0.85
 ZOOM_MAX = 2.0

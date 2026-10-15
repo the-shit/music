@@ -7,6 +7,7 @@ use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
+use function Laravel\Prompts\note;
 use function Laravel\Prompts\warning;
 
 class NowPlayingCommand extends Command
@@ -14,10 +15,10 @@ class NowPlayingCommand extends Command
     use RequiresSpotifyConfig;
 
     protected $signature = 'nowplaying
-        {--interval=3 : Polling interval in seconds}
-        {--stop : Kill any running nowplaying bridge}';
+        {--interval=3 : Polling interval in seconds (ignored; use setup:media-bridge)}
+        {--stop : Stop the Swift media bridge LaunchAgent}';
 
-    protected $description = 'Sync playback to macOS Control Center and enable media keys';
+    protected $description = 'Deprecated: use setup:media-bridge for macOS Control Center and media keys';
 
     public function handle(): int
     {
@@ -29,108 +30,35 @@ class NowPlayingCommand extends Command
             return self::FAILURE;
         }
 
-        $bridgeScript = $this->resolveBinFile('nowplaying-bridge.py');
-        $spotifyBin = $this->resolveSpotifyBin();
-        $interval = max(2, (int) $this->option('interval'));
-
-        if (! $bridgeScript || ! file_exists($bridgeScript)) {
-            error('Bridge script not found: nowplaying-bridge.py');
+        if (PHP_OS_FAMILY !== 'Darwin') {
+            error('Media keys / Control Center sync is only supported on macOS.');
+            note('On Linux, see specs/mpris/ for the planned MPRIS bridge.');
 
             return self::FAILURE;
         }
 
-        $python = trim(shell_exec('which python3') ?: '');
-        if ($python === '' || $python === '0') {
-            error('python3 not found — required for nowplaying bridge.');
+        warning('`spotify nowplaying` is deprecated.');
+        info('The Python nowplaying bridge was replaced by the Swift media bridge.');
+        note('Run: spotify setup:media-bridge');
+        note('Status: spotify setup:media-bridge --status');
 
-            return self::FAILURE;
-        }
-
-        info('Starting macOS NowPlaying bridge...');
-        $this->line('Media keys and Control Center widget will reflect Spotify playback.');
-        $this->line('Ctrl+C to stop.');
-        $this->newLine();
-
-        // Pipe `spotify watch --json` into the bridge script
-        $cmd = sprintf(
-            '%s watch --json --interval=%d | %s %s',
-            escapeshellarg($spotifyBin),
-            $interval,
-            escapeshellarg($python),
-            escapeshellarg($bridgeScript)
-        );
-
-        passthru($cmd, $exitCode);
-
-        return $exitCode === 0 ? self::SUCCESS : self::FAILURE;
-    }
-
-    /**
-     * Resolve a file from the bin/ directory, extracting from PHAR if needed.
-     *
-     * Inside a PHAR, external processes (python3, bash) cannot read files at
-     * phar:// URIs, so we copy the file to a temp directory first.
-     */
-    private function resolveBinFile(string $filename): ?string
-    {
-        $pharPath = \Phar::running(false);
-
-        if ($pharPath !== '') {
-            // Running inside a PHAR — extract to temp
-            $pharBinPath = \Phar::running(true).'/bin/'.$filename;
-
-            if (! file_exists($pharBinPath)) {
-                return null;
-            }
-
-            $tempDir = sys_get_temp_dir().'/spotify-cli-bin';
-            if (! is_dir($tempDir)) {
-                mkdir($tempDir, 0755, true);
-            }
-
-            $tempFile = $tempDir.'/'.$filename;
-
-            // Re-extract if missing or PHAR is newer than cached copy
-            if (! file_exists($tempFile) || filemtime($pharPath) > filemtime($tempFile)) {
-                copy($pharBinPath, $tempFile);
-                chmod($tempFile, 0755);
-            }
-
-            return $tempFile;
-        }
-
-        // Not in a PHAR — use the file directly from the project tree
-        $path = dirname(__DIR__, 2).'/bin/'.$filename;
-
-        return file_exists($path) ? $path : null;
-    }
-
-    /**
-     * Resolve the spotify binary path.
-     *
-     * Inside a PHAR the binary IS the PHAR file itself.
-     * Outside a PHAR it's the `spotify` script at the project root.
-     */
-    private function resolveSpotifyBin(): string
-    {
-        $pharPath = \Phar::running(false);
-
-        if ($pharPath !== '') {
-            return $pharPath;
-        }
-
-        return dirname(__DIR__, 2).'/spotify';
+        return self::FAILURE;
     }
 
     private function stopBridge(): int
     {
-        exec("pkill -f 'nowplaying-bridge.py'", $output, $code);
+        // Prefer the current Swift LaunchAgent; also clear any leftover Python bridge.
+        exec("pkill -f 'nowplaying-bridge.py' 2>/dev/null");
 
-        if ($code === 0) {
-            info('NowPlaying bridge stopped.');
-        } else {
-            warning('No running nowplaying bridge found.');
+        $exitCode = $this->call('setup:media-bridge', ['--uninstall' => true]);
+
+        if ($exitCode === self::SUCCESS) {
+            info('Media bridge stopped.');
+
+            return self::SUCCESS;
         }
+
+        warning('No running media bridge found. Try: spotify setup:media-bridge --status');
 
         return self::SUCCESS;
     }

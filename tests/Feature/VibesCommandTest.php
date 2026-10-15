@@ -137,6 +137,7 @@ describe('VibesCommand', function (): void {
 
         $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->andReturn(false);
+            $mock->shouldReceive('hasCredentials')->andReturn(false);
         });
         $this->mock(SpotifyDiscoveryService::class, function ($mock): void {
             $mock->shouldNotReceive('getTracks');

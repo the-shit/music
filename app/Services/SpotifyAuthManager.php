@@ -30,12 +30,29 @@ class SpotifyAuthManager
     }
 
     /**
-     * Check if Spotify is properly configured
+     * Check if API credentials (client id/secret) are present.
+     */
+    public function hasCredentials(): bool
+    {
+        return ! in_array($this->clientId, [null, '', '0'], true)
+            && ! in_array($this->clientSecret, [null, '', '0'], true);
+    }
+
+    /**
+     * Check if an access or refresh token is present (may still need refresh).
+     */
+    public function isAuthenticated(): bool
+    {
+        return ! in_array($this->accessToken, [null, '', '0'], true)
+            || ! in_array($this->refreshToken, [null, '', '0'], true);
+    }
+
+    /**
+     * Check if Spotify is fully ready (credentials + token).
      */
     public function isConfigured(): bool
     {
-        return ! in_array($this->clientId, [null, '', '0'], true) && ! in_array($this->clientSecret, [null, '', '0'], true)
-            && (! in_array($this->accessToken, [null, '', '0'], true) || ! in_array($this->refreshToken, [null, '', '0'], true));
+        return $this->hasCredentials() && $this->isAuthenticated();
     }
 
     /**

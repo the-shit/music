@@ -36,6 +36,9 @@ jobs:
       - name: Static analysis passes
         run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
 
+      - name: Code style passes
+        run: vendor/bin/pint --test
+
       - name: Install Box
         run: composer global require humbug/box --no-interaction
 

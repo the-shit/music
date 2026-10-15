@@ -21,14 +21,14 @@
 
     <div class="hero">
         <h1>MCP <span>Server</span></h1>
-        <p class="subtitle">Let your AI assistant control Spotify. 12 tools, 2 resources, one concept: it plays your music.</p>
+        <p class="subtitle">Let your AI assistant control Spotify. 15 tools, 2 resources, one concept: it plays your music.</p>
     </div>
 
     <div class="container">
 
         <div class="section">
             <h2>What is this?</h2>
-            <p>The Spotify CLI exposes an <a href="https://modelcontextprotocol.io">MCP server</a> so AI clients can search, play, pause, queue, and control Spotify directly. Built on <a href="https://github.com/laravel/mcp">laravel/mcp</a> with stdio transport.</p>
+            <p>The Spotify CLI exposes an <a href="https://modelcontextprotocol.io">MCP server</a> so AI clients can search, play, pause, queue, run listening sessions, and control Spotify directly. Built on <a href="https://github.com/laravel/mcp">laravel/mcp</a> with stdio transport.</p>
             <p>Once configured, ask your AI assistant to "play some chill music" or "what's currently playing?" and it just works.</p>
         </div>
 
@@ -65,6 +65,9 @@
                     <tr><td><code>devices</code></td><td>List available playback devices</td></tr>
                     <tr><td><code>shuffle</code></td><td>Toggle or set shuffle mode</td></tr>
                     <tr><td><code>repeat</code></td><td>Set repeat mode (off, track, context)</td></tr>
+                    <tr><td><code>session_start</code></td><td>Start an AI listening session from a natural-language vibe description</td></tr>
+                    <tr><td><code>session_status</code></td><td>Check current session phase, now-playing, and time remaining</td></tr>
+                    <tr><td><code>session_adjust</code></td><td>Adapt the remaining session from feedback ("more energy", "too intense")</td></tr>
                 </tbody>
             </table>
         </div>
@@ -117,13 +120,14 @@
 
         <div class="cmd-section">
             <h3>OpenCode</h3>
-            <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 12px;">Edit <code>opencode.json</code> or settings:</p>
+            <p style="color: var(--text-dim); font-size: 0.9rem; margin-bottom: 12px;">Edit <code>opencode.json</code> (see the repo's committed <code>opencode.json</code>):</p>
             <div class="code-block">
                 <pre>{
-  <span class="cmd">"mcpServers"</span>: {
+  <span class="cmd">"mcp"</span>: {
     <span class="cmd">"spotify"</span>: {
-      "command": "php",
-      "args": ["/absolute/path/to/spotify", "mcp:start", "spotify"]
+      "type": "local",
+      "enabled": true,
+      "command": ["php", "spotify", "mcp:start", "spotify"]
     }
   }
 }</pre>
@@ -131,7 +135,7 @@
         </div>
 
         <div class="global-note">
-            <strong>Tip:</strong> If you installed globally via Composer, replace the command with just <code>"command": "spotify"</code> and <code>"args": ["mcp:start", "spotify"]</code>. Find the path with <code>which spotify</code>.
+            <strong>Tip:</strong> If you installed globally via Composer, replace the command with just <code>"command": "spotify"</code> and <code>"args": ["mcp:start", "spotify"]</code> (Claude Desktop / Claude Code). Find the path with <code>which spotify</code>.
         </div>
 
     </div>
