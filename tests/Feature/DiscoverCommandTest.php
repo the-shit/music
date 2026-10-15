@@ -74,6 +74,7 @@ it('seeds from top artists when requested', function (): void {
 it('fails when not configured', function (): void {
     $authMock = Mockery::mock(SpotifyAuthManager::class);
     $authMock->shouldReceive('isConfigured')->andReturn(false);
+    $authMock->shouldReceive('hasCredentials')->andReturn(false);
     $this->app->instance(SpotifyAuthManager::class, $authMock);
 
     $this->artisan('discover', ['query' => 'test'])

@@ -38,6 +38,8 @@ describe('SpotifyAuthManager', function (): void {
                 unlink($this->tokenFile);
             }
 
+            expect($this->auth->hasCredentials())->toBeTrue();
+            expect($this->auth->isAuthenticated())->toBeFalse();
             expect($this->auth->isConfigured())->toBeFalse();
 
             file_put_contents($this->tokenFile, json_encode([
@@ -50,7 +52,17 @@ describe('SpotifyAuthManager', function (): void {
             $method->setAccessible(true);
             $method->invoke($this->auth);
 
+            expect($this->auth->isAuthenticated())->toBeTrue();
             expect($this->auth->isConfigured())->toBeTrue();
+        });
+
+        it('reports missing credentials separately from missing login', function (): void {
+            Config::set('spotify.client_id', '');
+            Config::set('spotify.client_secret', '');
+            $auth = new SpotifyAuthManager;
+
+            expect($auth->hasCredentials())->toBeFalse();
+            expect($auth->isConfigured())->toBeFalse();
         });
 
         it('reports configured when only refresh_token is available', function (): void {

@@ -31,10 +31,13 @@ jobs:
       - name: Run PHPStan
         run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
 
+      - name: Run Pint
+        run: vendor/bin/pint --test
+
       - uses: synapse-sentinel/gate@v1
         with:
           check: certify
-          coverage-threshold: 50
+          coverage-threshold: 55
           auto-merge: false
           coverage-comment: true
           github-token: ${{ secrets.GITHUB_TOKEN }}

@@ -121,6 +121,7 @@ describe('PulseCommand', function (): void {
     it('requires configuration', function (): void {
         $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
+            $mock->shouldReceive('hasCredentials')->once()->andReturn(false);
         });
 
         $this->artisan('pulse', ['--json' => true, '--max-ticks' => 1])

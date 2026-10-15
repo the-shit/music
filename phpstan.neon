@@ -2,11 +2,15 @@ parameters:
     paths:
         - app/
 
-    level: 5
+    level: 6
 
-    phpVersion: 80200
+    phpVersion: 80400
 
     ignoreErrors:
         - '#Strict comparison#'
         - '#While loop condition is always true#'
-
+        # Level 6 adds iterable value typing across Spotify API payloads.
+        # Raise intentionally; annotate arrays incrementally rather than block the level bump.
+        - identifier: missingType.iterableValue
+        # collect() on loosely typed agent/session payloads — same incremental path.
+        - identifier: argument.templateType

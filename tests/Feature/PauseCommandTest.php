@@ -44,12 +44,24 @@ describe('PauseCommand', function (): void {
     it('requires configuration', function (): void {
         $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
+            $mock->shouldReceive('hasCredentials')->once()->andReturn(false);
         });
 
         $this->artisan('pause')
             ->expectsOutputToContain('Spotify is not configured')
             ->expectsOutputToContain('Run "spotify setup" first')
+            ->assertExitCode(1);
+    });
 
+    it('requires login when credentials exist without a token', function (): void {
+        $this->mock(SpotifyAuthManager::class, function ($mock): void {
+            $mock->shouldReceive('isConfigured')->once()->andReturn(false);
+            $mock->shouldReceive('hasCredentials')->once()->andReturn(true);
+        });
+
+        $this->artisan('pause')
+            ->expectsOutputToContain('Not authenticated with Spotify')
+            ->expectsOutputToContain('Run "spotify login" first')
             ->assertExitCode(1);
     });
 

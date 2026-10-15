@@ -8,6 +8,7 @@ use App\Services\SpotifyPlayerService;
 it('requires configuration', function (): void {
     $authMock = Mockery::mock(SpotifyAuthManager::class);
     $authMock->shouldReceive('isConfigured')->andReturn(false);
+    $authMock->shouldReceive('hasCredentials')->andReturn(false);
     $this->app->instance(SpotifyAuthManager::class, $authMock);
 
     $this->artisan('session', ['--mood' => 'flow'])

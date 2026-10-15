@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased
+
+### Fixed
+
+- Docs and setup truth: OAuth redirect URI is `127.0.0.1` (not `localhost`), PHP requirement aligned to 8.4+, command/MCP docs match the shipped CLI (15 MCP tools, premium player, sessions)
+- `spotify nowplaying` no longer looks for the deleted Python bridge — points at `setup:media-bridge`
+- Preflight errors distinguish missing credentials (`setup`) from missing login (`login`)
+- Omarchy GTK window resolves `spotify` via `PATH` / `SPOTIFY_BIN` instead of a hardcoded Composer path
+
+### Changed
+
+- PHPStan raised to level 6 (CI PHP 8.4); Pint runs in Smoke + Sentinel; coverage floor 55%
+- Removed stale silent `composer audit.ignore` entries (audit is clean)
+- Draft SPECs added for MPRIS, ListenBrainz, and god-command splits (`specs/`)
+
 ## v1.2.0 — 2026-08-26
 
 ### Fixed

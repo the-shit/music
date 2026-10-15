@@ -123,32 +123,29 @@ a:hover { text-decoration: underline; }
 .hero-commit .check { color: var(--green); font-weight: 700; }
 .hero-commit .comment { color: var(--text-muted); }
 
-/* Media placeholder — slot for the player screenshot/GIF */
-.media-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-height: 220px;
+/* Player demo on the docs homepage */
+.media-demo {
     margin: 24px 0;
-    background:
-        radial-gradient(circle at 50% 0%, rgba(29, 185, 84, 0.06), transparent 60%),
-        var(--surface);
-    border: 1px dashed var(--border);
+}
+
+.media-demo img {
+    display: block;
+    width: 100%;
+    height: auto;
     border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
 }
 
-.media-placeholder .mp-label {
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: var(--green);
-}
-
-.media-placeholder .mp-note {
-    font-size: 0.8rem;
+.media-demo figcaption {
+    margin-top: 10px;
+    font-size: 0.85rem;
     color: var(--text-muted);
+    text-align: center;
+}
+
+.media-demo figcaption code {
+    color: var(--green);
 }
 
 /* Container */

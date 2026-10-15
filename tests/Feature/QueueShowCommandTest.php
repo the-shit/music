@@ -10,6 +10,7 @@ describe('QueueShowCommand', function (): void {
     it('requires Spotify to be configured', function (): void {
         $this->mock(SpotifyAuthManager::class, function ($mock): void {
             $mock->shouldReceive('isConfigured')->once()->andReturn(false);
+            $mock->shouldReceive('hasCredentials')->once()->andReturn(false);
         });
 
         $this->artisan('queue:show')

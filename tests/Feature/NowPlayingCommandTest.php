@@ -12,9 +12,9 @@ describe('NowPlayingCommand', function (): void {
             expect($command->getName())->toBe('nowplaying');
         });
 
-        it('has a description', function (): void {
+        it('has a description pointing at the media bridge', function (): void {
             $command = $this->app->make(NowPlayingCommand::class);
-            expect($command->getDescription())->not->toBeEmpty();
+            expect($command->getDescription())->toContain('setup:media-bridge');
         });
 
         it('has --interval option with default of 3', function (): void {
@@ -34,14 +34,13 @@ describe('NowPlayingCommand', function (): void {
 
     describe('--stop flag', function (): void {
 
-        it('reports no bridge running when pkill finds nothing', function (): void {
-            $this->artisan('nowplaying', ['--stop' => true])
-                ->expectsOutputToContain('No running nowplaying bridge found.')
-                ->assertExitCode(0);
-        });
+        it('delegates uninstall and reports success', function (): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
+                // --stop does not call ensureConfigured
+            });
 
-        it('returns success exit code regardless of bridge state', function (): void {
             $this->artisan('nowplaying', ['--stop' => true])
+                ->expectsOutputToContain('Media bridge')
                 ->assertExitCode(0);
         });
 
@@ -49,53 +48,51 @@ describe('NowPlayingCommand', function (): void {
 
     describe('not configured guard', function (): void {
 
-        it('fails when not configured', function (): void {
+        it('fails when credentials are missing', function (): void {
             $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(false);
+                $mock->shouldReceive('hasCredentials')->once()->andReturn(false);
             });
 
             $this->artisan('nowplaying')
                 ->expectsOutputToContain('Spotify is not configured')
+                ->expectsOutputToContain('Run "spotify setup" first')
+                ->assertExitCode(1);
+        });
+
+        it('fails when credentials exist but login is missing', function (): void {
+            $this->mock(SpotifyAuthManager::class, function ($mock): void {
+                $mock->shouldReceive('isConfigured')->once()->andReturn(false);
+                $mock->shouldReceive('hasCredentials')->once()->andReturn(true);
+            });
+
+            $this->artisan('nowplaying')
+                ->expectsOutputToContain('Not authenticated with Spotify')
+                ->expectsOutputToContain('Run "spotify login" first')
                 ->assertExitCode(1);
         });
 
     });
 
-    describe('bridge script missing', function (): void {
+    describe('deprecated redirect', function (): void {
 
-        it('fails with error when bridge script does not exist', function (): void {
+        it('points users at setup:media-bridge when configured', function (): void {
             $this->mock(SpotifyAuthManager::class, function ($mock): void {
                 $mock->shouldReceive('isConfigured')->once()->andReturn(true);
             });
 
-            // Temporarily rename the bridge script so the command can't find it
-            $bridgeScript = base_path('bin/nowplaying-bridge.py');
-            $tempName = $bridgeScript.'.bak';
-            $renamed = false;
-            if (file_exists($bridgeScript)) {
-                rename($bridgeScript, $tempName);
-                $renamed = true;
+            $artisan = $this->artisan('nowplaying');
+
+            if (PHP_OS_FAMILY === 'Darwin') {
+                $artisan
+                    ->expectsOutputToContain('deprecated')
+                    ->expectsOutputToContain('setup:media-bridge')
+                    ->assertExitCode(1);
+            } else {
+                $artisan
+                    ->expectsOutputToContain('only supported on macOS')
+                    ->assertExitCode(1);
             }
-
-            $this->artisan('nowplaying')
-                ->expectsOutputToContain('Bridge script not found')
-                ->assertExitCode(1);
-
-            if ($renamed) {
-                rename($tempName, $bridgeScript);
-            }
-        });
-
-    });
-
-    describe('python3 not found', function (): void {
-
-        it('fails with error when python3 is not available', function (): void {
-            // We can test this by checking the command structure is correct
-            // The actual python3 check uses shell_exec('which python3')
-            // In a real test environment python3 is usually available
-            $command = $this->app->make(NowPlayingCommand::class);
-            expect($command)->toBeInstanceOf(NowPlayingCommand::class);
         });
 
     });

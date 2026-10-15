@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Commands — the-shit/music</title>
-    <meta name="description" content="Complete command reference for the-shit/music. 32 commands for playback, discovery, queue management, and more.">
+    <meta name="description" content="Complete command reference for the-shit/music. 40+ commands for playback, discovery, queue management, sessions, and more.">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -33,7 +33,8 @@
                 <tbody>
                     <tr><td><code>spotify setup</code></td><td>Set up Spotify API credentials with guided wizard</td></tr>
                     <tr><td><code>spotify login</code></td><td>Authenticate with Spotify via OAuth</td></tr>
-                    <tr><td><code>spotify daemon:setup</code></td><td>Set up the Spotify daemon with all dependencies</td></tr>
+                    <tr><td><code>spotify daemon setup</code></td><td>Set up the Spotify daemon with all dependencies</td></tr>
+                    <tr><td><code>spotify setup:media-bridge</code></td><td>Set up the Swift media bridge for macOS Control Center and media keys</td></tr>
                 </tbody>
             </table>
         </div>
@@ -48,6 +49,7 @@
                     <tr><td><code>spotify resume</code></td><td>Resume playback from where it was paused</td></tr>
                     <tr><td><code>spotify skip</code></td><td>Skip to next track</td></tr>
                     <tr><td><code>spotify skip prev</code></td><td>Skip to previous track</td></tr>
+                    <tr><td><code>spotify seek [position]</code></td><td>Seek to a position in the current track</td></tr>
                     <tr><td><code>spotify volume [level]</code></td><td>Show or set volume (absolute or relative like +10, -10)</td></tr>
                     <tr><td><code>spotify shuffle [on|off]</code></td><td>Toggle or set shuffle mode</td></tr>
                     <tr><td><code>spotify repeat [off|track|context]</code></td><td>Set repeat mode</td></tr>
@@ -64,6 +66,8 @@
                     <tr><td><code>spotify devices</code></td><td>List available Spotify devices</td></tr>
                     <tr><td><code>spotify top [tracks|artists]</code></td><td>Show your top tracks or artists</td></tr>
                     <tr><td><code>spotify recent</code></td><td>Show recently played tracks</td></tr>
+                    <tr><td><code>spotify pulse</code></td><td>Live listening vitals for observability</td></tr>
+                    <tr><td><code>spotify wrapped</code></td><td>Spotify-Wrapped for your commit soundtrack</td></tr>
                 </tbody>
             </table>
         </div>
@@ -75,7 +79,7 @@
                 <tbody>
                     <tr><td><code>spotify queue "query"</code></td><td>Add a track to the queue</td></tr>
                     <tr><td><code>spotify queue:show</code></td><td>Show upcoming tracks in the queue</td></tr>
-                    <tr><td><code>spotify queue:fill</code></td><td>Auto-fill queue using Spotify's recommendation engine</td></tr>
+                    <tr><td><code>spotify queue:fill</code></td><td>Auto-fill queue using recommendations / genre search fallbacks</td></tr>
                 </tbody>
             </table>
         </div>
@@ -86,10 +90,13 @@
                 <thead><tr><th>Command</th><th>Description</th></tr></thead>
                 <tbody>
                     <tr><td><code>spotify discover "query"</code></td><td>AI-friendly search combining keywords with listening patterns</td></tr>
+                    <tr><td><code>spotify find</code></td><td>Fuzzy typeahead search and play (or queue) tracks</td></tr>
                     <tr><td><code>spotify chill</code></td><td>Queue chill, relaxing music</td></tr>
                     <tr><td><code>spotify flow</code></td><td>Queue focus/flow state music for deep work</td></tr>
                     <tr><td><code>spotify hype</code></td><td>Queue high-energy hype tracks</td></tr>
                     <tr><td><code>spotify autopilot --mood=focus</code></td><td>Auto-refill queue using mood presets (chill, flow, hype, focus, party, upbeat, melancholy, ambient, workout, sleep)</td></tr>
+                    <tr><td><code>spotify session "description"</code></td><td>Start an AI-powered listening session with mood-aware phases</td></tr>
+                    <tr><td><code>spotify playlist:create "name"</code></td><td>Create a new Spotify playlist</td></tr>
                 </tbody>
             </table>
         </div>
@@ -100,7 +107,7 @@
                 <thead><tr><th>Command</th><th>Description</th></tr></thead>
                 <tbody>
                     <tr><td><code>spotify player</code></td><td>Launch interactive player with visual controls</td></tr>
-                    <tr><td><code>spotify inspire</code></td><td>Display an inspiring quote</td></tr>
+                    <tr><td><code>spotify player:premium</code></td><td>Premium php-tui player with album art, mood themes, lyrics, and search palette</td></tr>
                 </tbody>
             </table>
         </div>
@@ -114,6 +121,7 @@
                     <tr><td><code>spotify serve</code></td><td>Run the Spotify request server (accepts Slack slash commands)</td></tr>
                     <tr><td><code>spotify webhook:configure</code></td><td>Configure webhook for event forwarding</td></tr>
                     <tr><td><code>spotify webhook:test</code></td><td>Send a test ping to the configured webhook</td></tr>
+                    <tr><td><code>spotify history:backfill</code></td><td>Backfill listening history from events.jsonl into Qdrant</td></tr>
                 </tbody>
             </table>
         </div>
@@ -123,9 +131,9 @@
             <table class="cmd-table">
                 <thead><tr><th>Command</th><th>Description</th></tr></thead>
                 <tbody>
-                    <tr><td><code>spotify daemon</code></td><td>Manage the Spotify daemon for terminal playback</td></tr>
+                    <tr><td><code>spotify daemon</code></td><td>Manage the Spotify daemon for terminal playback (setup, start, stop, status, health, install, uninstall)</td></tr>
                     <tr><td><code>spotify autopilot</code></td><td>Run queue autopilot, or manage its LaunchAgent with --install/--status/--uninstall</td></tr>
-                    <tr><td><code>spotify nowplaying</code></td><td>Sync playback to macOS Control Center and enable media keys</td></tr>
+                    <tr><td><code>spotify nowplaying</code></td><td>Deprecated — use <code>setup:media-bridge</code> for macOS Control Center and media keys</td></tr>
                     <tr><td><code>spotify watch</code></td><td>Watch playback and stream events (track changes, play/pause)</td></tr>
                     <tr><td><code>spotify event:emit</code></td><td>Emit an event to the event bus</td></tr>
                     <tr><td><code>spotify vibes</code></td><td>Generate the vibes page — commits grouped by song</td></tr>

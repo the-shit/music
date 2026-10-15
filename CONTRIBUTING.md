@@ -61,7 +61,7 @@ Follow these steps on a clean machine to get fully operational.
 - PHP 8.4+ with `curl`, `mbstring`, `dom`, `xml` extensions
 - Composer
 - Spotify Premium account
-- A [Spotify Developer App](https://developer.spotify.com/dashboard) with `http://localhost:8888/callback` as a redirect URI
+- A [Spotify Developer App](https://developer.spotify.com/dashboard) with `http://127.0.0.1:8888/callback` as a redirect URI (must be `127.0.0.1`, not `localhost` — Spotify treats them as different origins)
 
 ### Steps
 
@@ -84,21 +84,26 @@ cp .env.example .env          # fill in SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SEC
 ### Verify everything works
 
 ```bash
-php vendor/bin/pest            # test suite
-vendor/bin/phpstan analyse     # static analysis
+composer test                  # Pest (pcntl_fork disabled — see tests/Pest.php)
+composer analyse               # PHPStan level 6
+composer lint:check            # Pint
 php spotify app:build spotify  # PHAR build (requires phar.readonly=0)
 ./builds/spotify list          # built binary boots
 ```
+
+Product backlog for agents lives under [`specs/`](specs/) (MPRIS, ListenBrainz, god-command splits).
 
 ---
 
 ## Running the test suite
 
 ```bash
-php vendor/bin/pest
+composer test                 # preferred — disables pcntl_fork for Prompts spin()
+# or:
+php -d disable_functions=pcntl_fork vendor/bin/pest
 ```
 
-Coverage must stay above 50% (enforced by Sentinel Gate).
+Coverage must stay above 55% (enforced by Sentinel Gate).
 
 ---
 
@@ -108,8 +113,8 @@ CI runs three gates on every PR:
 
 | Gate | What it checks |
 |---|---|
-| **Sentinel Gate** | Test coverage ≥ 50% |
+| **Sentinel Gate** | Test coverage ≥ 55%, PHPStan, Pint |
 | **Vibe Check** | Every commit has a Spotify track URL |
-| **Smoke Test** | App boots, tests pass, PHPStan clean, PHAR builds (PHP 8.4) |
+| **Smoke Test** | App boots, tests pass, PHPStan + Pint clean, PHAR builds (PHP 8.4) |
 
 All must pass. No exceptions.
