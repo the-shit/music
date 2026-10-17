@@ -77,12 +77,7 @@ final class MoodSearch
         if ($name === 'pest' && str_contains($artist, 'kwite')) {
             return true;
         }
-
-        if (str_contains($name, 'boom boom pow')) {
-            return true;
-        }
-
-        return false;
+        return str_contains($name, 'boom boom pow');
     }
 
     private static function normalize(string $value): string
