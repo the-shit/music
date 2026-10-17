@@ -6,6 +6,7 @@ use App\Commands\Concerns\RequiresSpotifyConfig;
 use App\Commands\Concerns\ResolvesDevice;
 use App\Services\SpotifyDiscoveryService;
 use App\Services\SpotifyPlayerService;
+use App\Support\SpotifyRateLimit;
 use LaravelZero\Framework\Commands\Command;
 
 use function Laravel\Prompts\error;
@@ -38,6 +39,23 @@ class PlayCommand extends Command
             error('❌ Please specify what to play');
             info('💡 Usage: spotify play "song name"');
             info('💡 Or use "spotify resume" to continue paused playback');
+
+            return self::FAILURE;
+        }
+
+        // Rate-limited: say so up front and send nothing (every further request
+        // can extend Spotify's Retry-After), instead of "No results found".
+        if (($reason = SpotifyRateLimit::describe()) !== null) {
+            if ($this->option('json')) {
+                $this->line((string) json_encode([
+                    'success' => false,
+                    'error' => 'rate_limited',
+                    'message' => $reason,
+                    'resumes_at' => SpotifyRateLimit::resumesAt(),
+                ]));
+            } else {
+                error('⏳ '.$reason);
+            }
 
             return self::FAILURE;
         }

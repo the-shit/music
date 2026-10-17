@@ -21,6 +21,9 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        config(['spotify.token_path' => sys_get_temp_dir().'/spotify-cli-test-'.getmypid().'/token.json']);
+        config([
+            'spotify.token_path' => sys_get_temp_dir().'/spotify-cli-test-'.getmypid().'/token.json',
+            'spotify.state_dir' => sys_get_temp_dir().'/spotify-cli-test-'.getmypid().'/state',
+        ]);
     }
 }

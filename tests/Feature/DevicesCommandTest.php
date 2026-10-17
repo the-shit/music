@@ -119,7 +119,7 @@ describe('DevicesCommand', function (): void {
             SpotifyRateLimit::hit('3600');
 
             $this->artisan('devices')
-                ->expectsOutputToContain('rate-limiting this app (HTTP 429)')
+                ->expectsOutputToContain('Spotify is rate-limiting requests (HTTP 429); try again after')
                 ->doesntExpectOutputToContain('No devices found')
                 ->assertExitCode(1);
         });
