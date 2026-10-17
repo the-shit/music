@@ -77,6 +77,7 @@ final class MoodSearch
         if ($name === 'pest' && str_contains($artist, 'kwite')) {
             return true;
         }
+
         return str_contains($name, 'boom boom pow');
     }
 
