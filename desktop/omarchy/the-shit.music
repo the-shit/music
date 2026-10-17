@@ -2,10 +2,12 @@
 """Tiled music window. Class the-shit.music. Chrome follows Omamail and the live theme."""
 
 import base64
+import datetime
 import faulthandler
 import json
 import os
 import subprocess
+import tempfile
 import threading
 import time
 import traceback
@@ -24,11 +26,21 @@ import dbus
 from dbus.mainloop.glib import DBusGMainLoop
 
 DBusGMainLoop(set_as_default=True)
-LOG_PATH = os.path.expanduser("~/.local/state/the-shit-music.log")
+LOG_PATH = os.path.expanduser(os.environ.get("THE_SHIT_MUSIC_LOG") or "~/.local/state/the-shit-music.log")
+LOG_MAX_BYTES = 2 * 1024 * 1024
 
 APP_ID = "the-shit.music"
 SPOTIFY = os.path.expanduser("~/.config/composer/vendor/bin/spotify")
-CONFIG = os.path.expanduser("~/.config/spotify-cli")
+CONFIG = os.path.expanduser(os.environ.get("THE_SHIT_MUSIC_CONFIG") or "~/.config/spotify-cli")
+# Overridable so tests can point the window at a local stub instead of Spotify.
+API_BASE = (os.environ.get("THE_SHIT_MUSIC_API_BASE") or API_BASE + "").rstrip("/")
+ACCOUNTS_BASE = (os.environ.get("THE_SHIT_MUSIC_ACCOUNTS_BASE") or "https://accounts.spotify.com").rstrip("/")
+# Quota discipline: the queue is fetched on track change / show / user action only.
+QUEUE_SAFETY_S = 120      # fallback refresh, only while the window is actually visible
+QUEUE_MIN_GAP_S = 3.0     # never fetch the queue more often than this
+SLIDER_DEBOUNCE_MS = 300  # seek/volume: one call after the slider settles
+SEARCH_DEBOUNCE_MS = 500
+SEARCH_MIN_CHARS = 2
 FONT = '"JetBrainsMono Nerd Font", monospace'
 ZOOM_PATH = os.path.expanduser("~/.local/state/the-shit-music-zoom")
 ZOOM_MIN = 0.85
@@ -200,7 +212,18 @@ def save_token(data):
     os.replace(temporary, path)
 
 
+_token_lock = threading.Lock()
+
+
 def access_token():
+    # Check the shared 429 deadline BEFORE touching accounts.spotify.com.
+    if rate_limited():
+        return None
+    with _token_lock:
+        return _access_token()
+
+
+def _access_token():
     token = read_json(os.path.join(CONFIG, "token.json"))
     expires = token.get("expires_at") or 0
     if token.get("access_token") and expires > time.time() + 60:
@@ -213,7 +236,7 @@ def access_token():
         return token.get("access_token")
     basic = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
     request = urllib.request.Request(
-        "https://accounts.spotify.com/api/token",
+        ACCOUNTS_BASE + "/api/token",
         data=urllib.parse.urlencode({
             "grant_type": "refresh_token",
             "refresh_token": refresh,
@@ -226,8 +249,15 @@ def access_token():
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
             payload = json.load(response)
+        note_line("api POST /api/token 200")
+    except urllib.error.HTTPError as exc:
+        note_line(f"api POST /api/token -> {exc.code}")
+        if exc.code == 429:
+            note_rate_limit(exc.headers.get("Retry-After"), "POST /api/token")
+        return None
     except (OSError, json.JSONDecodeError, urllib.error.URLError):
-        return token.get("access_token")
+        note_line("api POST /api/token failed (network)")
+        return None
     token["access_token"] = payload.get("access_token")
     token["expires_at"] = int(time.time()) + int(payload.get("expires_in") or 3600)
     if payload.get("refresh_token"):
@@ -240,25 +270,115 @@ def access_token():
 RATE_LIMIT = os.path.join(CONFIG, "rate-limit.json")
 
 
+def rate_limit_paths():
+    # Same locations as the PHP CLI (SpotifyRateLimit::paths): primary next to the token,
+    # then the writable fallbacks it uses when the config dir is read-only.
+    paths = [RATE_LIMIT]
+    state = (os.environ.get("SPOTIFY_CLI_STATE_DIR") or "").strip()
+    if state:
+        paths.append(os.path.join(state, "rate-limit.json"))
+    else:
+        xdg = (os.environ.get("XDG_STATE_HOME") or "").strip()
+        if xdg:
+            paths.append(os.path.join(xdg, "spotify-cli", "rate-limit.json"))
+        paths.append(os.path.join(tempfile.gettempdir(), f"spotify-cli-{os.getuid()}", "rate-limit.json"))
+    unique = []
+    for path in paths:
+        if path not in unique:
+            unique.append(path)
+    return unique
+
+
+def parse_deadline(value):
+    """Unix seconds from an epoch number or a local/ISO datetime ("2026-10-17 08:28:50" or "2026-10-17T08:28:50")."""
+    if value is None or isinstance(value, bool):
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return 0.0
+    try:
+        return float(text)
+    except ValueError:
+        pass
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    for candidate in (text, text.replace(" ", "T", 1), text.replace("T", " ", 1)):
+        try:
+            parsed = datetime.datetime.fromisoformat(candidate)
+        except ValueError:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.astimezone()
+        return parsed.timestamp()
+    return 0.0
+
+
+def rate_limit_deadline():
+    latest = 0.0
+    for path in rate_limit_paths():
+        try:
+            with open(path, encoding="utf-8") as handle:
+                raw = handle.read()
+        except OSError:
+            continue
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            data = raw
+        value = data.get("resumes_at") if isinstance(data, dict) else data
+        latest = max(latest, parse_deadline(value))
+    return latest
+
+
+_rate_limit_noted = [0]
+
+
 def rate_limited():
     # Shared with the PHP CLI (SpotifyRateLimit): one 429 pauses every client of this app.
-    return int(read_json(RATE_LIMIT).get("resumes_at") or 0) > time.time()
+    deadline = rate_limit_deadline()
+    if deadline <= time.time():
+        return False
+    if _rate_limit_noted[0] != int(deadline):
+        _rate_limit_noted[0] = int(deadline)
+        note_line("rate-limited until " + time.strftime("%Y-%m-%d %H:%M:%S %Z", time.localtime(deadline))
+                  + "; skipping Spotify calls")
+    return True
 
 
-def note_rate_limit(retry_after):
+def rate_limit_text():
+    deadline = rate_limit_deadline()
+    if deadline <= time.time():
+        return ""
+    return "Spotify rate-limited until " + time.strftime("%H:%M", time.localtime(deadline))
+
+
+def note_rate_limit(retry_after, where=""):
     try:
         seconds = max(1, int(retry_after or 60))
     except (TypeError, ValueError):
         seconds = 60
-    temporary = RATE_LIMIT + ".tmp"
-    with open(temporary, "w", encoding="utf-8") as handle:
-        json.dump({"resumes_at": int(time.time()) + seconds}, handle)
-    os.replace(temporary, RATE_LIMIT)
+    deadline = max(int(time.time()) + seconds, int(rate_limit_deadline()))
+    note_line(f"429 {where} retry-after {seconds}s -> resumes "
+              + time.strftime("%H:%M:%S", time.localtime(deadline)))
+    payload = json.dumps({"resumes_at": deadline})
+    for path in rate_limit_paths():
+        try:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            temporary = path + ".tmp"
+            with open(temporary, "w", encoding="utf-8") as handle:
+                handle.write(payload)
+            os.replace(temporary, path)
+            return
+        except OSError:
+            continue
 
 
 def api(method, url, token, body=None):
-    if rate_limited():
+    if not token or rate_limited():
         return None
+    path = urllib.parse.urlsplit(url).path
     data = b"" if body is None and method in {"POST", "PUT"} else None
     if body is not None:
         data = json.dumps(body).encode()
@@ -274,13 +394,19 @@ def api(method, url, token, body=None):
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
             raw = response.read()
+            status = response.status
     except urllib.error.HTTPError as exc:
+        note_line(f"api {method} {path} -> {exc.code}")
         if exc.code == 429:
-            note_rate_limit(exc.headers.get("Retry-After"))
+            note_rate_limit(exc.headers.get("Retry-After"), f"{method} {path}")
             return None
         if exc.code == 401:
             return None
         raise
+    except (OSError, urllib.error.URLError):
+        note_line(f"api {method} {path} failed (network)")
+        raise
+    note_line(f"api {method} {path} {status}")
     if not raw:
         return {}
     return json.loads(raw)
@@ -290,13 +416,10 @@ def account_playlists():
     token = access_token()
     if not token:
         return []
-    url = "https://api.spotify.com/v1/me/playlists?limit=50"
+    url = API_BASE + "/v1/me/playlists?limit=50"
     found = []
     while url and len(found) < 200:
         page = api("GET", url, token)
-        if page is None:
-            token = access_token()
-            page = api("GET", url, token) if token else None
         if not page:
             break
         for item in page.get("items") or []:
@@ -315,7 +438,7 @@ def playlist_tracks(playlist_id):
     token = access_token()
     if not token:
         return []
-    url = f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks?limit=100"
+    url = API_BASE + f"/v1/playlists/{playlist_id}/tracks?limit=100"
     rows = []
     while url and len(rows) < 200:
         page = api("GET", url, token) or {}
@@ -340,7 +463,7 @@ def add_to_playlist(playlist_id, uri):
         return False
     return api(
         "POST",
-        f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
+        API_BASE + f"/v1/playlists/{playlist_id}/tracks",
         token,
         {"uris": [uri]},
     ) is not None
@@ -352,14 +475,28 @@ def remove_from_playlist(playlist_id, uri):
         return False
     return api(
         "DELETE",
-        f"https://api.spotify.com/v1/playlists/{playlist_id}/tracks",
+        API_BASE + f"/v1/playlists/{playlist_id}/tracks",
         token,
         {"tracks": [{"uri": uri}]},
     ) is not None
 
 
-def thor_device(token):
-    devices = api("GET", "https://api.spotify.com/v1/me/player/devices", token) or {}
+_device = {"id": None, "active": False}
+_device_lock = threading.Lock()
+
+
+def forget_device():
+    with _device_lock:
+        _device["id"] = None
+        _device["active"] = False
+
+
+def thor_device(token, refresh=False):
+    # Cached: the device id only changes when spotifyd restarts. Callers refresh on 404 / no device.
+    with _device_lock:
+        if not refresh and _device["id"]:
+            return _device["id"], _device["active"]
+    devices = api("GET", API_BASE + "/v1/me/player/devices", token) or {}
     chosen = None
     for device in devices.get("devices") or []:
         if device.get("name") == device_name():
@@ -370,9 +507,38 @@ def thor_device(token):
             if device.get("is_active"):
                 chosen = device
                 break
-    if not chosen:
+    if not chosen or not chosen.get("id"):
+        forget_device()
         return None, False
-    return chosen.get("id"), bool(chosen.get("is_active"))
+    with _device_lock:
+        _device["id"] = chosen.get("id")
+        _device["active"] = bool(chosen.get("is_active"))
+    return _device["id"], _device["active"]
+
+
+def device_call(token, method, url, body=None):
+    """Player call on the cached device; on a 404 (stale id / NO_ACTIVE_DEVICE) refresh it once."""
+    for attempt in (0, 1):
+        with _device_lock:
+            cached = bool(_device["id"])
+        device_id, _active = thor_device(token, refresh=attempt == 1)
+        full = url
+        if device_id:
+            full += ("&" if "?" in url else "?") + "device_id=" + urllib.parse.quote(device_id)
+        try:
+            result = api(method, full, token, body)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404 and attempt == 0 and cached:
+                note_line("device 404, refreshing device id")
+                forget_device()
+                continue
+            raise
+        if result is not None:
+            with _device_lock:
+                if _device["id"]:
+                    _device["active"] = True
+        return result
+    return None
 
 
 def start_on_thor(body):
@@ -381,14 +547,16 @@ def start_on_thor(body):
         return False
     device_id, active = thor_device(token)
     if device_id and not active:
-        api("PUT", "https://api.spotify.com/v1/me/player", token, {
-            "device_ids": [device_id],
-            "play": False,
-        })
-    url = "https://api.spotify.com/v1/me/player/play"
-    if device_id:
-        url += "?device_id=" + urllib.parse.quote(device_id)
-    return api("PUT", url, token, body) is not None
+        try:
+            api("PUT", API_BASE + "/v1/me/player", token, {
+                "device_ids": [device_id],
+                "play": False,
+            })
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+            forget_device()
+    return device_call(token, "PUT", API_BASE + "/v1/me/player/play", body) is not None
 
 
 def play_playlist(uri):
@@ -399,7 +567,7 @@ def search_tracks(query):
     token = access_token()
     if not token:
         return []
-    url = "https://api.spotify.com/v1/search?" + urllib.parse.urlencode({
+    url = API_BASE + "/v1/search?" + urllib.parse.urlencode({
         "q": query,
         "type": "track",
         "limit": 5,
@@ -412,7 +580,7 @@ def search_catalog(query):
     token = access_token()
     if not token:
         return []
-    url = "https://api.spotify.com/v1/search?" + urllib.parse.urlencode({
+    url = API_BASE + "/v1/search?" + urllib.parse.urlencode({
         "q": query,
         "type": "track,artist,playlist",
         "limit": 5,
@@ -459,7 +627,7 @@ def artist_top_track(artist_id):
     token = access_token()
     if not token or not artist_id:
         return None
-    url = f"https://api.spotify.com/v1/artists/{artist_id}/top-tracks?market=US"
+    url = API_BASE + f"/v1/artists/{artist_id}/top-tracks?market=US"
     payload = api("GET", url, token) or {}
     tracks = payload.get("tracks") or []
     return tracks[0] if tracks else None
@@ -469,23 +637,17 @@ def seek_to(ms):
     token = access_token()
     if not token:
         return False
-    device_id, _active = thor_device(token)
-    url = "https://api.spotify.com/v1/me/player/seek?position_ms=" + str(max(0, int(ms)))
-    if device_id:
-        url += "&device_id=" + urllib.parse.quote(device_id)
-    return api("PUT", url, token) is not None
+    url = API_BASE + "/v1/me/player/seek?position_ms=" + str(max(0, int(ms)))
+    return device_call(token, "PUT", url) is not None
 
 
 def set_stream_volume(percent):
     token = access_token()
     if not token:
         return False
-    device_id, _active = thor_device(token)
     bounded = max(0, min(100, int(percent)))
-    url = "https://api.spotify.com/v1/me/player/volume?volume_percent=" + str(bounded)
-    if device_id:
-        url += "&device_id=" + urllib.parse.quote(device_id)
-    return api("PUT", url, token) is not None
+    url = API_BASE + "/v1/me/player/volume?volume_percent=" + str(bounded)
+    return device_call(token, "PUT", url) is not None
 
 
 def clock(ms):
@@ -503,11 +665,14 @@ def play_in_album(track):
     return False
 
 
-def upcoming():
+def queue_snapshot():
+    """(current uri, upcoming rows), or None when no call was made (no token / rate-limited)."""
     token = access_token()
     if not token:
-        return []
-    payload = api("GET", "https://api.spotify.com/v1/me/player/queue", token) or {}
+        return None
+    payload = api("GET", API_BASE + "/v1/me/player/queue", token)
+    if payload is None:
+        return None
     current = (payload.get("currently_playing") or {}).get("uri") or ""
     seen = {current} if current else set()
     rows = []
@@ -524,25 +689,27 @@ def upcoming():
         rows.append({"uri": uri, "label": label})
         if len(rows) == 20:
             break
-    return rows
+    return current, rows
+
+
+def upcoming():
+    snapshot = queue_snapshot()
+    return None if snapshot is None else snapshot[1]
 
 
 def enqueue(uri):
     if not uri:
         return "missing"
-    current_rows = upcoming()
+    snapshot = queue_snapshot()
+    if snapshot is None:
+        return "missing"
+    current, current_rows = snapshot
     token = access_token()
     if not token:
         return "missing"
-    player = api("GET", "https://api.spotify.com/v1/me/player", token) or {}
-    current = ((player.get("item") or {}).get("uri")) or ""
     if uri == current or any(row["uri"] == uri for row in current_rows):
         return "already"
-    device_id, _active = thor_device(token)
-    url = "https://api.spotify.com/v1/me/player/queue?uri=" + urllib.parse.quote(uri)
-    if device_id:
-        url += "&device_id=" + urllib.parse.quote(device_id)
-    api("POST", url, token)
+    device_call(token, "POST", API_BASE + "/v1/me/player/queue?uri=" + urllib.parse.quote(uri))
     return "added"
 
 
@@ -550,7 +717,7 @@ def playing_context():
     token = access_token()
     if not token:
         return ""
-    player = api("GET", "https://api.spotify.com/v1/me/player", token) or {}
+    player = api("GET", API_BASE + "/v1/me/player", token) or {}
     context = player.get("context") or {}
     return str(context.get("uri") or "")
 
@@ -562,10 +729,22 @@ def note_failure():
         traceback.print_exc(file=handle)
 
 
+_log_lock = threading.Lock()
+
+
 def note_line(text):
-    os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
-    with open(LOG_PATH, "a", encoding="utf-8") as handle:
-        handle.write(time.strftime("%H:%M:%S ") + text + "\n")
+    try:
+        os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+        with _log_lock:
+            try:
+                if os.path.getsize(LOG_PATH) > LOG_MAX_BYTES:
+                    os.replace(LOG_PATH, LOG_PATH + ".1")
+            except OSError:
+                pass
+            with open(LOG_PATH, "a", encoding="utf-8") as handle:
+                handle.write(time.strftime("%Y-%m-%d %H:%M:%S ") + text + "\n")
+    except OSError:
+        pass
 
 
 def spotify():
@@ -649,6 +828,22 @@ class Music:
         self.stop_audio = False
         self.audio_proc = None
         self.loop = GLib.MainLoop()
+        # Visibility: hidden on special:music (not shown) or unmapped => no API calls, no viz.
+        override = os.environ.get("THE_SHIT_MUSIC_VISIBLE", "")
+        self.force_visible = override if override in ("0", "1") else ""
+        self.visible = self.force_visible != "0"
+        self.queue_timer = 0
+        self.queue_busy = False
+        self.queue_again = False
+        self.queue_last = 0.0
+        self.track_key = None
+        self.seek_timer = 0
+        self.seek_pending = None
+        self.seek_hold_until = 0.0
+        self.volume_timer = 0
+        self.volume_pending = None
+        self.send_lock = threading.Lock()
+        self.playlists_loaded = False
 
     def run(self):
         GLib.set_prgname(APP_ID)
@@ -702,18 +897,20 @@ class Music:
         win.add_controller(wheel)
         win.connect("realize", self.on_realize)
         win.connect("map", self.on_realize)
+        win.connect("map", lambda *_: self.schedule_queue(500, "map"))
+        win.connect("unmap", lambda *_: self.set_visible(False))
         win.connect("close-request", self.on_close)
         note_line("present")
         win.present()
         GLib.timeout_add(1000, self.remember_workspace)
         GLib.idle_add(lambda: win.set_focus(None))
         GLib.idle_add(self.load_playlists)
-        GLib.idle_add(self.paint_queue)
         GLib.timeout_add(1000, self.refresh)
-        GLib.timeout_add(15000, self.paint_queue)
+        GLib.timeout_add_seconds(QUEUE_SAFETY_S, self.queue_safety_poll)
         GLib.timeout_add(33, self.tick_viz)
         threading.Thread(target=self.listen, daemon=True).start()
         self.refresh()
+        self.schedule_queue(500, "startup")
         self.loop.run()
 
     def header(self):
@@ -1006,7 +1203,7 @@ class Music:
             ctx.fill()
 
     def tick_viz(self):
-        if self.viz is not None:
+        if self.viz is not None and self.visible:
             self.viz.queue_draw()
         return True
 
@@ -1017,6 +1214,9 @@ class Music:
             note_line("no numpy, bars stay down")
             return
         while not self.stop_audio:
+            if not self.visible:
+                time.sleep(1)
+                continue
             proc = None
             try:
                 sink = subprocess.check_output(["pactl", "get-default-sink"], text=True).strip()
@@ -1028,7 +1228,7 @@ class Music:
                 self.audio_proc = proc
                 frame = 2048 * 2 * 2
                 window = np.hanning(2048).astype(np.float32)
-                while not self.stop_audio:
+                while not self.stop_audio and self.visible:
                     data = b""
                     while len(data) < frame and not self.stop_audio:
                         chunk = proc.stdout.read(frame - len(data))
@@ -1057,6 +1257,10 @@ class Music:
             finally:
                 if proc is not None and proc.poll() is None:
                     proc.kill()
+                if proc is not None:
+                    proc.wait()
+            if not self.stop_audio and self.visible:
+                time.sleep(1)  # pw-cat ended on its own: don't respawn in a tight loop
 
     def show_art(self, url):
         if not url or url == self.art_url:
@@ -1127,10 +1331,12 @@ class Music:
         return page
 
     def load_playlists(self):
+        limited = rate_limited()
         try:
-            playlists = account_playlists()
+            playlists = [] if limited else account_playlists()
         except (OSError, urllib.error.URLError, json.JSONDecodeError):
             playlists = []
+        self.playlists_loaded = bool(playlists) or not rate_limited()
         if self.rail_box is None:
             return False
         while self.rail_box.get_first_child() is not None:
@@ -1139,7 +1345,7 @@ class Music:
         self.hot_slots = []
         self.rail_button("playing", "Playing", "", self.show_playing)
         if not playlists:
-            missing = Gtk.Label(label="No playlists", css_classes=["artist"])
+            missing = Gtk.Label(label=rate_limit_text() or "No playlists", css_classes=["artist"])
             missing.set_margin_start(14)
             missing.set_halign(Gtk.Align.START)
             self.rail_box.append(missing)
@@ -1315,16 +1521,20 @@ class Music:
             GLib.source_remove(self.search_timer)
             self.search_timer = 0
         text = entry.get_text().strip()
-        if not text:
-            self.results = []
-            self.result_index = 0
-            self.paint_results()
+        if len(text) < SEARCH_MIN_CHARS:
+            if self.results:
+                self.results = []
+                self.result_index = 0
+                self.paint_results()
             return
-        self.search_timer = GLib.timeout_add(220, lambda query=text: self.run_search(query))
+        self.search_timer = GLib.timeout_add(SEARCH_DEBOUNCE_MS, lambda query=text: self.run_search(query))
 
     def run_search(self, query):
         self.search_timer = 0
         if self.search is None or self.search.get_text().strip() != query:
+            return False
+        if rate_limited():
+            self.say(rate_limit_text())
             return False
         try:
             self.results = search_catalog(query)
@@ -1395,7 +1605,7 @@ class Music:
         except (OSError, urllib.error.URLError, json.JSONDecodeError):
             self.say("Couldn't start that")
             return
-        GLib.timeout_add(700, self.paint_queue)
+        self.schedule_queue(1200, "user")
 
     def queue_selected(self):
         row = self.selected_result()
@@ -1411,7 +1621,9 @@ class Music:
             self.say(f"{row['name']} is already queued")
         elif result == "added":
             self.say(f"Queued {row['name']}")
-        GLib.timeout_add(700, self.paint_queue)
+        elif rate_limited():
+            self.say(rate_limit_text())
+        self.schedule_queue(1200, "user")
 
     def add_selected_to_playlist(self):
         row = self.selected_result()
@@ -1569,32 +1781,105 @@ class Music:
         self.message_timer = GLib.timeout_add(2500, clear)
 
     def paint_queue(self):
-        try:
-            rows = upcoming()
-        except (OSError, urllib.error.URLError, json.JSONDecodeError):
-            return True
-        if self.next_label is not None:
+        # One-shot. (The old version returned True, so every idle_add/timeout_add of it
+        # became a permanent poller; the startup idle_add was a busy loop.)
+        self.schedule_queue(0, "manual")
+        return False
+
+    def schedule_queue(self, delay_ms, reason):
+        if not self.visible:
+            return
+        if self.queue_timer:
+            GLib.source_remove(self.queue_timer)
+        self.queue_timer = GLib.timeout_add(max(0, int(delay_ms)), self.fire_queue)
+
+    def fire_queue(self):
+        self.queue_timer = 0
+        if not self.visible or rate_limited():
+            return False
+        if self.queue_busy:
+            self.queue_again = True
+            return False
+        since = time.monotonic() - self.queue_last
+        if since < QUEUE_MIN_GAP_S:
+            self.queue_timer = GLib.timeout_add(int((QUEUE_MIN_GAP_S - since) * 1000) + 50, self.fire_queue)
+            return False
+        self.queue_busy = True
+        self.queue_last = time.monotonic()
+
+        def work():
+            try:
+                rows = upcoming()
+            except (OSError, urllib.error.URLError, json.JSONDecodeError):
+                rows = None
+            GLib.idle_add(self.apply_queue, rows)
+
+        threading.Thread(target=work, daemon=True).start()
+        return False
+
+    def apply_queue(self, rows):
+        self.queue_busy = False
+        if rows is not None and self.next_label is not None:
             self.next_label.set_label("Next   " + rows[0]["label"] if rows else "")
+        if self.queue_again:
+            self.queue_again = False
+            self.schedule_queue(500, "again")
+        return False
+
+    def queue_safety_poll(self):
+        if self.visible:
+            self.schedule_queue(0, "safety")
         return True
+
+    def set_visible(self, visible):
+        if self.force_visible:
+            visible = self.force_visible == "1"
+        if visible == self.visible:
+            return
+        self.visible = visible
+        note_line("shown" if visible else "hidden")
+        if not visible:
+            if self.queue_timer:
+                GLib.source_remove(self.queue_timer)
+                self.queue_timer = 0
+            return
+        self.refresh()
+        if not self.playlists_loaded and not rate_limited():
+            GLib.idle_add(self.load_playlists)
+        self.schedule_queue(300, "shown")
 
     def remember_workspace(self):
         try:
             clients = json.loads(subprocess.check_output(["hyprctl", "clients", "-j"], text=True))
-            active = json.loads(subprocess.check_output(["hyprctl", "activewindow", "-j"], text=True))
-        except (OSError, json.JSONDecodeError):
+            monitors = json.loads(subprocess.check_output(["hyprctl", "monitors", "-j"], text=True))
+        except (OSError, ValueError, subprocess.CalledProcessError):
             return True
-        workspace = ""
+        mine = None
         for client in clients:
-            if client.get("class") == "the-shit.music":
-                workspace = str((client.get("workspace") or {}).get("name") or "")
+            if client.get("pid") == os.getpid():
+                mine = client
                 break
+        if mine is None:
+            self.set_visible(False)
+            return True
+        workspace = str((mine.get("workspace") or {}).get("name") or "")
+        shown = set()
+        for monitor in monitors:
+            shown.add(str((monitor.get("activeWorkspace") or {}).get("name") or ""))
+            shown.add(str((monitor.get("specialWorkspace") or {}).get("name") or ""))
+        shown.discard("")
+        self.set_visible(bool(mine.get("mapped", True)) and not mine.get("hidden") and workspace in shown)
         if not workspace:
             return True
         if self.seen_workspace is None:
             self.seen_workspace = workspace
             return True
         if workspace != self.seen_workspace:
-            if (active or {}).get("class") == "the-shit.music":
+            try:
+                active = json.loads(subprocess.check_output(["hyprctl", "activewindow", "-j"], text=True))
+            except (OSError, ValueError, subprocess.CalledProcessError):
+                active = {}
+            if (active or {}).get("pid") == os.getpid():
                 path = os.path.expanduser("~/.local/state/the-shit-music-workspace")
                 try:
                     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -1622,6 +1907,8 @@ class Music:
             pass
 
     def refresh(self):
+        if not self.visible:
+            return True
         try:
             props, _player = spotify()
             title, artist, album, play, state = meta_text(props)
@@ -1637,13 +1924,23 @@ class Music:
                 self.bar_artist.set_label(artist)
             if props is not None:
                 metadata = props.Get("org.mpris.MediaPlayer2.Player", "Metadata")
-                length = int(metadata.get("mpris:length") or 0)
-                position = int(props.Get("org.mpris.MediaPlayer2.Player", "Position") or 0)
+                # MPRIS reports microseconds; the Web API seek wants milliseconds.
+                length = int(metadata.get("mpris:length") or 0) // 1000
+                position = int(props.Get("org.mpris.MediaPlayer2.Player", "Position") or 0) // 1000
+                if length:
+                    position = min(max(0, position), length)
                 self.track_length_ms = length
+                key = str(metadata.get("mpris:trackid") or "") or f"{title}|{artist}"
+                if key != self.track_key:
+                    changed = self.track_key is not None
+                    self.track_key = key
+                    if changed:
+                        self.schedule_queue(1500, "track")
                 fraction = min(1.0, position / length) if length else 0
                 if self.progress is not None:
                     self.progress.set_fraction(fraction)
-                if self.seek is not None and not self.seek.has_focus():
+                if (self.seek is not None and not self.seek.has_focus()
+                        and time.monotonic() > self.seek_hold_until):
                     self.seek.set_value(fraction * 1000)
                 if self.time_label is not None:
                     self.time_label.set_label(f"{clock(position)} / {clock(length)}")
@@ -1653,35 +1950,75 @@ class Music:
         return True
 
     def on_seek(self, _scale, _scroll, value):
-        if self.track_length_ms:
-            try:
-                seek_to(self.track_length_ms * (float(value) / 1000))
-            except (OSError, urllib.error.URLError, json.JSONDecodeError):
-                self.say("Couldn't seek")
+        # change-value fires on every drag step: remember the value, send once it settles.
+        self.seek_pending = min(1000.0, max(0.0, float(value)))
+        self.seek_hold_until = time.monotonic() + 2.0
+        if self.seek_timer:
+            GLib.source_remove(self.seek_timer)
+        self.seek_timer = GLib.timeout_add(SLIDER_DEBOUNCE_MS, self.flush_seek)
+        return False
+
+    def flush_seek(self):
+        self.seek_timer = 0
+        value, self.seek_pending = self.seek_pending, None
+        if value is None or not self.track_length_ms:
+            return False
+        if rate_limited():
+            self.say(rate_limit_text())
+            return False
+        target = self.track_length_ms * (value / 1000)
+        self.seek_hold_until = time.monotonic() + 2.0
+        self.send(lambda: seek_to(target), "Couldn't seek")
         return False
 
     def on_volume(self, _scale, _scroll, value):
-        try:
-            set_stream_volume(value)
-        except (OSError, urllib.error.URLError, json.JSONDecodeError):
-            self.say("Couldn't set volume")
+        self.volume_pending = min(100.0, max(0.0, float(value)))
+        if self.volume_timer:
+            GLib.source_remove(self.volume_timer)
+        self.volume_timer = GLib.timeout_add(SLIDER_DEBOUNCE_MS, self.flush_volume)
         return False
+
+    def flush_volume(self):
+        self.volume_timer = 0
+        value, self.volume_pending = self.volume_pending, None
+        if value is None:
+            return False
+        if rate_limited():
+            self.say(rate_limit_text())
+            return False
+        self.send(lambda: set_stream_volume(value), "Couldn't set volume")
+        return False
+
+    def send(self, call, failure):
+        def work():
+            with self.send_lock:
+                try:
+                    ok = call()
+                except (OSError, urllib.error.URLError, json.JSONDecodeError):
+                    ok = False
+            if not ok:
+                GLib.idle_add(lambda: self.say(failure) and False)
+
+        threading.Thread(target=work, daemon=True).start()
 
     def on_previous(self, _button):
         _props, player = spotify()
         if player is not None:
             player.Previous()
+            self.schedule_queue(1500, "user")
 
     def on_next(self, _button):
         _props, player = spotify()
         if player is not None:
             player.Next()
+            self.schedule_queue(1500, "user")
 
     def on_toggle(self, _button):
         _props, player = spotify()
         if player is not None:
             player.PlayPause()
-            GLib.timeout_add(200, self.refresh)
+            # One-shot: refresh() returns True, so passing it directly leaked a 200 ms timer per toggle.
+            GLib.timeout_add(200, lambda: self.refresh() and False)
 
 
 def main():
