@@ -61,6 +61,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | State Directory
+    |--------------------------------------------------------------------------
+    |
+    | Writable fallback for runtime state (the 429 rate-limit marker) when the
+    | token directory is read-only, e.g. bind-mounted into a container. When
+    | unset: $XDG_STATE_HOME/spotify-cli, then the system temp dir.
+    |
+    */
+
+    'state_dir' => env('SPOTIFY_CLI_STATE_DIR'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Qdrant Event Sink
     |--------------------------------------------------------------------------
     |

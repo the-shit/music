@@ -78,11 +78,7 @@ final class MoodSearch
             return true;
         }
 
-        if (str_contains($name, 'boom boom pow')) {
-            return true;
-        }
-
-        return false;
+        return str_contains($name, 'boom boom pow');
     }
 
     private static function normalize(string $value): string

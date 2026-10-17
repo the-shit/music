@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use Illuminate\Http\Client\Response;
+use Throwable;
 
 /**
  * Circuit breaker for Spotify Web API 429s.
@@ -17,6 +20,12 @@ use Illuminate\Http\Client\Response;
  * all API calls until it passes: callers get the same graceful empties they
  * already return on failure, WITHOUT touching the network.
  *
+ * The token directory may be READ-ONLY (e.g. bind-mounted into a container).
+ * Recording a 429 must never crash the command, so writes fall back to a
+ * writable state dir (SPOTIFY_CLI_STATE_DIR, else $XDG_STATE_HOME/spotify-cli,
+ * else the system temp dir) and finally to an in-process deadline. Reads take
+ * the latest deadline from every location.
+ *
  * Static on purpose: it is shared process-wide, has no dependencies beyond
  * config('spotify.token_path'), and the services already construct their HTTP
  * calls inline — guard() wraps a call site in one line.
@@ -25,6 +34,11 @@ final class SpotifyRateLimit
 {
     /** Cool-down (seconds) when a 429 arrives without a Retry-After header. */
     private const DEFAULT_RETRY_AFTER = 60;
+
+    private const FILE = 'rate-limit.json';
+
+    /** Deadline recorded in this process (survives an unwritable marker). */
+    private static ?int $memory = null;
 
     /**
      * Run a Spotify Web API call through the breaker: while rate-limited the
@@ -51,18 +65,22 @@ final class SpotifyRateLimit
 
     /**
      * Record a 429: persist the resume deadline derived from Retry-After.
+     * Never throws — a read-only config dir must not turn a 429 into a crash.
      */
     public static function hit(?string $retryAfter): void
     {
         $seconds = max(1, (int) ($retryAfter ?: self::DEFAULT_RETRY_AFTER));
+        $deadline = time() + $seconds;
 
-        $file = self::path();
-        $dir = dirname($file);
-        if (! is_dir($dir)) {
-            mkdir($dir, 0755, true);
+        self::$memory = max(self::$memory ?? 0, $deadline);
+
+        $payload = (string) json_encode(['resumes_at' => $deadline]);
+
+        foreach (self::paths() as $file) {
+            if (self::write($file, $payload)) {
+                return;
+            }
         }
-
-        file_put_contents($file, json_encode(['resumes_at' => time() + $seconds]));
     }
 
     /**
@@ -80,22 +98,34 @@ final class SpotifyRateLimit
      */
     public static function resumesAt(): ?int
     {
-        $file = self::path();
+        $now = time();
+        $latest = null;
 
-        if (! is_file($file)) {
-            return null;
+        if (self::$memory !== null) {
+            if (self::$memory > $now) {
+                $latest = self::$memory;
+            } else {
+                self::$memory = null;
+            }
         }
 
-        $data = json_decode((string) file_get_contents($file), true);
-        $deadline = (int) (is_array($data) ? ($data['resumes_at'] ?? 0) : 0);
+        foreach (self::paths() as $file) {
+            $deadline = self::read($file);
 
-        if ($deadline <= time()) {
-            @unlink($file);
+            if ($deadline === null) {
+                continue;
+            }
 
-            return null;
+            if ($deadline <= $now) {
+                @unlink($file);
+
+                continue;
+            }
+
+            $latest = max($latest ?? 0, $deadline);
         }
 
-        return $deadline;
+        return $latest;
     }
 
     /**
@@ -113,9 +143,12 @@ final class SpotifyRateLimit
             return null;
         }
 
+        $minutes = max(1, (int) ceil(($resumesAt - time()) / 60));
+
         return sprintf(
-            'Spotify is rate-limiting this app (HTTP 429) until %s. Device and playback calls are paused until then.',
-            date('Y-m-d H:i T', $resumesAt),
+            'Spotify is rate-limiting requests (HTTP 429); try again after %s (about %d min).',
+            self::formatTime($resumesAt),
+            $minutes,
         );
     }
 
@@ -124,15 +157,93 @@ final class SpotifyRateLimit
      */
     public static function clear(): void
     {
-        @unlink(self::path());
+        self::$memory = null;
+
+        foreach (self::paths() as $file) {
+            @unlink($file);
+        }
     }
 
     /**
-     * The deadline lives alongside the OAuth token so every command/daemon
-     * process shares one breaker (and it survives restarts).
+     * Marker locations, primary first. The primary lives alongside the OAuth
+     * token so every command/daemon process shares one breaker (and it
+     * survives restarts); the rest are writable fallbacks.
+     *
+     * @return list<string>
      */
-    private static function path(): string
+    private static function paths(): array
     {
-        return dirname((string) config('spotify.token_path')).'/rate-limit.json';
+        $paths = [dirname((string) config('spotify.token_path')).'/'.self::FILE];
+
+        $stateDir = config('spotify.state_dir');
+
+        if (is_string($stateDir) && trim($stateDir) !== '') {
+            $paths[] = rtrim(trim($stateDir), '/').'/'.self::FILE;
+        } else {
+            $xdg = getenv('XDG_STATE_HOME');
+
+            if (is_string($xdg) && trim($xdg) !== '') {
+                $paths[] = rtrim(trim($xdg), '/').'/spotify-cli/'.self::FILE;
+            }
+
+            $user = function_exists('posix_getuid') ? (string) posix_getuid() : get_current_user();
+            $paths[] = rtrim(sys_get_temp_dir(), '/').'/spotify-cli-'.$user.'/'.self::FILE;
+        }
+
+        return array_values(array_unique($paths));
+    }
+
+    private static function read(string $file): ?int
+    {
+        if (! is_file($file) || ! is_readable($file)) {
+            return null;
+        }
+
+        $raw = @file_get_contents($file);
+
+        if (! is_string($raw)) {
+            return null;
+        }
+
+        $data = json_decode($raw, true);
+        $deadline = (int) (is_array($data) ? ($data['resumes_at'] ?? 0) : 0);
+
+        return $deadline > 0 ? $deadline : null;
+    }
+
+    private static function write(string $file, string $payload): bool
+    {
+        try {
+            $dir = dirname($file);
+
+            if (! is_dir($dir) && ! @mkdir($dir, 0700, true) && ! is_dir($dir)) {
+                return false;
+            }
+
+            return @file_put_contents($file, $payload) !== false;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Local wall-clock time for the deadline, honouring $TZ when set.
+     */
+    private static function formatTime(int $timestamp): string
+    {
+        $zone = null;
+        $tz = getenv('TZ');
+
+        if (is_string($tz) && $tz !== '') {
+            try {
+                $zone = new DateTimeZone(ltrim($tz, ':'));
+            } catch (Throwable) {
+                $zone = null;
+            }
+        }
+
+        $zone ??= new DateTimeZone(date_default_timezone_get());
+
+        return (new DateTimeImmutable('@'.$timestamp))->setTimezone($zone)->format('g:i A T');
     }
 }
